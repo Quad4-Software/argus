@@ -1,0 +1,11 @@
+# cargo-dist release config: https://opensource.axo.dev/cargo-dist/
+# Enables: github releases with musl static binaries, shell installers,
+# homebrew tap, and checksums. Run `dist init` to regenerate workflow.
+[workspace]
+# members are resolved via Cargo.toml
+[dist]
+cargo-dist-version = "0.28.0"
+ci = "github"
+installers = ["shell", "powershell", "homebrew"]
+targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl", "x86_64-apple-darwin", "aarch64-apple-darwin", "x86_64-pc-windows-msvc"]
+pr-run-mode = "plan"
