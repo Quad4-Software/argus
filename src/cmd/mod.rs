@@ -17,3 +17,4 @@ pub(crate) use misc::*;
 pub(crate) use remote::*;
 pub(crate) use sandbox_apply::*;
 pub(crate) use watcher::*;
+pub(crate) mod similar_cmd;

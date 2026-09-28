@@ -40,5 +40,3 @@ matched evidence, and a remediation hint. Exit code 1 when findings meet
 - Rules live in TOML and can be replaced or extended without rebuilding
 - Scans run under Linux Landlock: no network for local scans, read-only
   filesystem, writes only where the command needs them
-- Everything argus can do is also a `cargo test` contract: the ruleset
-  corpus and the arch gate keep new rules and code honest

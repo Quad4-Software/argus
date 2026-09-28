@@ -7,6 +7,10 @@
 [![last commit](https://img.shields.io/github/last-commit/Quad4-Software/argus?style=flat-square&color=1f2430&label=last%20commit)](https://github.com/Quad4-Software/argus)
 [![top language](https://img.shields.io/github/languages/top/Quad4-Software/argus?style=flat-square&color=1f2430)](https://github.com/Quad4-Software/argus)
 
+> [!IMPORTANT]
+> Open-weight LLMs are used to assist development of this tool. Those
+> models are: GLM 5.3-flash, Qwen 3.8 and Kimi K3.
+
 Supply-chain security and repository-forensics scanner. One static
 binary checks local checkouts, GitHub/GitLab/Gitea orgs, container
 images, web front-ends, and the host for leaked secrets, known-bad
@@ -39,6 +43,8 @@ Full documentation lives in [docs/](docs/index.md) and on the
 [documentation site](https://quad4-software.github.io/argus/):
 
 - [Commands](docs/commands.md) - every subcommand, what it does, examples
+- `argus similar` and `scan --similar` find copied or vendored code by
+  normalized-token winnowing fingerprints, robust to renames
 - [Configuration](docs/config.md) - flags < env < TOML, tokens, offline, sandbox
 - [Output and CI](docs/output.md) - formats, baselines, VEX, CI wiring
 - [Rulesets](docs/rulesets.md) - TOML rule format and the test corpus

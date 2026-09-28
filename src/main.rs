@@ -27,6 +27,7 @@ mod sandbox;
 mod sbom;
 mod scan;
 mod settings;
+mod similar;
 mod sysaudit;
 mod verify;
 mod vex;
@@ -255,6 +256,18 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
                 });
                 report.findings.append(&mut findings);
             }
+            if let Some(refpath) = &cli.similar {
+                crate::cmd::similar_cmd::vendored_check(
+                    paths,
+                    refpath,
+                    &opts,
+                    &mut report,
+                    cli.verbose,
+                );
+            }
+        }
+        Cmd::Similar { a, b } => {
+            crate::cmd::similar_cmd::similar_cmd(a, b.as_deref(), &opts, &mut report);
         }
         Cmd::Roam(a) => {
             roam_cmd(cli, a, &cfg, &rules, &opts, &mut report)?;

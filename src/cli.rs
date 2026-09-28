@@ -194,6 +194,14 @@ pub struct Cli {
     pub dep_check: bool,
 
     #[arg(
+        long = "similar",
+        global = true,
+        value_name = "PATH",
+        help = "Vendored-code check: compare scanned files against this reference tree (winnowing fingerprints)"
+    )]
+    pub similar: Option<PathBuf>,
+
+    #[arg(
         long = "internal-prefix",
         global = true,
         help = "Mark dep names with these prefixes as organization-internal (dependency-confusion)"
@@ -377,6 +385,15 @@ pub enum Cmd {
     Verify {
         /// Paths to scan for secrets (default: .)
         paths: Vec<PathBuf>,
+    },
+
+    /// Code similarity scoring: normalized-token winnowing fingerprints.
+    /// Two paths = pair score; one path = near-duplicate pairs inside it.
+    Similar {
+        /// Left side (file or directory).
+        a: PathBuf,
+        /// Right side (file or directory). Omit for internal dedup of `a`.
+        b: Option<PathBuf>,
     },
 
     /// Audit a container image: baked-in secrets, root user, history

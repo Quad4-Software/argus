@@ -59,6 +59,15 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
     match &cli.cmd {
         Cmd::Scan { paths } => {
             sb.reads.extend(paths.iter().cloned());
+            if let Some(r) = &cli.similar {
+                sb.reads.push(r.clone());
+            }
+        }
+        Cmd::Similar { a, b } => {
+            sb.reads.push(a.clone());
+            if let Some(b) = b {
+                sb.reads.push(b.clone());
+            }
         }
         Cmd::System { extra } => {
             sb.reads.extend(extra.iter().cloned());

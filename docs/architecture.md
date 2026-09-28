@@ -40,17 +40,3 @@ ports (or open for forge APIs). Missing kernel support degrades to a
 warning. The `image` command skips it because rootless podman/docker
 manage their own user and mount namespaces.
 
-## Extension points
-
-- New rulesets: drop TOML in `rules/` (builtin) or a rules dir
-- New rule matcher kinds: extend `rules.rs` `RuleKind`
-- New commands: `Cmd` variant + handler in `src/cmd/`, grants in
-  `sandbox_apply.rs`, docs, and a corpus case where applicable
-- New output: `Report::to_*` + `Format` variant
-
-## Gates
-
-`tests/arch.rs` keeps main.rs at dispatch size and every file under
-1000 lines. `tests/corpus/` proves every rule id against fixtures.
-`tests/hardening.rs` covers adversarial input, determinism, and
-baseline behavior.

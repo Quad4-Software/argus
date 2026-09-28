@@ -55,6 +55,21 @@ firewall presence, logging, integrity tooling, home directory modes,
 and quick malware checks (`ld.so.preload`, `/tmp` executables,
 deleted-but-running binaries).
 
+## similar &lt;a&gt; [b]
+
+Code similarity scoring using normalized-token winnowing fingerprints
+(MOSS/SCANOSS lineage). Two paths print similarity findings for every
+matching pair; one path finds near-duplicate pairs inside it.
+Tokenization normalizes identifiers and literals, so renaming does not
+hide copying. `SIM-001` (jaccard over 70%) marks likely vendored code,
+`SIM-002` marks embedded copies inside larger files.
+
+```sh
+argus similar file.rs other.rs         # pair score
+argus similar src/                     # near-dups inside the tree
+argus scan . --similar /opt/reference  # flag files copied FROM the reference
+```
+
 ## verify [paths]
 
 Extract provider-shaped tokens from scan paths and ask the provider

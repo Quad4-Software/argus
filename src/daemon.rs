@@ -13,8 +13,8 @@
 //! --notify-url (ntfy.sh or any JSON webhook endpoint).
 
 use crate::finding::{Finding, Report};
-use hmac::{Hmac, Mac};
 use hmac::digest::KeyInit;
+use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::sync::Mutex;

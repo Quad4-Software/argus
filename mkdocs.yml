@@ -1,6 +1,30 @@
 site_name: argus
 site_url: https://quad4-software.github.io/argus/
 docs_dir: docs
+
+# dark/light with system preference + manual toggle (mkdocs-material
+# palette - also readable by zensical which has the same two-mode UI)
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue grey
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue grey
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+# version selector via mike-compatible metadata
+extra:
+  version:
+    provider: mike
+    alias: true
+    default: latest
+
 nav:
   - Overview: index.md
   - Install: install.md

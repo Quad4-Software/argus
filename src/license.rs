@@ -107,7 +107,7 @@ fn manifest_license(root: &Path) -> Vec<(String, String)> {
         }
     }
     if let Ok(t) = std::fs::read_to_string(root.join("Cargo.toml"))
-        && let Ok(v) = t.parse::<toml::Value>()
+        && let Ok(v) = toml::from_str::<toml::Value>(&t)
     {
         for path in [
             &["package", "license"][..],
@@ -123,7 +123,7 @@ fn manifest_license(root: &Path) -> Vec<(String, String)> {
         }
     }
     if let Ok(t) = std::fs::read_to_string(root.join("pyproject.toml"))
-        && let Ok(v) = t.parse::<toml::Value>()
+        && let Ok(v) = toml::from_str::<toml::Value>(&t)
     {
         let lic = v.get("project").and_then(|p| p.get("license"));
         if let Some(l) = lic.and_then(|x| x.get("text")).and_then(|x| x.as_str()) {
