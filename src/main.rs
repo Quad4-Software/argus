@@ -593,7 +593,9 @@ exec argus scan --staged --fail-on medium
         }
         None => emit(&rendered),
     }
-    if cli.ci || cfg.defaults.ci.unwrap_or(false) || in_ci() {
+    // explicit --ci always annotates; auto-detect only for text output so
+    // json/sarif stdout stays machine-parseable inside CI environments
+    if cli.ci || cfg.defaults.ci.unwrap_or(false) || (in_ci() && matches!(format, Format::Text)) {
         emit(&report.to_annotations());
         if let Ok(sum) = std::env::var("GITHUB_STEP_SUMMARY") {
             let _ = std::fs::OpenOptions::new()

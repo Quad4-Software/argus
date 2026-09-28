@@ -171,16 +171,14 @@ fn repo_findings(http: &HttpClient, api: &str, repo: &RepoSpec, out: &mut Vec<Fi
                 ));
             }
         }
-        Ok((404, _)) => {
-            if !repo.fork && !repo.archived {
-                out.push(finding(
-                    t,
-                    "RST-210",
-                    Severity::Medium,
-                    format!("default branch {default_branch} has no protection - direct pushes can rewrite release history"),
-                    "Add a branch protection rule: require PRs, dismiss stale reviews, restrict force pushes.",
-                ));
-            }
+        Ok((404, _)) if !repo.fork && !repo.archived => {
+            out.push(finding(
+                t,
+                "RST-210",
+                Severity::Medium,
+                format!("default branch {default_branch} has no protection - direct pushes can rewrite release history"),
+                "Add a branch protection rule: require PRs, dismiss stale reviews, restrict force pushes.",
+            ));
         }
         _ => {} // 401/403: cannot determine, stay quiet
     }

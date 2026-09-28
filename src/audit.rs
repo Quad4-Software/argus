@@ -194,7 +194,7 @@ pub fn authors(root: &Path) -> Vec<(String, String, usize)> {
     }
     let mut v: Vec<(String, String, usize)> =
         counts.into_iter().map(|((n, e), c)| (n, e, c)).collect();
-    v.sort_by(|a, b| b.2.cmp(&a.2));
+    v.sort_by_key(|x| std::cmp::Reverse(x.2));
     v
 }
 
