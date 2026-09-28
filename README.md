@@ -15,7 +15,7 @@ secrets and secret liveness, dependency confusion and hygiene, malicious
 workflow/container/host configuration, and agent-substituted authorship.
 
 > [!IMPORTANT]
-> Crucial information necessary for users to succeed.
+> Open-weight LLMs are used to assist development of this tool. Those models are: GLM 5.3-flash, Qwen 3.8 and Kimi K3.
 
 ## Usage
 
