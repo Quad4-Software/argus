@@ -1,0 +1,10 @@
+# ~/.config/systemd/user/argus-system.timer
+[Unit]
+Description=weekly argus system scan
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

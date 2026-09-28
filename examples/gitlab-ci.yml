@@ -1,0 +1,12 @@
+# .gitlab-ci.yml fragment — emits a codequality artifact for MR diffs.
+argus:
+  image: rust:latest
+  script:
+    - cargo install --path . || cargo install argus
+    - argus scan . --format codeclimate --output argus-codequality.json
+    - argus scan . --format markdown --output argus.md
+  artifacts:
+    when: always
+    reports:
+      codequality: argus-codequality.json
+    paths: [argus.md]

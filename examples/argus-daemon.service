@@ -1,0 +1,16 @@
+# ~/.config/systemd/user/argus-daemon.service
+# systemctl --user daemon-reload && systemctl --user enable --now argus-daemon
+# Point forge webhooks at http://<host>:8694/webhook/{github|gitlab|gitea}
+# with secret $ARGUS_WEBHOOK_SECRET (use a systemd EnvironmentFile for it).
+[Unit]
+Description=argus supply-chain watch daemon
+After=network-online.target
+
+[Service]
+EnvironmentFile=-%h/.config/argus/daemon.env
+ExecStart=%h/.local/bin/argus daemon --listen 127.0.0.1:8694 --interval 900 --repo owner/repo --repo org/another
+Restart=on-failure
+RestartSec=15
+
+[Install]
+WantedBy=default.target

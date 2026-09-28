@@ -1,0 +1,15 @@
+name: argus
+description: Supply-chain indicator scanner — local rules, YARA, IoC lists, OSV advisories
+branding: { icon: shield, color: red }
+inputs:
+  paths:    { default: ".", description: "paths to scan" }
+  fail-on:  { default: high, description: "severity that fails the step" }
+  format:   { default: markdown, description: "text|json|markdown|sarif|codeclimate" }
+  osv:      { default: "false" }
+runs:
+  using: composite
+  steps:
+    - run: cargo install --locked argus || cargo install --locked --git https://github.com/Quad4-Software/argus
+      shell: bash
+    - run: argus scan ${{ inputs.paths }} --ci --fail-on ${{ inputs.fail-on }} --format ${{ inputs.format }} ${{ inputs.osv == 'true' && '--osv' || '' }}
+      shell: bash

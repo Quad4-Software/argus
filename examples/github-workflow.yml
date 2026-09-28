@@ -1,0 +1,21 @@
+# .github/workflows/argus.yml — scan the repo on every PR and push.
+# Works as-is on Gitea/Forgejo act_runner too.
+name: argus
+on:
+  pull_request:
+  push:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f65bea8e4f4 # v6.0.0
+        with:
+          fetch-depth: 0
+      - name: Install argus
+        run: cargo install --path . || cargo install argus
+      - name: Scan
+        run: argus scan . --ci --format markdown --output argus.md
+      # Optional: publish SARIF to GitHub code scanning
+      # - run: argus scan . --format sarif --output argus.sarif
+      # - uses: github/codeql-action/upload-sarif@v4
+      #   with: { sarif_file: argus.sarif }

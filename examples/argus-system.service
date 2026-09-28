@@ -1,0 +1,8 @@
+# ~/.config/systemd/user/argus-system.service
+# systemctl --user daemon-reload && systemctl --user enable --now argus-system.timer
+[Unit]
+Description=argus system scan (supply-chain indicators)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'mkdir -p $HOME/.local/share/argus && exec argus system --format json --color never --output "$HOME/.local/share/argus/system-$(date +%%Y%%m%%d).json"'

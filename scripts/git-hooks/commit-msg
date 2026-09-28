@@ -1,0 +1,15 @@
+#!/bin/sh
+# Conventional Commits gate: type(scope)?: subject
+# types: feat fix docs test refactor chore perf build ci style revert
+re='^(feat|fix|docs|test|refactor|chore|perf|build|ci|style|revert)(\([a-z0-9._/-]+\))?!?: .{5,}$'
+if ! grep -qE "$re" "$1"; then
+    echo "commit-msg: not a conventional commit:" >&2
+    head -1 "$1" >&2
+    echo "expected: <type>(<scope>)?: <subject> - e.g. feat(scan): ..." >&2
+    exit 1
+fi
+# no attribution trailers
+if grep -qiE 'co-authored-by|generated with|assisted by' "$1"; then
+    echo "commit-msg: attribution trailers are not allowed" >&2
+    exit 1
+fi
