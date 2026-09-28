@@ -297,7 +297,6 @@ pub fn query_batch(
     Ok(out)
 }
 
-
 /// First "fixed" version across the advisory's affected ranges, if any.
 fn fixed_version(v: &serde_json::Value) -> String {
     for a in v["affected"].as_array().into_iter().flatten() {
