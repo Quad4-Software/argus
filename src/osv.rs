@@ -297,6 +297,21 @@ pub fn query_batch(
     Ok(out)
 }
 
+
+/// First "fixed" version across the advisory's affected ranges, if any.
+fn fixed_version(v: &serde_json::Value) -> String {
+    for a in v["affected"].as_array().into_iter().flatten() {
+        for r in a["ranges"].as_array().into_iter().flatten() {
+            for e in r["events"].as_array().into_iter().flatten() {
+                if let Some(f) = e["fixed"].as_str() {
+                    return f.to_string();
+                }
+            }
+        }
+    }
+    String::new()
+}
+
 #[cfg(test)]
 mod eco_tests {
     use super::*;
@@ -341,18 +356,4 @@ mod eco_tests {
         assert_eq!(p[0].ecosystem, "Pub");
         assert_eq!(p[0].name, "http");
     }
-}
-
-/// First "fixed" version across the advisory's affected ranges, if any.
-fn fixed_version(v: &serde_json::Value) -> String {
-    for a in v["affected"].as_array().into_iter().flatten() {
-        for r in a["ranges"].as_array().into_iter().flatten() {
-            for e in r["events"].as_array().into_iter().flatten() {
-                if let Some(f) = e["fixed"].as_str() {
-                    return f.to_string();
-                }
-            }
-        }
-    }
-    String::new()
 }
