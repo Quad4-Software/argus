@@ -1,0 +1,40 @@
+# argus configuration
+# Search order: --config > $ARGUS_CONFIG > ./argus.toml > ~/.config/argus/argus.toml
+
+[defaults]
+# Landlock sandbox (Linux): on by default. Uncomment to disable.
+# no_sandbox = true
+# Never touch the network: refuse remote commands, skip OSV/check-runs.
+# offline = true
+
+# format       = "text"    # text | json
+# color        = "auto"    # auto | always | never  (NO_COLOR env also respected)
+# jobs         = 8
+# severity     = "info"    # minimum severity to report: info|low|medium|high|critical
+# fail_on      = "low"     # findings at/above this exit with code 1
+# max_file_size_kb = 8192
+# rules_dirs   = ["/etc/argus/rules", "~/.config/argus/rules"]
+# yara_dirs    = ["/etc/argus/yara"]        # .yar/.yara files
+# ioc_files    = ["/etc/argus/iocs.txt"]    # flat IoC lists
+# ci           = false                         # force CI annotations on/off
+# internal_prefixes = ["@myorg", "myorg-"]   # dep names treated as internal
+                                              # for --dep-check confusion detection
+
+[tokens]
+# Prefer env vars over putting tokens in files:
+#   GITHUB_TOKEN / GH_TOKEN, GITLAB_TOKEN, GITEA_TOKEN / FORGEJO_TOKEN, ARGUS_TOKEN
+# github = "ghp_..."
+# gitlab = "glpat-..."
+# gitea  = "..."
+
+[github]
+# host = "github.mycorp.example"     # GitHub Enterprise (API auto-uses /api/v3)
+# git_user = "x-access-token"
+
+[gitlab]
+# host = "gitlab.mycorp.example"
+# git_user = "oauth2"
+
+[gitea]
+# host = "git.mycorp.example"
+# git_user = "oauth2"
