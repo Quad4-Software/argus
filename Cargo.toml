@@ -28,3 +28,6 @@ yara = ["dep:yara-x"]
 [profile.release]
 lto = true
 strip = true
+
+[dev-dependencies]
+sha2 = "0.11"

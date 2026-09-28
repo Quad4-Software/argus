@@ -144,16 +144,13 @@ fn markdown_and_sarif_formats() {
 
 #[test]
 fn ioc_list_import() {
+    use sha2::Digest;
     // sha256 of the fixture bundle.js lands as a hash rule.
-    let out = Command::new("sha256sum")
-        .arg(fixture("dirty-repo").join("bundle.js"))
-        .output()
-        .unwrap();
-    let hash = String::from_utf8_lossy(&out.stdout)
-        .split_whitespace()
-        .next()
-        .unwrap()
-        .to_string();
+    let data = std::fs::read(fixture("dirty-repo").join("bundle.js")).unwrap();
+    let hash = sha2::Sha256::digest(&data)
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
     let dir = std::env::temp_dir().join(format!("argus-ioc-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let list = dir.join("iocs.txt");
