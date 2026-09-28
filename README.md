@@ -14,7 +14,8 @@ compromises (Shai-Hulud family, TeamPCP/trivy-action, malicious litellm),
 secrets and secret liveness, dependency confusion and hygiene, malicious
 workflow/container/host configuration, and agent-substituted authorship.
 
-
+> [!IMPORTANT]
+> Crucial information necessary for users to succeed.
 
 ## Usage
 
