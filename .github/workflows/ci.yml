@@ -71,7 +71,11 @@ jobs:
         shell: bash
         run: |
           ./target/release/argus --version
-          ./target/release/argus scan . --severity info --format json --output /tmp/r.json
+          # findings are expected on this repo's own fixtures - exit 1 is fine,
+          # only exit 2 (operational error) fails the smoke test
+          rc=0
+          ./target/release/argus scan . --severity info --format json --output /tmp/r.json || rc=$?
+          [ "$rc" -le 1 ]
           test -s /tmp/r.json
 
   # live network checks: real registry/osv/web endpoints. Weekly or manual only,
