@@ -1,0 +1,120 @@
+# Arch User Repository supply-chain attacks.
+#
+# July 2025 - CHAOS RAT (waves 1+2): browser-lookalike packages whose PKGBUILD
+#   `source=` pulled a malicious "patch" repo (GitHub, then Codeberg).
+#   Sources: https://lists.archlinux.org/archives/list/aur-general@lists.archlinux.org/thread/LPDIQKHTREE3TH35PDRZ4YOTVOHKYQSF/
+#            https://www.bleepingcomputer.com/news/security/arch-linux-pulls-aur-packages-that-installed-chaos-rat-malware/
+#            https://www.mh4ckt3mh4ckt1c4s.xyz/blog/aur-chaos-malware-analysis/
+#
+# June 2026 - "atomic-lockfile" / Atomic Arch (400-1600+ packages): orphaned
+#   packages hijacked via forged commits; `npm install atomic-lockfile` /
+#   `lockfile-js` or `bun install js-digest` injected into PKGBUILD, .install
+#   and .hook files. Payload = Rust infostealer + optional eBPF rootkit.
+#   Sources: https://archlinux.org/news/active-aur-malicious-packages-incident/
+#            https://ioctl.fail/preliminary-analysis-of-aur-malware/
+#            https://github.com/lenucksi/aur-malware-check
+
+[ruleset]
+name = "aur-attacks"
+version = "2026.09.27"
+description = "AUR compromises: CHAOS RAT (Jul 2025) and atomic-lockfile Atomic Arch campaign (Jun 2026)"
+
+# --- June 2026 atomic-lockfile campaign ---
+
+[[rule]]
+id = "AUR-001"
+type = "content"
+severity = "critical"
+contains = ["atomic-lockfile", "lockfile-js", "js-digest", "nextfile-js"]
+description = "Atomic Arch malicious npm/bun package name (atomic-lockfile campaign)"
+remediation = "If a PKGBUILD/.install/.hook pulls one of these, the package is trojanized; the npm artifacts are a Rust infostealer with an eBPF rootkit. Do not build; audit any host that installed it."
+reference = "https://archlinux.org/news/active-aur-malicious-packages-incident/"
+
+[[rule]]
+id = "AUR-002"
+type = "content"
+severity = "high"
+path = '(^|/)(PKGBUILD|\.SRCINFO|[^/]*\.(install|INSTALL|hook|hooks))$'
+regex = '\b(npm|pnpm|yarn|bun|bunx)\s+(install|i|add|x)\b|\bpip3?\s+install\b'
+description = "JS/Python package manager invoked inside pacman packaging or install hook (atomic-lockfile injection pattern)"
+remediation = "npm/bun/pip calls do not belong in PKGBUILD/.install/.hook files for normal packages. Inspect what package is being installed; this is the exact Atomic Arch injection."
+reference = "https://ioctl.fail/preliminary-analysis-of-aur-malware/"
+
+[[rule]]
+id = "AUR-003"
+type = "content"
+severity = "high"
+contains = ["herbsobering"]
+description = "npm publisher 'herbsobering' (Atomic Arch campaign publisher account)"
+remediation = "Packages published by this account are malicious (atomic-lockfile, js-digest)."
+reference = "https://github.com/lenucksi/aur-malware-check"
+
+[[rule]]
+id = "AUR-004"
+type = "content"
+severity = "high"
+path = '(^|/)(PKGBUILD|\.SRCINFO|[^/]*\.(install|INSTALL|hook|hooks))$'
+regex = '(?i)krisztinavarga|franziskaweber|tobiaswesterburg|ellenmyklebust|custodiatovar|veramagalhaes|ivonahruskova|simongeisler'
+description = "Atomic Arch attacker/sockpuppet account name in package metadata"
+remediation = "Package was adopted by a known-bad actor account during the June 2026 campaign; inspect the git history."
+reference = "https://github.com/lenucksi/aur-malware-check"
+
+[[rule]]
+id = "AUR-005"
+type = "path"
+severity = "high"
+regex = '(^|/)src/hooks/deps$'
+description = "File at src/hooks/deps (atomic-lockfile preinstall executes an ELF credential stealer at this path)"
+remediation = "Treat as active malware if executable; check for eBPF artifacts and credential theft."
+reference = "https://ioctl.fail/preliminary-analysis-of-aur-malware/"
+
+[[rule]]
+id = "AUR-006"
+type = "content"
+severity = "medium"
+contains = ["~/.local/bin/sudo"]
+description = "Reference to ~/.local/bin/sudo (Atomic Arch sudo password grabber drop path)"
+remediation = "Check if the file exists and is not the real sudo; known grabber sha256 fd4852334ce1c2d7c9bf0e1c91dbf274a1247989b4827d4f7758cbf3bf42ebfe."
+reference = "https://github.com/lenucksi/aur-malware-check/issues/24"
+
+# --- July 2025 CHAOS RAT campaign ---
+
+[[rule]]
+id = "AUR-010"
+type = "content"
+severity = "critical"
+path = '(^|/)(PKGBUILD|\.SRCINFO|[^/]*\.(install|INSTALL))$'
+regex = '(?i)pkgname\s*=\s*["\x27]?(librewolf-fix-bin|firefox-patch-bin|zen-browser-patched-bin|minecraft-cracked|ttf-ms-fonts-all|ttf-all-ms-fonts|vesktop-bin-patched)\b'
+description = "Known-malicious CHAOS RAT AUR package name (July 2025)"
+remediation = "Do not build; if installed, CHAOS RAT (C2 130.162.225.47:8080) may be present. Remove package and check for persistence."
+reference = "https://lists.archlinux.org/archives/list/aur-general@lists.archlinux.org/thread/LPDIQKHTREE3TH35PDRZ4YOTVOHKYQSF/"
+
+[[rule]]
+id = "AUR-011"
+type = "content"
+severity = "critical"
+contains = ["danikpapas", "zenbrowser-patch"]
+description = "CHAOS RAT attacker repo/actor reference (danikpapas, zenbrowser-patch.git)"
+remediation = "The July 2025 packages pulled a 'patch' repo that installed the RAT; treat the package as malicious."
+reference = "https://www.bleepingcomputer.com/news/security/arch-linux-pulls-aur-packages-that-installed-chaos-rat-malware/"
+
+[[rule]]
+id = "AUR-012"
+type = "content"
+severity = "high"
+contains = ["130.162.225.47"]
+description = "CHAOS RAT C2 address (130.162.225.47:8080)"
+remediation = "Check hosts for outbound connections to this IP."
+reference = "https://www.bleepingcomputer.com/news/security/arch-linux-pulls-aur-packages-that-installed-chaos-rat-malware/"
+
+# --- PKGBUILD hygiene ---
+
+[[rule]]
+id = "AUR-020"
+type = "content"
+severity = "low"
+path = '(^|/)(PKGBUILD|[^/]*\.(install|INSTALL|hook|hooks))$'
+regex = '(curl|wget)\s[^|#\n]*\|\s*(sudo\s+)?(ba|z|d|fi)?sh\b'
+description = "Pipe-to-shell remote code in PKGBUILD/install hook (curl|sh)"
+remediation = "AUR packaging should fetch via source=() with checksums, not pipe remote code into a shell."
+reference = "https://wiki.archlinux.org/title/PKGBUILD"

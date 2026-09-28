@@ -1,0 +1,34 @@
+# Typosquat detection on dependency manifests: names within edit distance 1
+# of the curated top-package lists, or confusable-unicode names.
+
+[ruleset]
+name = "typosquat"
+version = "2026.09.27"
+description = "Dep names within edit distance 1 of popular npm/PyPI packages or containing confusable unicode"
+
+[[rule]]
+id = "TSQ-001"
+type = "typosquat"
+severity = "low"
+list = "npm"
+description = "npm dependency name suspiciously close to a popular package"
+remediation = "Verify the exact package name and publisher; typosquats land via autocomplete slips and doc-copying."
+reference = "https://en.wikipedia.org/wiki/Typosquatting"
+
+[[rule]]
+id = "TSQ-002"
+type = "typosquat"
+severity = "low"
+list = "pypi"
+description = "PyPI dependency name suspiciously close to a popular package"
+remediation = "Verify the exact package name and publisher; typosquats land via autocomplete slips and doc-copying."
+reference = "https://en.wikipedia.org/wiki/Typosquatting"
+
+[[rule]]
+id = "TSQ-003"
+type = "typosquat"
+severity = "low"
+list = "crates"
+description = "Cargo dependency name suspiciously close to a popular crate"
+remediation = "Verify the exact crate name on crates.io; typosquats land via autocomplete slips and doc-copying."
+reference = "https://en.wikipedia.org/wiki/Typosquatting"

@@ -1,0 +1,36 @@
+# Actor watchlist: known supply-chain attacker accounts and throwaway
+# identity patterns in git commit metadata (name <email> lines).
+
+[ruleset]
+name = "actor-watchlist"
+version = "2026.09.27"
+description = "Suspicious git author/committer identities: known attacker handles, disposable email domains, noreply mismatch"
+
+[[rule]]
+id = "ACTOR-001"
+type = "content"
+severity = "high"
+path = '(?i)git-authors$'
+regex = '(?i)(danikpapas|herbsobering|krisztinavarga|franziskaweber|tobiaswesterburg|ellenmyklebust|custodiatovar|veramagalhaes|ivonahruskova|simongeisler|makandrol|olaf_anonymous|five\_ee|pl4nty-fixed)'
+description = "Commit by a handle linked to a known supply-chain campaign (AUR/TeamPCP/Shai-Hulud actor lists)"
+remediation = "Review this author's commits carefully; check for forged committer metadata."
+reference = "https://github.com/lenucksi/aur-malware-check"
+
+[[rule]]
+id = "ACTOR-002"
+type = "content"
+severity = "medium"
+path = '(?i)git-authors$'
+regex = '(?i)@(mailinator|guerrillamail|sharklasers|yopmail|tempmail|10minutemail|temp-mail|trashmail|getnada|dispostable)\.'
+description = "Commit author using a disposable email domain"
+remediation = "Disposable emails on commits are a burner-account signal; review the commits."
+reference = "https://cwe.mitre.org/data/definitions/506.html"
+
+[[rule]]
+id = "ACTOR-003"
+type = "content"
+severity = "medium"
+path = '(?i)git-authors$'
+regex = '(?i)(github-actions|dependabot|renovate|github)\[bot\]\s*<[^>]+@(gmail|outlook|proton|yahoo|hotmail|mail|icloud)\.'
+description = "Bot-named author with a non-standard email (possible forged identity)"
+remediation = "Bot accounts have canonical noreply emails; a mismatched address suggests spoofing."

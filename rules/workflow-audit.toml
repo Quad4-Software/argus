@@ -1,0 +1,18 @@
+# Metadata-only set: the workflow-audit checks are implemented in Rust
+# (src/workflow_audit.rs) over parsed YAML — TOML regex rules cannot express
+# job-level semantics. Listed here so `argus rules` shows the coverage and
+# --ruleset/--disable-rule can filter it.
+
+[ruleset]
+name = "workflow-audit"
+version = "2026.09.27"
+description = "zizmor-class GitHub Actions audits: template injection, excessive permissions, secrets-inherit, GITHUB_ENV writes, artipacked, cache poisoning, self-hosted runners, unpinned images, ref-confusion, bot conditions, insecure commands"
+
+# placeholder keeps the set loadable; findings carry WFA-* ids
+[[rule]]
+id = "WFA-000"
+type = "path"
+severity = "info"
+regex = '^__placeholder__never_matches__$'
+description = "workflow-audit is code-driven; see src/workflow_audit.rs"
+remediation = ""

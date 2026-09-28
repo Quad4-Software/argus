@@ -1,0 +1,146 @@
+# TeamPCP campaign, March 2026: Trivy -> CanisterWorm -> Checkmarx -> PyPI.
+#
+# Mar 19: aquasecurity/trivy-action had 76/77 tags force-pushed to malicious
+#   commits (only 0.35.0 survived - immutable releases); all 7 setup-trivy tags
+#   replaced; Trivy v0.69.4 binary backdoored (v0.69.5/.6 docker images too).
+# Mar 20: CanisterWorm npm worm (~65 packages: @emilgroup, @opengov, @teale.io,
+#   @airtm, @pypestream, @leafnoise scopes) - postinstall drops Python backdoor,
+#   systemd pgmon.service, polls ICP canister for payload URL.
+# Mar 23: checkmarx kics-github-action parallel compromise.
+# Mar 24: litellm 1.82.7/1.82.8 on PyPI (litellm_init.pth auto-exec payload).
+# Mar 27: telnyx 4.87.1/4.87.2 on PyPI.
+#
+# Sources: https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23
+#          https://www.microsoft.com/en-us/security/blog/2026/03/24/detecting-investigating-defending-against-trivy-supply-chain-compromise/
+#          https://www.wiz.io/blog/trivy-compromised-teampcp-supply-chain-attack
+#          https://www.aikido.dev/blog/teampcp-deploys-worm-npm-trivy-compromise
+#          https://research.jfrog.com/post/litellm-compromised-teampcp/
+#          https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/
+#          https://www.geordie.ai/resources/technical-advisory-teampcp-supply-chain-campaign/
+
+[ruleset]
+name = "teampcp"
+version = "2026.09.27"
+description = "TeamPCP Mar 2026: Trivy/trivy-action/setup-trivy, CanisterWorm npm, litellm & telnyx PyPI"
+
+[[rule]]
+id = "TPCP-001"
+type = "action_ref"
+severity = "medium"
+repo = "aquasecurity/trivy-action"
+unsafe_refs = "all"
+description = "aquasecurity/trivy-action: 76/77 tags force-pushed to credential-stealing commits (2026-03-19..24); only tag 0.35.0 was provably safe, and SHA pins to commits before 2025-04-09 were compromised transitively"
+remediation = "Pin to tag 0.35.0+ or a commit after 2025-04-09 verified against the advisory. Rotate secrets if a run executed during the window."
+reference = "https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23"
+
+[[rule]]
+id = "TPCP-002"
+type = "action_ref"
+severity = "medium"
+repo = "aquasecurity/setup-trivy"
+unsafe_refs = "all"
+description = "aquasecurity/setup-trivy: all 7 tags replaced with malicious commits (2026-03-19)"
+remediation = "Pin to a commit verified against the advisory (safe tag 0.2.6+). Rotate secrets for runs during the window."
+reference = "https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23"
+
+[[rule]]
+id = "TPCP-003"
+type = "action_ref"
+severity = "medium"
+repo = "checkmarx/kics-github-action"
+unsafe_refs = "all"
+description = "checkmarx/kics-github-action: parallel TeamPCP compromise identified 2026-03-23"
+remediation = "Verify the ref against the advisory; rotate secrets for runs during Mar 2026."
+reference = "https://www.wiz.io/blog/trivy-compromised-teampcp-supply-chain-attack"
+
+[[rule]]
+id = "TPCP-004"
+type = "content"
+severity = "critical"
+contains = ["scan.aquasecurtiy.org", "checkmarx.zone", "models.litellm.cloud"]
+description = "TeamPCP exfiltration/C2 domain (aquasecurtiy typosquat, checkmarx.zone, litellm.cloud)"
+remediation = "Full credential exposure event on any host that ran this; rotate everything and hunt for persistence."
+reference = "https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/"
+
+[[rule]]
+id = "TPCP-005"
+type = "content"
+severity = "high"
+contains = ["45.148.10.212", "tdtqy-oyaaa-aaaae-af2dq-cai", "plug-tab-protective-relay"]
+description = "TeamPCP infrastructure (aquasecurtiy resolver IP, ICP canister C2, Cloudflare Tunnel C2)"
+remediation = "Audit egress logs for these indicators."
+reference = "https://www.wiz.io/blog/trivy-compromised-teampcp-supply-chain-attack"
+
+[[rule]]
+id = "TPCP-006"
+type = "content"
+severity = "high"
+regex = '(?i)trivy[^\n"\x27]{0,40}\b0\.69\.[456]\b'
+description = "Reference to backdoored Trivy version (v0.69.4/.5/.6)"
+remediation = "Trivy v0.69.4 (and .5/.6 images) shipped a credential stealer; treat hosts/pipelines that ran it as compromised."
+reference = "https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23"
+
+[[rule]]
+id = "TPCP-007"
+type = "package"
+severity = "critical"
+names = ["litellm"]
+versions = ["1.82.7", "1.82.8"]
+description = "litellm 1.82.7/1.82.8 on PyPI backdoored by TeamPCP (credential harvester + litellm_init.pth persistence)"
+remediation = "Pin != 1.82.7/1.82.8 (clean: 1.82.6). Hosts that imported it: rotate all credentials incl. cloud/K8s/SSH; check for 'System Telemetry Service' systemd unit."
+reference = "https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/"
+
+[[rule]]
+id = "TPCP-008"
+type = "package"
+severity = "critical"
+names = ["telnyx"]
+versions = ["4.87.1", "4.87.2"]
+description = "telnyx 4.87.1/4.87.2 on PyPI backdoored by TeamPCP"
+remediation = "Pin to a clean release; rotate credentials on hosts that installed it."
+reference = "https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/"
+
+[[rule]]
+id = "TPCP-009"
+type = "path"
+severity = "critical"
+regex = '(^|/)litellm_init\.pth$'
+description = "litellm_init.pth dropper (executable .pth runs at every Python interpreter start)"
+remediation = "Delete and hunt for the systemd persistence the payload installs."
+reference = "https://pydevtools.com/blog/litellm-supply-chain-attack-and-securing-python-dependencies/"
+
+[[rule]]
+id = "TPCP-010"
+type = "content"
+severity = "high"
+contains = ["pgmon.service", "System Telemetry Service"]
+description = "TeamPCP/CanisterWorm persistence unit (pgmon.service / 'System Telemetry Service')"
+remediation = "Check systemd user services; both names are attacker-registered persistence."
+reference = "https://www.geordie.ai/resources/technical-advisory-teampcp-supply-chain-campaign/"
+
+[[rule]]
+id = "TPCP-011"
+type = "package"
+severity = "medium"
+names = ["@emilgroup/", "@opengov/", "@teale.io/", "@airtm/", "@pypestream/", "@leafnoise/"]
+description = "npm scope hit by CanisterWorm (Mar 20 2026) - compromised patch versions published across these namespaces"
+remediation = "Compare resolved versions against the JFrog/Aikido lists; compromised versions contain a postinstall Python backdoor."
+reference = "https://www.aikido.dev/blog/teampcp-deploys-worm-npm-trivy-compromise"
+
+[[rule]]
+id = "TPCP-012"
+type = "package"
+severity = "medium"
+names = ["eslint-config-ppf", "react-leaflet-marker-layer", "react-leaflet-cluster-layer", "react-autolink-text", "opengov-k6-core", "jest-preset-ppf", "cit-playwright-tests", "eslint-config-service-users", "babel-plugin-react-pure-component"]
+description = "Unscoped npm package compromised in CanisterWorm (specific versions per JFrog)"
+remediation = "Verify resolved version against the advisory list."
+reference = "https://research.jfrog.com/post/canister-worm/"
+
+[[rule]]
+id = "TPCP-013"
+type = "content"
+severity = "high"
+regex = '\bNPM_TOKENS\b'
+description = "NPM_TOKENS env var (CanisterWorm deploy.js propagation token list)"
+remediation = "If found with a deploy.js that enumerates/publishes packages, it is the worm's self-propagation tool."
+reference = "https://www.aikido.dev/blog/teampcp-deploys-worm-npm-trivy-compromise"

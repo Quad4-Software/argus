@@ -1,0 +1,80 @@
+# CI workflow privilege/trigger analysis and dependency auto-merge config.
+
+[ruleset]
+name = "workflow-security"
+version = "2026.09.27"
+description = "Privileged triggers, missing permission boundaries, dependency auto-merge"
+
+[[rule]]
+id = "WFS-001"
+type = "content"
+severity = "high"
+path = '(^|/)\.github/workflows/[^/]+\.ya?ml$|(^|/)\.gitea/workflows/[^/]+\.ya?ml$|(^|/)\.forgejo/workflows/[^/]+\.ya?ml$'
+contains = ["pull_request_target", "write-all"]
+contains_all = true
+description = "pull_request_target + permissions: write-all (full pwn-request shape)"
+remediation = "pull_request_target with write-all lets any PR author write the repo and read all secrets. Remove or gate with environments/labels."
+reference = "https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
+
+[[rule]]
+id = "WFS-002"
+type = "content"
+severity = "medium"
+path = '(^|/)\.github/workflows/[^/]+\.ya?ml$|(^|/)\.gitea/workflows/[^/]+\.ya?ml$|(^|/)\.forgejo/workflows/[^/]+\.ya?ml$'
+contains = ["pull_request_target"]
+unless = 'permissions\s*:'
+description = "pull_request_target without an explicit permissions block (inherits broad default)"
+remediation = "Set `permissions: contents: read` (or tighter) explicitly so PR-triggered jobs cannot write."
+reference = "https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
+
+[[rule]]
+id = "WFS-003"
+type = "content"
+severity = "medium"
+path = '(^|/)\.github/workflows/[^/]+\.ya?ml$'
+contains = ["pull_request_target"]
+regex = 'github\.event\.pull_request\.head\.(sha|ref)|\$\{\{\s*github\.event\.pull_request\.head'
+description = "pull_request_target checks out PR head code (arbitrary code exec under elevated token)"
+remediation = "Under pull_request_target, checking out the PR head runs attacker code with base-repo secrets. Avoid or gate."
+reference = "https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
+
+[[rule]]
+id = "WFS-004"
+type = "content"
+severity = "medium"
+path = '(^|/)\.github/workflows/[^/]+\.ya?ml$'
+contains = ["workflow_run"]
+unless = 'permissions\s*:'
+description = "workflow_run trigger without permissions block (downstream of untrusted PR runs)"
+remediation = "workflow_run artifacts/outputs from PR workflows can carry hostile input; pin permissions."
+reference = "https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/"
+
+[[rule]]
+id = "WFS-005"
+type = "content"
+severity = "medium"
+path = '(^|/)\.github/dependabot\.ya?ml$|(^|/)renovate\.json5?$|(^|/)\.github/renovate\.json5?$'
+regex = '(?i)automerge|"auto.?merge"\s*:\s*true|platformAutomerge'
+description = "Dependency auto-merge configured (unreviewed dep bumps land without human eyes)"
+remediation = "Auto-merge turns a poisoned registry release into an instant install; require CI + review."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "WFS-006"
+type = "content"
+severity = "low"
+path = '(^|/)\.gitlab-ci\.ya?ml$'
+regex = 'include\s*:\s*\n?[^\n]*remote\s*:'
+description = "GitLab CI `include: remote` pulls mutable external CI config"
+remediation = "Prefer project/local includes or pin remote includes by ref + checksum."
+reference = "https://docs.gitlab.com/ci/yaml/includes/"
+
+[[rule]]
+id = "WFS-007"
+type = "content"
+severity = "low"
+path = '(^|/)\.github/workflows/[^/]+\.ya?ml$|(^|/)\.gitea/workflows/[^/]+\.ya?ml$|(^|/)\.forgejo/workflows/[^/]+\.ya?ml$'
+regex = 'secrets\.[A-Za-z_]+[^\n]*(curl|wget|http|tee|base64)|echo[^\n]*\$\{\{\s*secrets\.'
+description = "Secret value flows into a shell/network command (possible exfil or log leak)"
+remediation = "Secrets should be consumed by trusted actions, not echoed/piped."
+reference = "https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions"

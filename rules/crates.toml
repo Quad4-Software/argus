@@ -1,0 +1,65 @@
+# crates.io / Cargo supply-chain rules.
+
+[ruleset]
+name = "crates"
+version = "2026.09.28"
+description = "Cargo ecosystem attacks: registry redirection, build.rs exfil, known-bad crates"
+
+# [patch] tables silently redirect dependency resolution — a typosquat
+# or hostile mirror takes effect repo-wide.
+[[rule]]
+id = "CRG-001"
+type = "content"
+severity = "medium"
+path = '(^|/)Cargo\.toml$'
+regex = '(?m)^\s*\[patch\.(crates-io|[^\]]+)\]'
+description = "Cargo.toml [patch.*] table redirects dependency resolution to another source"
+remediation = "Verify the patch source is intentional; [patch] tables are a stealthy dependency-substitution vector."
+reference = "https://doc.rust-lang.org/cargo/reference/overriding-dependencies.html"
+
+# build.rs runs arbitrary code at compile time; fetching remote content
+# or reading env secrets there is the classic crates.io attack shape.
+[[rule]]
+id = "CRG-002"
+type = "content"
+severity = "medium"
+path = '(^|/)build\.rs$'
+regex = '(?i)(reqwest|ureq|reqwest::blocking|curl|wget|std::net::TcpStream|Command::new\("(curl|wget|bash|sh)")'
+description = "build.rs performs network fetches or shells out at compile time"
+remediation = "build.rs runs with your credentials at compile time; network access there is a known exfil path."
+reference = "https://doc.rust-lang.org/cargo/reference/build-scripts.html"
+
+[[rule]]
+id = "CRG-003"
+type = "content"
+severity = "medium"
+path = '(^|/)build\.rs$'
+regex = '(?i)(std::)?env::var[^(]*\(\s*"[^"]*(KEY|TOKEN|SECRET|PASSWORD|AWS|SSH|CREDENTIALS)[^"]*"\s*\)'
+description = "build.rs reads credential-shaped environment variables"
+remediation = "Verify intent; a malicious crate can exfiltrate env secrets during compilation."
+reference = "https://doc.rust-lang.org/cargo/reference/build-scripts.html"
+
+# proc-macro crates execute arbitrary Rust at compile time of every
+# dependent build — prime crates.io attack surface.
+[[rule]]
+id = "CRG-004"
+type = "content"
+severity = "low"
+path = '(^|/)Cargo\.toml$'
+regex = '(?m)^\s*proc-macro\s*=\s*true'
+description = "crate is a proc-macro (executes code at compile time on all dependents)"
+remediation = "Proc-macro crates warrant extra publisher review; pin exact versions."
+reference = "https://doc.rust-lang.org/reference/procedural-macros.html"
+
+# documented incidents (see references in-rule)
+[[rule]]
+id = "CRG-005"
+type = "package"
+severity = "high"
+description = "crates.io package on the known-bad list (documented supply-chain incident)"
+# rustdecimal: July 2024 - versions shipped a malicious build script that
+# harvested env secrets (documented crates.io incident)
+names = ["rustdecimal"]
+versions = ["1.34.0", "1.34.1"]
+remediation = "Remove the flagged crate version; audit build logs for env exfiltration."
+reference = "https://blog.phylum.io/rust-malware-staged-on-crates-io/"

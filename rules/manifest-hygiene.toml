@@ -1,0 +1,124 @@
+# Cross-ecosystem supply-chain hygiene beyond CI workflows:
+# lockfile source URLs, git deps, composer/cargo/ruby/go install-time code,
+# editor task auto-run, dockerfile fetches, git internals.
+
+[ruleset]
+name = "manifest-hygiene"
+version = "2026.09.27"
+description = "Dependency-source and build-time code execution patterns across npm/pip/cargo/go/gem/composer"
+
+[[rule]]
+id = "MAN-001"
+type = "source_url"
+severity = "low"
+description = "Dependency fetched from non-standard host (mirror/lockfile tampering check)"
+remediation = "Verify the mirror is intentional; lockfile rewrites to attacker hosts are a classic tamper signal."
+reference = "https://socket.dev/blog/what-is-dependency-confusion"
+
+[[rule]]
+id = "MAN-002"
+type = "content"
+severity = "low"
+path = '(^|/)package\.json$'
+regex = '"[^"]+"\s*:\s*"(git\+|github:|gitlab:|bitbucket:|git://)'
+description = "git-based dependency in package.json (bypasses registry integrity)"
+remediation = "Prefer registry versions or pin the git dep to a full commit hash."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MAN-003"
+type = "content"
+severity = "medium"
+path = '(^|/)composer\.json$'
+regex = '"(pre|post)-(install|update)-cmd"\s*:'
+description = "composer.json install/update hook (Packagist attacks use these)"
+remediation = "Audit what the hook executes; install hooks run on every composer install."
+reference = "https://socket.dev/blog/polinrider-github-packagist"
+
+[[rule]]
+id = "MAN-004"
+type = "content"
+severity = "high"
+path = '(^|/)\.vscode/tasks\.json$'
+regex = '"runOn"\s*:\s*"folderOpen"|"runOptions"\s*:\s*\{[^}]*"runOn"\s*:\s*"folderOpen"'
+description = "VS Code task auto-runs on folder open (repo-poisoning vector)"
+remediation = "VS Code prompts before running, but auto-run tasks in cloned repos are a known attack path."
+reference = "https://code.visualstudio.com/docs/editor/tasks"
+
+[[rule]]
+id = "MAN-005"
+type = "content"
+severity = "medium"
+path = '(^|/)Dockerfile[^/]*$|(^|/)Containerfile[^/]*$'
+regex = '(?im)^\s*ADD\s+https?://'
+description = "Dockerfile ADD of remote URL (no integrity check; prefer curl + sha256 verification)"
+remediation = "Fetch explicitly and verify a checksum instead of ADD-ing remote content."
+reference = "https://docs.docker.com/build/building/best-practices/"
+
+[[rule]]
+id = "MAN-006"
+type = "content"
+severity = "low"
+path = '(^|/)Dockerfile[^/]*$|(^|/)Containerfile[^/]*$'
+regex = '(curl|wget)\s[^|#\n]*\|\s*(sudo\s+)?(ba|z|d|fi)?sh\b'
+description = "Pipe-to-shell inside container build (curl|sh in Dockerfile)"
+remediation = "Vendor or pin the installer by checksum."
+
+[[rule]]
+id = "MAN-007"
+type = "content"
+severity = "medium"
+path = '(^|/)build\.rs$'
+regex = 'Command::new\s*\(\s*"(curl|wget|sh|bash|powershell|cmd)"'
+description = "Rust build.rs spawning shell/downloader (build-time code exec)"
+remediation = "build.rs runs on every cargo build; network or shell access is unusual."
+reference = "https://doc.rust-lang.org/cargo/reference/build-scripts.html"
+
+[[rule]]
+id = "MAN-008"
+type = "content"
+severity = "medium"
+path = '(^|/)(Makefile|makefile|justfile|Taskfile\.ya?ml|Rakefile|Procfile)$'
+regex = '(curl|wget)\s[^|#\n]*\|\s*(sudo\s+)?(ba|z|d|fi)?sh\b'
+description = "Pipe-to-shell in build task file"
+remediation = "Vendor the installer or verify a checksum."
+
+[[rule]]
+id = "MAN-009"
+type = "content"
+severity = "low"
+path = '(^|/)(pip\.conf|pip\.ini|uv\.toml|pyproject\.toml)$'
+regex = '(?i)(index-url|extra-index-url)\s*=\s*["\x27]?http://|extra-index-url\s*='
+description = "Python index-url over plain HTTP or extra-index-url set (dependency-confusion vector)"
+remediation = "Verify custom index hosts are expected; extra-index-url enables public-registry shadowing."
+reference = "https://pydevtools.com/blog/litellm-supply-chain-attack-and-securing-python-dependencies/"
+
+[[rule]]
+id = "MAN-010"
+type = "content"
+severity = "low"
+path = '(^|/)\.npmrc$'
+regex = '(?im)^registry\s*=\s*https?://'
+description = ".npmrc overrides the default registry"
+remediation = "Verify the registry host is intentional; unexpected registry redirects are a hijack vector."
+
+# Git internals (require --include-git)
+
+[[rule]]
+id = "GIT-001"
+type = "content"
+severity = "high"
+path = '(^|/)\.git/config$'
+regex = '(?im)^\s*hooksPath\s*='
+description = "core.hooksPath set in git config (redirects hooks to attacker-controlled dir)"
+remediation = "Check where hooksPath points; legitimate devcontainers/tools set it, malware abuses it."
+reference = "https://git-scm.com/docs/githooks"
+
+[[rule]]
+id = "GIT-002"
+type = "content"
+severity = "high"
+path = '(^|/)\.git/hooks/[^/]+$'
+regex = 'curl|wget|nc\s+-|base64\s+-d|/dev/tcp/'
+description = "Git hook containing network/exec primitives"
+remediation = "Git hooks run on commit/checkout; this repo's hooks deserve a look."

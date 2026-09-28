@@ -1,0 +1,25 @@
+# Generic npm-package malware shapes (complements the campaign rulesets).
+
+[ruleset]
+name = "npm-generic"
+version = "2026.09.27"
+description = "npm lifecycle and manifest hygiene: remote fetch in install hooks, eval loaders, git deps to suspicious hosts"
+
+[[rule]]
+id = "NPM-001"
+type = "content"
+severity = "high"
+path = '(^|/)package\.json$'
+regex = '"(preinstall|install|postinstall|prepare)"\s*:\s*"[^"]*(curl\b|wget\b|fetch\s*\(|eval\s*\(|base64\s+-d|powershell|iex)'
+description = "npm lifecycle script fetches remote code or evals (install-time payload shape)"
+remediation = "Lifecycle scripts run on every install/CI checkout; remote fetches here bypass lockfile integrity."
+reference = "https://docs.npmjs.com/cli/using-npm/scripts"
+
+[[rule]]
+id = "NPM-002"
+type = "content"
+severity = "medium"
+path = '\.js$'
+regex = '(eval|new Function)\s*\([^\n]{0,80}(atob|base64|Buffer\.from|decodeURIComponent|fromCharCode)'
+description = "JS eval of decoded/encoded blob (obfuscation pattern used by npm malware)"
+remediation = "Decode the blob and review it; this is a loader shape, not normal application code."

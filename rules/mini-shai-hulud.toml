@@ -1,0 +1,100 @@
+# Mini Shai-Hulud (May 2026 wave, re-armed Sept 16 2026).
+# Sources: https://socket.dev/blog/mini-shai-hulud-actions
+#          https://socket.dev/blog/antv-packages-compromised
+#
+# Two compromised GitHub Actions were re-enabled with release tags still
+# pointing at the May 18, 2026 malicious payload. The payload installs Bun and
+# runs an obfuscated index.js that harvests CI/CD and developer secrets, with a
+# hardcoded exfil endpoint and a GitHub repo fallback.
+
+[ruleset]
+name = "mini-shai-hulud"
+version = "2026.09.24"
+description = "actions-cool re-armed compromise plus Mini Shai-Hulud npm payload IoCs"
+source = "https://socket.dev/blog/mini-shai-hulud-actions"
+
+[[rule]]
+id = "MSH-001"
+type = "action_ref"
+severity = "critical"
+repo = "actions-cool/issues-helper"
+unsafe_refs = "tags"
+malicious_shas = ["a0c53dd42fc842d2f9276c5a1d4f9a26abe8713d"]
+description = "Compromised action actions-cool/issues-helper"
+remediation = "Remove the action or pin to a commit verified to predate 2026-05-18. Rotate any secrets exposed to workflows that ran it on or after 2026-09-16."
+reference = "https://socket.dev/blog/mini-shai-hulud-actions"
+
+[[rule]]
+id = "MSH-002"
+type = "action_ref"
+severity = "high"
+repo = "actions-cool/maintain-one-comment"
+unsafe_refs = "all"
+description = "Compromised action actions-cool/maintain-one-comment"
+remediation = "Remove the action or pin to a commit verified to predate 2026-05-18. Rotate any secrets exposed to workflows that ran it on or after 2026-09-16."
+reference = "https://socket.dev/blog/mini-shai-hulud-actions"
+
+[[rule]]
+id = "MSH-003"
+type = "content"
+severity = "critical"
+path = '(^|/)package\.json$'
+regex = '"(preinstall|install|postinstall)"\s*:\s*"[^"]*bun\s+run\s+index\.js'
+description = "Mini Shai-Hulud lifecycle hook (bun run index.js in install script)"
+remediation = "Quarantine the package, restore a clean version, rotate all credentials reachable from install/CI environments."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-004"
+type = "content"
+severity = "critical"
+contains = ["@antv/setup", "@tanstack/setup"]
+description = "Malicious git-based setup dependency injected by Mini Shai-Hulud"
+remediation = "Remove the dependency and check package.json for injected preinstall hooks; rotate npm/GitHub tokens."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-005"
+type = "content"
+severity = "critical"
+contains = ["t.m-kosche.com", "m-kosche.com"]
+description = "Mini Shai-Hulud exfiltration endpoint"
+remediation = "Host is compromised; rotate all credentials stored on it and audit CI history."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-006"
+type = "content"
+severity = "medium"
+contains = ["fc2edea72"]
+description = "Mini Shai-Hulud obfuscation decryptor marker (globalThis.fc2edea72)"
+remediation = "Verify whether the file is a Mini Shai-Hulud payload artifact."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-007"
+type = "content"
+severity = "critical"
+contains = ["niagA oG eW ereH :duluH-iahS", "Shai-Hulud: Here We Go Again", "niaga og ew ereh :duluh-iahs"]
+description = "Mini Shai-Hulud campaign marker string"
+remediation = "Content was produced by the worm; audit repo history and rotate exposed secrets."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-008"
+type = "path"
+severity = "high"
+regex = '(^|/)results/results-[0-9]+-[0-9]+\.json$'
+description = "Mini Shai-Hulud GitHub exfil file pattern (results/results-<ts>-<n>.json)"
+remediation = "Repo may be a worm-created exfil target or was written to by a stolen token."
+reference = "https://socket.dev/blog/antv-packages-compromised"
+
+[[rule]]
+id = "MSH-009"
+type = "content"
+severity = "high"
+path = '\.ya?ml$'
+regex = 'bun\s+run\s+\$GITHUB_ACTION_PATH/index\.js'
+description = "Runs Bun payload from an action directory (Mini Shai-Hulud wrapper shape)"
+remediation = "Inspect the referenced action and workflow; an issue-helper has no reason to install Bun and run index.js."
+reference = "https://socket.dev/blog/mini-shai-hulud-actions"

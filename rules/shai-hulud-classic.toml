@@ -1,0 +1,77 @@
+# Original Shai-Hulud npm worm, Sept 15-16 2025 (~200+ packages, downstream of
+# the s1ngularity/Nx compromise).
+# Sources: https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack
+#          https://www.sysdig.com/blog/shai-hulud-the-novel-self-replicating-worm-infecting-hundreds-of-npm-packages
+#          https://checkmarx.com/zero-post/npm-hit-by-shai-hulud-the-self-replicating-supply-chain-attack/
+
+[ruleset]
+name = "shai-hulud-classic"
+version = "2025.09.18"
+description = "Sept 2025 self-replicating npm worm: bundle.js postinstall, TruffleHog, webhook.site exfil, Shai-Hulud repos/workflows"
+source = "https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack"
+
+[[rule]]
+id = "SHC-001"
+type = "content"
+severity = "critical"
+path = '(^|/)package\.json$'
+regex = '"(preinstall|install|postinstall)"\s*:\s*"[^"]*(node\s+bundle\.js|bundle\.js)'
+description = "Shai-Hulud lifecycle hook (node bundle.js install script)"
+remediation = "Trojanized package: pin to a clean version, rotate npm/GitHub/cloud credentials on install hosts."
+reference = "https://www.sysdig.com/blog/shai-hulud-the-novel-self-replicating-worm-infecting-hundreds-of-npm-packages"
+
+[[rule]]
+id = "SHC-002"
+type = "content"
+severity = "critical"
+contains = ["webhook.site/bb8ca5f6-4175-45d2-b042-fc9ebb8170b7"]
+description = "Shai-Hulud webhook.site exfiltration endpoint"
+remediation = "Secrets were exfiltrated; rotate everything reachable and audit GitHub for 'Shai-Hulud' repos."
+reference = "https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack"
+
+[[rule]]
+id = "SHC-003"
+type = "path"
+severity = "critical"
+regex = '(^|/)\.github/workflows/shai-hulud-workflow\.ya?ml$'
+description = "Shai-Hulud dropped workflow file (shai-hulud-workflow.yml)"
+remediation = "Delete the workflow, rotate all repo secrets, check for a 'shai-hulud' branch and exfil repos."
+reference = "https://checkmarx.com/zero-post/npm-hit-by-shai-hulud-the-self-replicating-supply-chain-attack/"
+
+[[rule]]
+id = "SHC-004"
+type = "content"
+severity = "critical"
+contains = ["Shai-Hulud Migration"]
+description = "Shai-Hulud repo migration marker (private repos made public by the worm)"
+remediation = "A private repo may have been migrated to a public attacker-controlled copy; audit the account."
+reference = "https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack"
+
+[[rule]]
+id = "SHC-005"
+type = "content"
+severity = "medium"
+regex = 'trufflehog'
+path = '\.(ya?ml|sh|js|json)$'
+description = "TruffleHog invocation (Shai-Hulud uses it for secret harvesting; also legitimate use exists)"
+remediation = "If this appears in a lifecycle script or unexpected workflow, investigate as compromise."
+reference = "https://www.sysdig.com/blog/shai-hulud-the-novel-self-replicating-worm-infecting-hundreds-of-npm-packages"
+
+[[rule]]
+id = "SHC-006"
+type = "path"
+severity = "critical"
+regex = '(^|/)\.git/refs/(heads|remotes)/[^/]*shai-hulud[^/]*$'
+description = "shai-hulud branch ref present in .git (worm-created exfil branch; needs --include-git)"
+remediation = "Delete the branch, rotate credentials, look for the workflow file and exfil commits."
+reference = "https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack"
+
+[[rule]]
+id = "SHC-007"
+type = "content"
+severity = "critical"
+path = '(^|/)\.git/packed-refs$'
+regex = 'shai-hulud'
+description = "shai-hulud ref inside packed-refs (worm-created branch/tag; needs --include-git)"
+remediation = "Same as SHC-006."
+reference = "https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack"

@@ -1,0 +1,90 @@
+# Known GitHub Actions supply-chain compromises where release tags were moved
+# to malicious commits. Tag refs are flagged at the rule severity; refs pinned
+# to the listed SHA are always critical.
+
+[ruleset]
+name = "action-compromises"
+version = "2026.09.27"
+description = "GitHub Actions compromised via retargeted tags (tj-actions Mar 2025, reviewdog Mar 2025 chain)"
+
+[[rule]]
+id = "ACT-001"
+type = "action_ref"
+severity = "low"
+repo = "tj-actions/changed-files"
+unsafe_refs = "tags"
+malicious_shas = ["0e58ed8671d6b60d0890c21b07f8835ace038e67"]
+description = "tj-actions/changed-files compromised 2025-03-14/15 (CVE-2025-30066); tags were retargeted to a malicious commit"
+remediation = "Pin to a known-clean SHA or replace with step-security/changed-files. Rotate secrets if a run executed during the compromise window."
+reference = "https://github.com/advisories/GHSA-mrrh-fwg8-r2c3"
+
+[[rule]]
+id = "ACT-002"
+type = "action_ref"
+severity = "low"
+repo = "reviewdog/action-setup"
+unsafe_refs = "tags"
+malicious_shas = ["f0d342d24037bb11d26b9bd8496e0808ba32e9ec"]
+description = "reviewdog/action-setup@v1 compromised 2025-03-11 (CVE-2025-30154); root cause of the tj-actions incident"
+remediation = "Pin to a known-clean SHA (v1 retagged at 3f401fe1d58fe77e10d665ab713057375e39b887). Rotate secrets if a run executed in the window."
+reference = "https://github.com/advisories/GHSA-qmg3-hpqr-gqvc"
+
+[[rule]]
+id = "ACT-003"
+type = "action_ref"
+severity = "medium"
+repo = "reviewdog/action-shellcheck"
+unsafe_refs = "all"
+description = "reviewdog/action-shellcheck transitively compromised via reviewdog/action-setup@v1 (< v1.29.2)"
+remediation = "Upgrade past v1.29.2 or pin a verified-clean SHA; rotate secrets for runs in Mar 2025."
+reference = "https://github.com/reviewdog/reviewdog/issues/2079"
+
+[[rule]]
+id = "ACT-004"
+type = "action_ref"
+severity = "medium"
+repo = "reviewdog/action-staticcheck"
+unsafe_refs = "all"
+description = "reviewdog/action-staticcheck transitively compromised via reviewdog/action-setup@v1 (< v1.26.2)"
+remediation = "Upgrade past v1.26.2 or pin a verified-clean SHA; rotate secrets for runs in Mar 2025."
+reference = "https://github.com/reviewdog/reviewdog/issues/2079"
+
+[[rule]]
+id = "ACT-005"
+type = "action_ref"
+severity = "medium"
+repo = "reviewdog/action-typos"
+unsafe_refs = "all"
+description = "reviewdog/action-typos transitively compromised via reviewdog/action-setup@v1 (< v1.17.2)"
+remediation = "Upgrade past v1.17.2 or pin a verified-clean SHA; rotate secrets for runs in Mar 2025."
+reference = "https://github.com/reviewdog/reviewdog/issues/2079"
+
+[[rule]]
+id = "ACT-006"
+type = "action_ref"
+severity = "medium"
+repo = "reviewdog/action-ast-grep"
+unsafe_refs = "all"
+description = "reviewdog/action-ast-grep transitively compromised via reviewdog/action-setup@v1 (< v1.26.2)"
+remediation = "Upgrade past v1.26.2 or pin a verified-clean SHA; rotate secrets for runs in Mar 2025."
+reference = "https://github.com/reviewdog/reviewdog/issues/2079"
+
+[[rule]]
+id = "ACT-007"
+type = "action_ref"
+severity = "medium"
+repo = "reviewdog/action-composite-template"
+unsafe_refs = "all"
+description = "reviewdog/action-composite-template transitively compromised via reviewdog/action-setup@v1 (< v0.20.2)"
+remediation = "Upgrade past v0.20.2 or pin a verified-clean SHA; rotate secrets for runs in Mar 2025."
+reference = "https://github.com/reviewdog/reviewdog/issues/2079"
+
+[[rule]]
+id = "ACT-008"
+type = "action_ref"
+severity = "medium"
+repo = "tj-actions/eslint-changed-files"
+unsafe_refs = "all"
+description = "tj-actions/eslint-changed-files transitively compromised (it consumes reviewdog/action-setup and tj-actions/changed-files)"
+remediation = "Pin a verified-clean SHA or remove; rotate secrets for runs during Mar 2025."
+reference = "https://www.wiz.io/blog/new-github-action-supply-chain-attack-reviewdog-action-setup"

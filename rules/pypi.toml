@@ -1,0 +1,68 @@
+# PyPI compromise patterns: poisoned releases, .pth persistence, setup.py RCE.
+# Sources: https://www.wiz.io/blog/ultralytics-ai-model-library-supply-chain-attack (Dec 2024-Jan 2025)
+#          https://securitylabs.datadoghq.com/articles/litellm-compromised-pypi-teampcp-supply-chain-campaign/
+
+[ruleset]
+name = "pypi"
+version = "2026.09.27"
+description = "PyPI supply-chain indicators: bad versions, executable .pth drops, setup.py RCE shapes, interpreter persistence"
+
+[[rule]]
+id = "PYPI-001"
+type = "package"
+severity = "critical"
+names = ["ultralytics"]
+versions = ["8.3.41", "8.3.42", "8.3.45", "8.3.46"]
+description = "ultralytics 8.3.41/8.3.42 (Dec 2024) and 8.3.45/8.3.46 (Jan 2025) shipped cryptominer + credential stealer"
+remediation = "Pin outside the listed versions; hosts that ran them are credential-exposure events."
+reference = "https://www.wiz.io/blog/ultralytics-ai-model-library-supply-chain-attack"
+
+[[rule]]
+id = "PYPI-002"
+type = "package"
+severity = "low"
+names = ["torchtriton"]
+description = "torchtriton on PyPI was a dependency-confusion payload (Dec 2022); the name is now claimed by PyTorch upstream"
+remediation = "Verify the resolved source is the official PyTorch index, not a stray public upload."
+reference = "https://pytorch.org/blog/compromised-nightly-dependency/"
+
+[[rule]]
+id = "PYPI-003"
+type = "content"
+severity = "high"
+path = '\.pth$'
+regex = '(?i)\b(import\s+subprocess|exec\s*\(|eval\s*\(|__import__|os\.system|subprocess\.|urllib\.request|requests\.|socket\.|base64)'
+unless = '(?i)coverage_process_start|setuptools_use_distutils|_virtualenv|distutils-precedence|enable user site'
+description = "Executable code inside a .pth file (runs at every interpreter startup - litellm_init.pth pattern)"
+remediation = ".pth files should contain only sys.path entries or import lines for site hooks; code execution here is a classic persistence vector."
+reference = "https://pydevtools.com/blog/litellm-supply-chain-attack-and-securing-python-dependencies/"
+
+[[rule]]
+id = "PYPI-004"
+type = "content"
+severity = "high"
+path = '(^|/)(sitecustomize|usercustomize)\.py$'
+regex = '\b(os\.system|subprocess\.|exec\s*\(|eval\s*\(|__import__|urllib\.request|requests\.|socket\.|base64)'
+unless = '(?i)coverage|debugpy|pydev|gevent|opentelemetry'
+description = "sitecustomize.py/usercustomize.py with exec/network primitives (auto-imported at interpreter start)"
+remediation = "These modules auto-import at interpreter start; review the code path."
+reference = "https://docs.python.org/3/library/site.html"
+
+[[rule]]
+id = "PYPI-005"
+type = "content"
+severity = "medium"
+path = '(^|/)setup\.py$'
+regex = 'os\.system|eval\s*\(|exec\s*\(|__import__\(|base64\.b64decode'
+description = "setup.py with code execution / network fetch (PyPI install-time payload shape)"
+remediation = "setup.py runs at install time; review the code path before installing."
+reference = "https://packaging.python.org/en/latest/discussions/setup-py-deprecated/"
+
+[[rule]]
+id = "PYPI-006"
+type = "content"
+severity = "high"
+path = '\.py$'
+regex = '(exec|eval)\s*\([^\n]{0,100}(b64decode|marshal\.loads|zlib\.decompress|codecs\.decode|fromhex)'
+description = "Python exec/eval of decoded payload (b64/marshal/zlib/hex) - standard PyPI malware loader"
+remediation = "Inspect the decoded blob; this is a malware staging pattern."
