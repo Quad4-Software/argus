@@ -50,7 +50,8 @@ jobs:
           cp "target/$TARGET/release/$bin" "dist/$name/"
           cp README.md LICENSE "dist/$name/"
           if [ "$PKG" = zip ]; then
-            (cd dist && zip -r "$name.zip" "$name")
+            # windows git-bash has no zip; bsdtar writes zip via -a
+            tar -a -cf "dist/$name.zip" -C dist "$name"
           else
             (cd dist && tar -czf "$name.tar.gz" "$name")
           fi
