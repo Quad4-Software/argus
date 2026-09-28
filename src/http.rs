@@ -26,7 +26,7 @@ impl HttpClient {
         }
     }
 
-    /// GET `url`, parse the body as JSON. Retries transient failures
+    /// GET url, parse the body as JSON. Retries transient failures
     /// (429/5xx/connect/timeouts) with backoff + Retry-After; surfaces
     /// rate-limit and offline diagnostics in the error text.
     pub fn get_json(&self, url: &str) -> Result<serde_json::Value, String> {
@@ -58,7 +58,7 @@ impl HttpClient {
         parse_resp(url, resp)
     }
 
-    /// GET `url`, returning (status, parsed-body-or-Null). Unlike get_json,
+    /// GET url, returning (status, parsed-body-or-Null). Unlike get_json,
     /// 4xx responses are returned as data so callers can distinguish
     /// "resource absent" (404) from "cannot determine" (401/403).
     pub fn get_status_json(&self, url: &str) -> Result<(u16, serde_json::Value), String> {
@@ -114,8 +114,8 @@ impl HttpClient {
         Ok((status, v))
     }
 
-    /// Paginated GET: appends `&page=N` (or `?page=N`) until a page returns
-    /// fewer than `per_page` array entries. Concatenates all items.
+    /// Paginated GET: appends &page=N (or ?page=N) until a page returns
+    /// fewer than per_page array entries. Concatenates all items.
     pub fn get_paged(
         &self,
         base_url: &str,

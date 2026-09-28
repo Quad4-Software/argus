@@ -1,10 +1,10 @@
-//! Container image audit: `argus image <ref>`.
+//! Container image audit: argus image <ref>.
 //!
-//! - `docker/podman inspect`: baked-in ENV secrets, image runs as root,
+//! - docker/podman inspect: baked-in ENV secrets, image runs as root,
 //!   :latest tag, image age
-//! - `docker history --no-trunc`: secret-looking build steps (they survive
+//! - docker history --no-trunc: secret-looking build steps (they survive
 //!   in layer history forever)
-//! - `--deep`: `docker save` the image, extract to a temp dir, run the
+//! - --deep: docker save the image, extract to a temp dir, run the
 //!   full rules engine over every layer's files
 
 use crate::finding::{Finding, Severity};
@@ -83,7 +83,7 @@ fn secretish(name: &str) -> bool {
     .any(|m| n.contains(m))
 }
 
-/// Metadata checks over `inspect` + `history`.
+/// Metadata checks over inspect + history.
 pub fn inspect_audit(rt: &str, image: &str, target: &str) -> Result<Vec<Finding>, String> {
     let mut out = Vec::new();
     let xdg = xdg_scratch();
@@ -208,7 +208,7 @@ fn days_since(iso: &str) -> Option<u64> {
     Some((today - days).max(0) as u64)
 }
 
-/// Export the image to `workdir` and return the extracted root for a
+/// Export the image to workdir and return the extracted root for a
 /// normal file scan (the caller runs the rules engine over it).
 pub fn export_files(rt: &str, image: &str, workdir: &Path) -> Result<PathBuf, String> {
     let tar = workdir.join("image.tar");

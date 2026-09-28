@@ -53,12 +53,12 @@ pub struct Window {
 #[derive(Debug, serde::Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RuleKindDef {
-    /// Fire on file content matches. With no content matchers, behaves like `path`.
+    /// Fire on file content matches. With no content matchers, behaves like path.
     Content {
         /// Regex applied to the repo-relative path; file must match to be checked.
         #[serde(default)]
         path: Option<String>,
-        /// Substring checks; any match fires unless `contains_all`.
+        /// Substring checks; any match fires unless contains_all.
         #[serde(default)]
         contains: Vec<String>,
         #[serde(default)]
@@ -73,25 +73,25 @@ pub enum RuleKindDef {
         #[serde(default)]
         exclude: Option<String>,
     },
-    /// Check `uses: owner/repo@ref` refs. `repo = "*` matches any action ref.
+    /// Check uses: owner/repo@ref refs. repo = "* matches any action ref.
     ActionRef {
         repo: String,
         /// Full-length SHAs known to resolve to malicious content.
         #[serde(default)]
         malicious_shas: Vec<String>,
-        /// Which refs are findings: `tags` (anything that is not a full SHA) or `all`.
+        /// Which refs are findings: tags (anything that is not a full SHA) or all.
         #[serde(default)]
         unsafe_refs: UnsafeRefs,
     },
     /// File content SHA-256 match (files hashed during scan).
     Hash { sha256: Vec<String> },
     /// Audit dependency-source URLs in manifests/lockfiles: flag any
-    /// resolved/registry/index/source URL whose host is not in `allowed_hosts`.
+    /// resolved/registry/index/source URL whose host is not in allowed_hosts.
     SourceUrl {
         #[serde(default)]
         allowed_hosts: Vec<String>,
     },
-    /// Secret detection: `regex` must capture the candidate secret in group 1;
+    /// Secret detection: regex must capture the candidate secret in group 1;
     /// finding fires only if it passes the entropy floor and isn't a placeholder.
     Secret {
         regex: String,
@@ -101,7 +101,7 @@ pub enum RuleKindDef {
         min_len: Option<usize>,
     },
     /// Typosquat check: flag manifest dep names within edit distance 1 of a
-    /// popular package (builtin lists `npm`/`pypi`), or containing non-ASCII.
+    /// popular package (builtin lists npm/pypi), or containing non-ASCII.
     Typosquat {
         list: String,
         #[serde(default)]
@@ -198,7 +198,7 @@ impl CompiledRule {
         matches!(self.kind, CompiledKind::Hash { .. })
     }
 
-    /// Builtin path scope for dependency manifests used by `package` rules.
+    /// Builtin path scope for dependency manifests used by package rules.
     pub const DEP_MANIFESTS_RE: &'static str = concat!(
         r"(?i)(^|/)(",
         r"package\.json|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|",
@@ -212,7 +212,7 @@ impl CompiledRule {
     );
 
     /// Pre-filter: can this rule apply to the given relative path at all?
-    /// Content rules with a `path` regex are scoped; everything else is global.
+    /// Content rules with a path regex are scoped; everything else is global.
     pub fn path_in_scope(&self, rel: &str) -> bool {
         match &self.kind {
             CompiledKind::Content { path: Some(p), .. } => p.is_match(rel),

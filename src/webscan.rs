@@ -670,7 +670,7 @@ fn cert_days_left(host: &str) -> Option<i64> {
         .output()
         .ok()?;
     let text = String::from_utf8_lossy(&out.stdout);
-    // `openssl x509 -enddate` gives a cleaner date but needs the cert piped;
+    // openssl x509 -enddate gives a cleaner date but needs the cert piped;
     // s_client prints "verify return" lines only, so do a second pass.
     let _ = text;
     let out2 = std::process::Command::new("sh")

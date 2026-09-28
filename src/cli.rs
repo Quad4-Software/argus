@@ -281,7 +281,7 @@ pub enum Cmd {
         #[arg(default_value = ".")]
         paths: Vec<PathBuf>,
     },
-    /// Install a pre-commit hook that runs `argus scan --staged`.
+    /// Install a pre-commit hook that runs argus scan --staged.
     Init {
         /// Repo path (default: .)
         path: Option<PathBuf>,
@@ -482,7 +482,7 @@ pub struct WatchArgs {
     pub org: Option<String>,
     #[arg(long)]
     pub user: Option<String>,
-    /// Explicit repos owner/name (repeatable) — overrides org/user.
+    /// Explicit repos owner/name (repeatable) - overrides org/user.
     #[arg(long)]
     pub repo: Vec<String>,
     /// Atom/RSS feed URLs to also poll (repeatable); newest entry change triggers a note.
@@ -562,7 +562,7 @@ pub struct RemoteArgs {
     pub settings: bool,
 }
 
-/// Generate shell completions: `argus completions bash > ...`
+/// Generate shell completions: argus completions bash > ...
 #[derive(Args)]
 pub struct CompletionsArgs {
     pub shell: clap_complete::Shell,

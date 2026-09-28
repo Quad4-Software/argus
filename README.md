@@ -1,11 +1,20 @@
 # argus
 
+[![version](https://img.shields.io/badge/version-0.1.0-1f2430?style=flat-square)](https://github.com/Quad4-Software/argus)
+[![license](https://img.shields.io/badge/license-MIT--0-1f2430?style=flat-square)](LICENSE)
+[![rust](https://img.shields.io/badge/rust-edition_2021-1f2430?style=flat-square&logo=rust&logoColor=d6a300)](Cargo.toml)
+[![tests](https://img.shields.io/badge/tests-60%20pass-1f2430?style=flat-square)](tests/)
+[![last commit](https://img.shields.io/github/last-commit/Quad4-Software/argus?style=flat-square&color=1f2430&label=last%20commit)](https://github.com/Quad4-Software/argus)
+[![top language](https://img.shields.io/github/languages/top/Quad4-Software/argus?style=flat-square&color=1f2430)](https://github.com/Quad4-Software/argus)
+
 Supply-chain security and repository-forensics scanner. One static binary
 checks local checkouts, whole GitHub / GitLab / Gitea accounts, container
 images, web front-ends and the host itself for indicators of known
 compromises (Shai-Hulud family, TeamPCP/trivy-action, malicious litellm),
 secrets and secret liveness, dependency confusion and hygiene, malicious
 workflow/container/host configuration, and agent-substituted authorship.
+
+
 
 ## Usage
 
@@ -80,12 +89,12 @@ argus daemon --listen 127.0.0.1:8694 --repo o/r --notify-url https://ntfy.sh/MYT
 #   (HMAC-signed push webhooks -> instant rescan + new-finding notifications)
 argus sbom .                                                 # CycloneDX 1.5 JSON from lockfiles
 argus ai .                                                   # AI-provenance: agent trailers, velocity, style tells
-argus fix .                                                  # pin mutable uses: to SHA + add permissions block (dry-run; --write applies)
+argus fix .                                                  # pin mutable uses: to SHA + add permissions block (dry-run, --write applies)
 argus license . --deps                                       # license audit + copyleft dep check via registry
 argus publish .                                              # pre-flight: scan only files npm pack/cargo package would ship
 argus scan . --dep-check --internal-prefix "@myorg"            # registry hygiene: confusion, missing, unmaintained deps
 argus github --org my-org --settings                         # + org/repo settings audit (branch protection, actions perms)
-argus image debian:bookworm-slim --deep                      # image audit: secrets, root user, history; --deep scans every layer
+argus image debian:bookworm-slim --deep                      # image audit: secrets, root user, history - --deep scans every layer
 argus web https://example.com --depth 1                     # web audit: headers, cookies, TLS, exposed .git/.env, secrets in JS bundles + source maps, --depth crawls same-origin links
 argus system                                                 # Lynis-class host audit: kernel/auth/ssh/net/fs/services/logging/integrity/malware checks
 argus verify .                                               # secrets liveness: are found tokens still valid? live = critical
@@ -101,14 +110,13 @@ argus mcp
 # tools exposed: scan(paths, min_severity, include_git, diff), scan_system, list_rules
 ```
 
-Exit codes: `0` clean (below `--fail-on`), `1` findings at/above `--fail-on`,
-`2` operational error.
+Exit codes: `0` clean, `1` findings at/above `--fail-on`, `2` operational error.
 
 ## Resilience
 
-- `--offline` / `ARGUS_OFFLINE=1` / `defaults.offline` — zero network activity; remote subcommands refuse cleanly, `--osv`/`--check-runs` are skipped, scanning is fully local (rules are compiled in).
+- `--offline` / `ARGUS_OFFLINE=1` / `defaults.offline` - zero network activity. Remote subcommands refuse cleanly, `--osv`/`--check-runs` are skipped, scanning stays local (rules are compiled in).
 - HTTP layer: 30s global timeout, retry on 429/5xx/connect/timeouts with backoff + `Retry-After`, rate-limit and auth diagnostics in error text, per-repo clone failures degrade to `errors[]` instead of aborting.
-- Sandbox (Linux Landlock): local scans get **zero network** and read-only filesystem; remote commands get their workdir + the forge's network only; daemon gets its listen port. `--no-sandbox` to disable.
+- Sandbox (Linux Landlock): local scans get **zero network** and read-only filesystem. Remote commands get their workdir + the forge's network only. Daemon gets its listen port. `--no-sandbox` to disable.
 
 ## Daemon mode
 
@@ -124,7 +132,7 @@ the same secret on the forge. GitHub uses `X-Hub-Signature-256`, GitLab
 ## Rulesets
 
 Rules live in TOML files. Four sets are compiled in (`--no-builtin-rules` to
-skip); extra `.toml` files load from `--rules <file|dir>`,
+skip) - extra `.toml` files load from `--rules <file|dir>`,
 `defaults.rules_dirs` in the config, and `~/.config/argus/rules/`.
 
 ```toml
@@ -137,7 +145,7 @@ id = "MINE-001"
 type = "action_ref"            # match `uses: owner/repo@ref`
 severity = "critical"          # info|low|medium|high|critical
 repo = "owner/repo"            # or "*" for any action
-unsafe_refs = "tags"           # tags = non-SHA refs; all = every ref
+unsafe_refs = "tags"           # tags = non-SHA refs, all = every ref
 malicious_shas = ["40-char..."]
 description = "..."
 remediation = "..."
@@ -180,7 +188,7 @@ Builtin sets (~76 rules):
 | `mini-shai-hulud` | actions-cool re-armed Sept 2026 + npm payload IoCs |
 | `shai-hulud-classic` | Sept 2025 self-replicating npm worm |
 | `action-compromises` | tj-actions, reviewdog Mar 2025 tag hijacks |
-| `aur-attacks` | CHAOS RAT Jul 2025 + atomic-lockfile Jun 2026 AUR campaigns; PKGBUILD/.install/.hook injection patterns |
+| `aur-attacks` | CHAOS RAT Jul 2025 + atomic-lockfile Jun 2026 AUR campaigns, PKGBUILD/.install/.hook injection patterns |
 | `teampcp` | Mar 2026 Trivy/trivy-action/setup-trivy hijack, CanisterWorm npm scopes, litellm/telnyx PyPI backdoors |
 | `pypi` | ultralytics/torchtriton bad versions, executable .pth, setup.py RCE, interpreter persistence |
 | `npm-generic` | lifecycle-script remote fetch, eval-of-encoded-blob loaders |
@@ -192,7 +200,7 @@ Builtin sets (~76 rules):
 | `actor-watchlist` | known attacker handles (danikpapas, herbsobering, campaign sockpuppets) + disposable-email commit authors, evaluated over git author metadata via `argus authors` |
 | `osint` | young-repo detection (repos <30d old are a throwaway-account signal on remote scans) |
 | `crates` | Cargo ecosystem: `[patch.*]` registry redirects, build.rs network/env access, proc-macro flags, known-bad crates (rustdecimal incident) |
-| `secrets` | structured token regexes (AWS/GitHub/npm/PyPI/OpenAI/Stripe/Slack/Google/GitLab/SendGrid/Telegram/JWT/private keys/creds-in-URL) + entropy-gated generic assignments; secrets are masked in excerpts |
+| `secrets` | structured token regexes (AWS/GitHub/npm/PyPI/OpenAI/Stripe/Slack/Google/GitLab/SendGrid/Telegram/JWT/private keys/creds-in-URL) + entropy-gated generic assignments - secrets are masked in excerpts |
 | `hygiene` | mutable tags, curl\|sh, committed tokens, pull_request_target |
 
 Suppression comments: `argus:ignore ID` on a line, `argus:ignore-next-line ID`,
@@ -213,22 +221,22 @@ See `argus.example.toml`. Precedence: flag > env > config file.
 
 ## Notes
 
-- The scanner matches indicators; a clean result is not proof of safety.
+- The scanner matches indicators - a clean result is not proof of safety.
 - SHA-pinned refs are only reported when the SHA is a known-malicious commit or
-  the rule uses `unsafe_refs = "all"`; arbitrary SHAs cannot be verified offline.
+  the rule uses `unsafe_refs = "all"` - arbitrary SHAs cannot be verified offline.
 - For repos that ran a compromised workflow, rotate secrets and audit run
-  history — this tool finds the exposure, not the blast radius.
+  history - this tool finds the exposure, not the blast radius.
 
 
 ## AI provenance (`argus ai`)
 
-Evidence-based AI-code detection — outputs a score + evidence list, never a bare verdict:
+Evidence-based AI-code detection - outputs a score + evidence list, never a bare verdict:
 
 - **High**: `Co-Authored-By:`/`Generated with/by` trailers naming agents (Claude, Copilot, Cursor, Aider, Devin, OpenHands, Sweep, CodeRabbit, Gemini, Windsurf, ...), commits authored by agent bot accounts
 - **Medium**: commit bursts (60+/24h), median inter-commit gap <90s at scale, median LoC/commit ≥2500, pervasive uniform style across 10+ files
 - **Low**: em-dash density in prose/comments, AI-cliche phrasing ("seamlessly", "it's important to note", "delve into", ...)
 
-Low-tier signals alone cap at "some AI indicators" — a verdict of *likely AI-assisted* requires a high-tier signal or medium-tier clustering.
+Low-tier signals alone cap at "some AI indicators" - a verdict of *likely AI-assisted* requires a high-tier signal or medium-tier clustering.
 
 ### Hiding-attempt forensics
 
@@ -327,7 +335,7 @@ to compose services lacking it.
 ENV secrets, root user, mutable tag, image age, and secrets left in build
 history. `--deep` exports every layer and runs the full rules engine over
 the merged filesystem. The image command runs the container runtime
-unsandboxed (rootless runtimes manage their own namespaces); scanning a
+unsandboxed (rootless runtimes manage their own namespaces). Scanning a
 runtime does not need the sandbox anyway.
 
 ## Dependency hygiene (`--dep-check`)
@@ -336,7 +344,7 @@ runtime does not need the sandbox anyway.
 cache) and reports:
 
 - `DEP-001` dep not found on the public registry (typo, renamed, or private name)
-- `DEP-002` internal-looking name resolving publicly (dependency-confusion exposure;
+- `DEP-002` internal-looking name resolving publicly (dependency-confusion exposure -
   mark your prefixes via `--internal-prefix` or `defaults.internal_prefixes`)
 - `DEP-010` dep dormant >2 years (takeover target)
 - `DEP-011` upstream repository archived/read-only
@@ -344,20 +352,19 @@ cache) and reports:
 `argus watch` tracks the dep set per repo: pushes report `DEPD-001..003`
 (added/removed/version-changed). With `--dep-watch` it also tracks registry
 maintainer sets per dep and fires `DEPD-010` (high) when a maintainer list
-changes — the package-hijack signal. The daemon's webhook rescans get the
+changes - the package-hijack signal. The daemon's webhook rescans get the
 same dep delta.
 
 ## License
 
-MIT-0 — see LICENSE. Use, copy and redistribute without attribution.
+MIT-0 - see LICENSE. Use, copy and redistribute without attribution.
 
 ## Testing
 
 `cargo test` runs unit + binary-level tests plus three structural
 suites:
 
-- `tests/corpus/` - rule fixture corpus; each case dir holds a fixture
-  and `expected.txt` (rule ids that MUST fire, `!id` = MUST NOT)
+- `tests/corpus/` - rule fixture corpus - each case dir holds a fixture and `expected.txt` (rule ids that MUST fire, `!id` = MUST NOT)
 - `tests/arch.rs` - god-file gate: main.rs is dispatch-only (command
   bodies live in `src/cmd/`), no source file over 1000 lines
 - `tests/hardening.rs` - adversarial/FP/determinism checks
@@ -365,5 +372,5 @@ suites:
 ## Contributing
 
 Commits follow Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`,
-`refactor:`, `chore:`) enforced by `scripts/commit-msg` — install with
+`refactor:`, `chore:`) enforced by `scripts/commit-msg` - install with
 `git config core.hooksPath scripts/git-hooks` or copy it into `.git/hooks/`.

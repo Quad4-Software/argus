@@ -157,7 +157,7 @@ pub(crate) fn prose_tells(root: &Path, max: usize) -> Vec<AiEvidence> {
             .unwrap_or(&f)
             .to_string_lossy()
             .replace('\\', "/");
-        let dashes = text.matches('—').count();
+        let dashes = text.matches('\u{2014}').count();
         let words = text.split_whitespace().count().max(1);
         if dashes >= 6 && dashes * 500 > words {
             out.push(AiEvidence {
@@ -224,7 +224,7 @@ pub(crate) fn code_comment_tells(root: &Path, max: usize) -> Vec<AiEvidence> {
             if !is_comment {
                 continue;
             }
-            if t.contains('—') {
+            if t.contains('\u{2014}') {
                 dash_comments += 1;
             }
             let l = t.to_lowercase();

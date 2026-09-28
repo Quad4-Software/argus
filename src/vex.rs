@@ -49,8 +49,8 @@ pub fn load(path: &str) -> Result<Vec<Statement>, String> {
     Ok(out)
 }
 
-/// Apply statements to findings: drop `not_affected`/`fixed`, annotate
-/// `under_investigation` in the message. Returns (kept, suppressed-count).
+/// Apply statements to findings: drop not_affected/fixed, annotate
+/// under_investigation in the message. Returns (kept, suppressed-count).
 pub fn apply(findings: Vec<Finding>, stmts: &[Statement]) -> (Vec<Finding>, usize) {
     let mut suppressed = 0usize;
     let mut out = Vec::with_capacity(findings.len());

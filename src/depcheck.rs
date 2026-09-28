@@ -50,8 +50,8 @@ fn looks_internal(name: &str, prefixes: &[String]) -> bool {
         || l.ends_with("-private")
 }
 
-/// Registry metadata pass over the dep set. `target` labels findings.
-/// `internal` prefixes come from --internal-prefix / config; without them
+/// Registry metadata pass over the dep set. target labels findings.
+/// internal prefixes come from --internal-prefix / config; without them
 /// the shadow-check only fires on generic internal markers.
 pub fn check(
     deps: &[Dep],

@@ -1,6 +1,6 @@
 //! Ruleset fixture corpus: every case dir under tests/corpus/ holds a
 //! fixture file plus expected.txt listing rule ids that MUST fire
-//! (one per line) or `!id` lines for ids that MUST NOT fire on it.
+//! (one per line) or !id lines for ids that MUST NOT fire on it.
 //! Adding a rule without a matching fixture will eventually leave it
 //! unproven - keep coverage honest.
 

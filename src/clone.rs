@@ -1,4 +1,4 @@
-//! `git clone` wrapper with token auth via GIT_ASKPASS (token stays out of argv).
+//! git clone wrapper with token auth via GIT_ASKPASS (token stays out of argv).
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -8,7 +8,7 @@ pub struct GitAuth {
     pub password: String,
 }
 
-/// Write the askpass helper script into `workdir`; returns its path.
+/// Write the askpass helper script into workdir; returns its path.
 fn write_askpass(workdir: &Path) -> Result<PathBuf, String> {
     let script = workdir.join("askpass.sh");
     let body = "#!/bin/sh\ncase \"$1\" in\n  *assword*|*Password*) printf '%s' \"$ARGUS_ASKPASS_PASSWORD\" ;;\n  *) printf '%s' \"$ARGUS_ASKPASS_USERNAME\" ;;\nesac\n";
@@ -25,7 +25,7 @@ fn write_askpass(workdir: &Path) -> Result<PathBuf, String> {
     Ok(script)
 }
 
-/// Shallow-clone `url` into `dest`. Uses GIT_ASKPASS for https credentials so
+/// Shallow-clone url into dest. Uses GIT_ASKPASS for https credentials so
 /// the token never appears in the process list.
 pub fn clone_repo(
     url: &str,

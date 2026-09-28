@@ -1,5 +1,5 @@
 # Metadata-only set: the workflow-audit checks are implemented in Rust
-# (src/workflow_audit.rs) over parsed YAML — TOML regex rules cannot express
+# (src/workflow_audit.rs) over parsed YAML  -  TOML regex rules cannot express
 # job-level semantics. Listed here so `argus rules` shows the coverage and
 # --ruleset/--disable-rule can filter it.
 

@@ -1,6 +1,6 @@
-//! Auto-remediation for workflow findings: pin `uses:` refs to commit
-//! SHAs (resolved via `git ls-remote`, tag kept as a comment) and inject
-//! a top-level `permissions:` block when absent. Dry-run by default.
+//! Auto-remediation for workflow findings: pin uses: refs to commit
+//! SHAs (resolved via git ls-remote, tag kept as a comment) and inject
+//! a top-level permissions: block when absent. Dry-run by default.
 
 use std::path::{Path, PathBuf};
 
@@ -16,8 +16,8 @@ fn is_sha(s: &str) -> bool {
     s.len() == 40 && s.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-/// Resolve `owner/repo@ref` to a commit sha via git ls-remote.
-/// Prefers the dereferenced tag object (`ref^{}`) over the tag ref.
+/// Resolve owner/repo@ref to a commit sha via git ls-remote.
+/// Prefers the dereferenced tag object (ref^{}) over the tag ref.
 fn resolve_ref(repo: &str, refname: &str, verbose: bool) -> Option<String> {
     let url = format!("https://github.com/{repo}");
     let out = std::process::Command::new("git")
@@ -151,7 +151,7 @@ fn fix_workflow_text(
     (out, edits)
 }
 
-/// Apply fixes across workflow files under each root. `write` applies;
+/// Apply fixes across workflow files under each root. write applies;
 /// dry-run just reports. Returns (edits, errors).
 pub fn run(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edit>, Vec<String>) {
     let mut edits = Vec::new();

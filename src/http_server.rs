@@ -89,7 +89,7 @@ pub fn respond(stream: &mut TcpStream, status: u16, body: &str, content_type: &s
     let _ = stream.write_all(out.as_bytes());
 }
 
-/// Serve requests on `listener`, calling `handler` per connection.
+/// Serve requests on listener, calling handler per connection.
 pub fn serve(
     listener: TcpListener,
     handler: impl Fn(Request) -> (u16, String) + Send + Sync + 'static,

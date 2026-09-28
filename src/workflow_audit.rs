@@ -92,7 +92,7 @@ pub fn audit(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) ->
                     Severity::Medium,
                     rel,
                     target,
-                    format!("{scope} permissions grants `{k}: {v}` — broad write scope"),
+                    format!("{scope} permissions grants `{k}: {v}` - broad write scope"),
                     "Restrict permissions to the minimum required.",
                     disabled,
                 ));
@@ -108,7 +108,7 @@ pub fn audit(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) ->
             let jn = jname.as_str().unwrap_or("?");
             if job["secrets"].as_str() == Some("inherit") {
                 out.push(mk("WFA-004", Severity::High, rel, target,
-                    format!("job `{jn}` uses `secrets: inherit` — all secrets flow into a reusable workflow"),
+                    format!("job `{jn}` uses `secrets: inherit` - all secrets flow into a reusable workflow"),
                     "List only the secrets the called workflow needs.", disabled));
             }
             // job-level permissions
@@ -271,7 +271,7 @@ fn audit_step(
                     rel,
                     target,
                     format!(
-                        "upload-artifact captures `{}` — may include .git credentials or secrets",
+                        "upload-artifact captures `{}` - may include .git credentials or secrets",
                         if path.is_empty() { "<repo root>" } else { path }
                     ),
                     "checkout persists credentials in .git/config; never upload the repo root.",
@@ -301,7 +301,7 @@ fn audit_step(
                     || r.contains("head.ref"))
             {
                 out.push(mk("WFA-009", Severity::High, rel, target,
-                    format!("actions/checkout of `{r}` under a privileged trigger — attacker code runs with secrets"),
+                    format!("actions/checkout of `{r}` under a privileged trigger - attacker code runs with secrets"),
                     "Checking out the PR head under pull_request_target/workflow_run executes untrusted code with the write token.", disabled));
             }
         }

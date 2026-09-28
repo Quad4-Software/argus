@@ -5,7 +5,7 @@ name = "crates"
 version = "2026.09.28"
 description = "Cargo ecosystem attacks: registry redirection, build.rs exfil, known-bad crates"
 
-# [patch] tables silently redirect dependency resolution — a typosquat
+# [patch] tables silently redirect dependency resolution  -  a typosquat
 # or hostile mirror takes effect repo-wide.
 [[rule]]
 id = "CRG-001"
@@ -40,7 +40,7 @@ remediation = "Verify intent; a malicious crate can exfiltrate env secrets durin
 reference = "https://doc.rust-lang.org/cargo/reference/build-scripts.html"
 
 # proc-macro crates execute arbitrary Rust at compile time of every
-# dependent build — prime crates.io attack surface.
+# dependent build  -  prime crates.io attack surface.
 [[rule]]
 id = "CRG-004"
 type = "content"

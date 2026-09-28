@@ -25,7 +25,7 @@ fn finding(target: &str, id: &str, sev: Severity, msg: String, remediation: &str
     }
 }
 
-/// Audit org + repo posture on GitHub. `repos` is the already-filtered list;
+/// Audit org + repo posture on GitHub. repos is the already-filtered list;
 /// without a token the unauthenticated API budget (~60/hr) caps per-repo
 /// checks to the first few repos.
 pub fn audit_github(

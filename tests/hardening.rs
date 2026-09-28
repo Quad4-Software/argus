@@ -542,7 +542,7 @@ fn watch_feed_parser() {
     // instead: feed URL to a local file is invalid, so test parser logic via a tiny
     // inline fixture shipped as a test resource.
     let atom = r#"<?xml version="1.0"?><feed><entry><id>tag:x,2026:commit/abc123</id><title>c</title></entry></feed>"#;
-    // sanity: our regex shape — call argus authors json as smoke instead; feed parser
+    // sanity: our regex shape - call argus authors json as smoke instead; feed parser
     // is exercised live. This asserts the binary handles a bad feed URL gracefully.
     let out = bin()
         .args(["watch", "--feed", "file:///nonexistent.atom", "--once"])
@@ -594,7 +594,7 @@ fn api_change_clean_error() {
 
 #[test]
 fn api_rate_limit_then_ok() {
-    // first a 429 shape (we return 200 with array on 2nd) — actually serve real 429
+    // first a 429 shape (we return 200 with array on 2nd) - actually serve real 429
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let hits = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
@@ -685,7 +685,7 @@ fn ai_detects_agent_trailer_and_burst() {
         ]);
     }
     // em-dash saturated doc
-    std::fs::write(d.join("README.md"), "A — B — C — D — E — F — G — H — seamlessly — leverage — it's important to note — comprehensive solution — delve into — meticulous\n".repeat(50)).unwrap();
+    std::fs::write(d.join("README.md"), "A - B - C - D - E - F - G - H - seamlessly - leverage - it's important to note - comprehensive solution - delve into - meticulous\n".repeat(50)).unwrap();
     let out = bin()
         .args(["ai"])
         .arg(&d)

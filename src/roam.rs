@@ -77,7 +77,7 @@ fn github_search(http: &HttpClient, api: &str, q: &RoamQuery) -> Result<Vec<Repo
         let v = http.get_json(&url)?;
         let items = v["items"].as_array().cloned().unwrap_or_default();
         for it in items {
-            // code search items wrap repo in `repository`
+            // code search items wrap repo in repository
             let r = it.get("repository").unwrap_or(&it);
             let full = r["full_name"]
                 .as_str()

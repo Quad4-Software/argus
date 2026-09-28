@@ -1,5 +1,5 @@
 //! Watch mode: continuously monitor repos (and RSS/Atom feeds) for pushes,
-//! rescanning on change. Push detection via `git ls-remote` (forge-agnostic);
+//! rescanning on change. Push detection via git ls-remote (forge-agnostic);
 //! optional atom/rss feed targets for notification-style updates.
 
 use serde::{Deserialize, Serialize};
@@ -78,7 +78,7 @@ pub fn save_state(s: &WatchState) -> Result<(), String> {
     .map_err(|e| format!("{}: {e}", p.display()))
 }
 
-/// `git ls-remote <url> HEAD` -> sha (forge-agnostic push detection).
+/// git ls-remote <url> HEAD -> sha (forge-agnostic push detection).
 pub fn remote_head(url: &str) -> Result<String, String> {
     let out = std::process::Command::new("git")
         .args(["ls-remote", url, "HEAD"])

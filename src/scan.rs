@@ -42,7 +42,7 @@ impl Default for ScanOptions {
     }
 }
 
-/// Recursively collect files under `root`, skipping VCS internals and
+/// Recursively collect files under root, skipping VCS internals and
 /// symlinked directories. Returns repo-relative paths.
 pub fn collect_files(root: &Path, include_git: bool) -> Vec<PathBuf> {
     let mut out = Vec::new();
@@ -104,7 +104,7 @@ fn is_full_sha(s: &str) -> bool {
     s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-/// docker://...@sha256:<64hex> style digest pin — immutable like a commit SHA.
+/// docker://...@sha256:<64hex> style digest pin - immutable like a commit SHA.
 fn is_digest_pin(s: &str) -> bool {
     s.len() == 71 && s.starts_with("sha256:") && s[7..].bytes().all(|b| b.is_ascii_hexdigit())
 }
@@ -431,11 +431,11 @@ fn check_file(
     hits
 }
 
-/// Scan one file; returns findings. `text` is None for skipped/oversize/binary files.
+/// Scan one file; returns findings. text is None for skipped/oversize/binary files.
 /// True when a suppression marker covers this finding.
-/// Markers: `argus:ignore <ID>` on the same line, `argus:ignore-next-line <ID>`
-/// on the previous line, `argus:ignore-file` anywhere near the top (first 20 lines).
-/// `<ID>` optional = suppress everything; comma lists allowed.
+/// Markers: argus:ignore <ID> on the same line, argus:ignore-next-line <ID>
+/// on the previous line, argus:ignore-file anywhere near the top (first 20 lines).
+/// <ID> optional = suppress everything; comma lists allowed.
 fn suppressed(text: Option<&str>, line: Option<usize>, rule_id: &str) -> bool {
     let Some(t) = text else { return false };
     let lines: Vec<&str> = t.lines().take(line.unwrap_or(20)).collect();
@@ -515,7 +515,7 @@ pub fn scan_file(
     out
 }
 
-/// Scan all files under `root` in parallel. `target` labels findings.
+/// Scan all files under root in parallel. target labels findings.
 /// Returns (findings, files_scanned).
 pub fn scan_root(
     root: &Path,
@@ -527,7 +527,7 @@ pub fn scan_root(
     run_pool(files, root, target, rules, opts)
 }
 
-/// Scan an explicit repo-relative file list under `root` (used by --diff mode).
+/// Scan an explicit repo-relative file list under root (used by --diff mode).
 pub fn scan_selected(
     root: &Path,
     rels: &[String],
@@ -658,8 +658,8 @@ fn hex_sha256(b: &[u8]) -> String {
     h.finalize().iter().map(|x| format!("{x:02x}")).collect()
 }
 
-/// Run all rules against in-memory text as a pseudo-file `rel` under `target`.
-/// Used by `system` scans for synthesized inputs (e.g. pacman -Qqm output).
+/// Run all rules against in-memory text as a pseudo-file rel under target.
+/// Used by system scans for synthesized inputs (e.g. pacman -Qqm output).
 pub fn scan_text(rel: &str, text: &str, rules: &[CompiledRule], target: &str) -> Vec<Finding> {
     let opts = ScanOptions::default();
     let applicable: Vec<&CompiledRule> = rules.iter().filter(|r| r.path_in_scope(rel)).collect();
@@ -820,7 +820,7 @@ fn dep_name_candidates(rel: &str, text: &str) -> Vec<(String, usize)> {
             }
         }
         "pnpm-lock.yaml" | "yarn.lock" => {
-            // quoted/unquoted dep keys: `'/name/version'` or `name@version:`
+            // quoted/unquoted dep keys: '/name/version' or name@version:
             let re = regex::Regex::new(
                 r#"(?m)^\s{0,4}['\"]?/?(@?[a-zA-Z0-9][a-zA-Z0-9._/-]*?)[@/][v\d]"#,
             )

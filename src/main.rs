@@ -172,8 +172,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     // tokens are already loaded; nothing below needs more than read on scan
     // roots (+/etc for resolver/TLS), write on clone/output dirs, and TCP
     // 443/22 only for remote work.
-    // git operations under the sandbox are read-only safe, but `diff`/
-    // `ls-files` may try to refresh the index (a write) - resolve changed
+    // git operations under the sandbox are read-only safe, but diff/
+    // ls-files may try to refresh the index (a write) - resolve changed
     // file lists before sandboxing.
     let diff_map: std::collections::HashMap<String, Vec<String>> =
         if let Cmd::Scan { paths } = &cli.cmd {
@@ -466,7 +466,7 @@ exec argus scan --staged --fail-on medium
                 _ => {
                     for r in &reports {
                         println!(
-                            "{} — score {} ({}) [{} commits]",
+                            "{} - score {} ({}) [{} commits]",
                             r.repo, r.score, r.verdict, r.commits_sampled
                         );
                         for e in &r.evidence {

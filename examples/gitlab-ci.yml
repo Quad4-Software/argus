@@ -1,4 +1,4 @@
-# .gitlab-ci.yml fragment — emits a codequality artifact for MR diffs.
+# .gitlab-ci.yml fragment - emits a codequality artifact for MR diffs.
 argus:
   image: rust:latest
   script:

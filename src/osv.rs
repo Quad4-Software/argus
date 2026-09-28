@@ -108,7 +108,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
             }
         }
         "go.mod" => {
-            // require blocks: `module/path v1.2.3`
+            // require blocks: module/path v1.2.3
             let re = regex::Regex::new(r"(?m)^\s*([a-zA-Z0-9._~/-]+)\s+v([0-9][0-9a-zA-Z.+-]*)")
                 .unwrap();
             for c in re.captures_iter(text) {
@@ -125,7 +125,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
             }
         }
         "Gemfile.lock" => {
-            // GEM specs section: `    name (1.2.3)`
+            // GEM specs section:     name (1.2.3)
             let re = regex::Regex::new(r"(?m)^    ([a-zA-Z0-9._-]+) \(([0-9][0-9a-zA-Z.-]*)\)\s*$")
                 .unwrap();
             for c in re.captures_iter(text) {
@@ -138,7 +138,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
             }
         }
         _ => {
-            // CI workflows: `uses: owner/repo@ref` -> GitHub Actions ecosystem advisories
+            // CI workflows: uses: owner/repo@ref -> GitHub Actions ecosystem advisories
             if rel.contains("workflows/") || base.ends_with(".action.yml") || base == "action.yml" {
                 let re = regex::Regex::new(r#"(?m)uses\s*[:=]\s*["']?([a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+)@(v?[0-9][0-9a-zA-Z._-]*)"#).unwrap();
                 for c in re.captures_iter(text) {

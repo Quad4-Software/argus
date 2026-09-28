@@ -34,7 +34,7 @@ fn is_git_repo(root: &Path) -> bool {
     root.join(".git").exists()
 }
 
-/// `git remote get-url origin` -> Some((host, owner, repo)) for github/gitlab/gitea https or ssh urls.
+/// git remote get-url origin -> Some((host, owner, repo)) for github/gitlab/gitea https or ssh urls.
 pub fn origin_repo(root: &Path) -> Option<(String, String, String)> {
     let out = Command::new("git")
         .args([
@@ -81,7 +81,7 @@ pub fn parse_remote(url: &str) -> Option<(String, String, String)> {
 }
 
 /// Audit commits in compromise windows + forged-author hints.
-/// Only runs when `root` is a git repo.
+/// Only runs when root is a git repo.
 pub fn audit_history(root: &Path, target: &str, findings: &mut Vec<Finding>, verbose: u8) {
     if !is_git_repo(root) {
         return;
@@ -147,7 +147,7 @@ pub fn audit_history(root: &Path, target: &str, findings: &mut Vec<Finding>, ver
 }
 
 /// For a GitHub-hosted repo with a flagged workflow file, list runs of that
-/// workflow inside `window` (YYYY-MM-DD). Returns count of runs observed.
+/// workflow inside window (YYYY-MM-DD). Returns count of runs observed.
 pub fn github_runs_in_window(
     api_base: &str,
     token: Option<&str>,
@@ -175,7 +175,7 @@ pub fn github_runs_in_window(
 }
 
 /// Unique commit authors (name + email + count) across all branches.
-/// Sorted by commit count desc — the import list for identity review.
+/// Sorted by commit count desc - the import list for identity review.
 pub fn authors(root: &Path) -> Vec<(String, String, usize)> {
     let r = root.to_string_lossy();
     let out = Command::new("git")

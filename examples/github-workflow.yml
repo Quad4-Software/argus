@@ -1,4 +1,4 @@
-# .github/workflows/argus.yml — scan the repo on every PR and push.
+# .github/workflows/argus.yml - scan the repo on every PR and push.
 # Works as-is on Gitea/Forgejo act_runner too.
 name: argus
 on:

@@ -168,7 +168,7 @@ pub(crate) fn rules_update(feed: &str, verbose: u8) -> Result<ExitCode, String> 
 
 /// For every ActionRef finding with a window, resolve the repo's GitHub remote
 /// and count workflow runs inside the window. Emits CRITICAL findings when runs
-/// exist — that is the difference between "exposed" and "executed the payload".
+/// exist - that is the difference between "exposed" and "executed the payload".
 pub(crate) fn check_runs(cli: &Cli, report: &mut Report) {
     let token = config::resolve_token(
         None,
@@ -219,7 +219,7 @@ pub(crate) fn check_runs(cli: &Cli, report: &mut Report) {
                 line: f.line,
                 excerpt: f.excerpt.clone(),
                 message: format!(
-                    "{owner}/{repo}: workflow ran {n} time(s) inside the compromise window {}..{} — payload likely executed",
+                    "{owner}/{repo}: workflow ran {n} time(s) inside the compromise window {}..{} - payload likely executed",
                     win.0, win.1
                 ),
                 remediation: Some("Rotate every secret available to this workflow and audit run logs.".into()),
@@ -233,7 +233,7 @@ pub(crate) fn check_runs(cli: &Cli, report: &mut Report) {
     report.findings.extend(new_findings);
 }
 
-/// Files changed vs `base` (git diff base...HEAD) plus untracked files.
+/// Files changed vs base (git diff base...HEAD) plus untracked files.
 pub(crate) fn staged_files(repo: &Path) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let r = repo.to_string_lossy();
@@ -395,7 +395,7 @@ pub(crate) fn young_repo_finding(repo: &RepoSpec) -> Option<finding::Finding> {
         path: "-".into(),
         line: None,
         excerpt: None,
-        message: format!("repository created {days} day(s) ago ({created}) — new repos cloned into supply-chain positions are a throwaway-account pattern"),
+        message: format!("repository created {days} day(s) ago ({created}) - new repos cloned into supply-chain positions are a throwaway-account pattern"),
         remediation: Some("Check the publisher account age and history before trusting this code.".into()),
         reference: None,
         window: None,

@@ -120,7 +120,7 @@ impl Report {
         }
     }
 
-    /// Recompute summary after all findings are collected. `min` filters out
+    /// Recompute summary after all findings are collected. min filters out
     /// findings below the reporting threshold.
     pub fn finalize(&mut self, min: Severity) {
         // deterministic ordering: severity desc, then path/line/rule
@@ -206,8 +206,8 @@ impl Report {
             }
         };
         out.push_str(&format!(
-            "\n{}  {} files, {} targets | {}\n",
-            st.bold("Summary:"),
+            "\n{} {} files, {} targets | {}\n",
+            st.bold("Scan:"),
             self.files_scanned,
             self.targets.len(),
             [
@@ -249,8 +249,14 @@ impl Report {
         }
         let s = &self.summary;
         out.push_str(&format!(
-            "**Summary**: {} files, {} targets scanned — {} critical, {} high, {} medium, {} low, {} info.\n",
-            self.files_scanned, self.targets.len(), s.critical, s.high, s.medium, s.low, s.info
+            "**Scan** - {} files, {} targets | {} crit, {} high, {} med, {} low, {} info\n",
+            self.files_scanned,
+            self.targets.len(),
+            s.critical,
+            s.high,
+            s.medium,
+            s.low,
+            s.info
         ));
         if !self.errors.is_empty() {
             out.push_str(&format!(
@@ -437,7 +443,7 @@ function fil(){{
         .expect("sarif serialization")
     }
 
-    /// Code Climate JSON — consumed by GitLab as a codequality report artifact.
+    /// Code Climate JSON - consumed by GitLab as a codequality report artifact.
     pub fn to_codeclimate(&self) -> String {
         let issues: Vec<serde_json::Value> = self
             .findings
@@ -496,7 +502,7 @@ function fil(){{
 }
 
 fn md5ish(s: &str) -> u64 {
-    // FNV-1a 64 — stable fingerprint without pulling a crypto dep.
+    // FNV-1a 64 - stable fingerprint without pulling a crypto dep.
     let mut h: u64 = 0xcbf29ce484222325;
     for b in s.as_bytes() {
         h ^= *b as u64;

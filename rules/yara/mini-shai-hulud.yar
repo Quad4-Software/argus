@@ -1,4 +1,4 @@
-// Mini Shai-Hulud payload family — obfuscation marker + exfil endpoint.
+// Mini Shai-Hulud payload family  -  obfuscation marker + exfil endpoint.
 rule MiniShaiHulud_Payload {
     meta:
         severity = "critical"
