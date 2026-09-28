@@ -1,1 +1,23 @@
+# rust build output
 /target
+
+# packaging / releases
+/dist
+*.tar.gz
+*.zip
+*.sigstore.json
+
+# argus runtime artifacts (local caches, reports, keys)
+.arguscache.json
+*.argus.db
+*.toml.sig
+argus.db
+
+# editor + OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# local ruleset signing keys (never commit private keys)
+*.priv
