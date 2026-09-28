@@ -83,6 +83,13 @@ pub struct Cli {
     #[arg(long, global = true, help = "Do not load builtin rulesets")]
     pub no_builtin_rules: bool,
 
+    #[arg(
+        long = "rules-pubkey",
+        global = true,
+        help = "Require --rules files to carry a valid .toml.sig by this ed25519 public key"
+    )]
+    pub rules_pubkey: Option<PathBuf>,
+
     #[arg(long, global = true, value_enum, help = "Minimum severity to report")]
     pub severity: Option<Severity>,
 
@@ -199,6 +206,20 @@ pub struct Cli {
         help = "Check deps against registries: confusion exposure, missing packages, unmaintained upstreams"
     )]
     pub dep_check: bool,
+
+    #[arg(
+        long = "store",
+        global = true,
+        help = "Persist this scan to ~/.local/share/argus/argus.db for trend diffs"
+    )]
+    pub store: bool,
+
+    #[arg(
+        long = "incremental",
+        global = true,
+        help = "Reuse findings for unchanged files via .arguscache.json"
+    )]
+    pub incremental: bool,
 
     #[arg(
         long = "history-secrets",
@@ -320,6 +341,23 @@ pub enum Cmd {
     Gitea(RemoteArgs),
     /// List loaded rulesets and rules.
     Rules,
+    /// Generate an ed25519 keypair for ruleset signing.
+    RulesKeygen {
+        /// Private key output (PEM).
+        #[arg(long)]
+        privkey: PathBuf,
+        /// Public key output (PEM).
+        #[arg(long)]
+        pubkey: PathBuf,
+    },
+    /// Detached-sign a ruleset file (writes <file>.sig).
+    RulesSign {
+        /// Ruleset TOML to sign.
+        file: PathBuf,
+        /// ed25519 private key PEM.
+        #[arg(long)]
+        key: PathBuf,
+    },
     /// Update rulesets in ~/.config/argus/rules from a feed.
     /// Feed is a git URL (cloned/pulled) or https URL to a single TOML file.
     /// Without --feed, uses config defaults.rules_feed.
@@ -369,6 +407,27 @@ pub enum Cmd {
         /// USER, add no-new-privileges to compose services.
         #[arg(long)]
         containers: bool,
+        /// Flip unsafe IaC booleans (encryption, public acl, deletion
+        /// protection, public-ip mapping).
+        #[arg(long)]
+        iac: bool,
+        /// Bump pinned deps to OSV-fixed versions (requirements.txt,
+        /// Cargo.toml). Queries OSV; needs network.
+        #[arg(long)]
+        deps: bool,
+    },
+
+    /// Interactive triage: walk findings, suppress via .argusignore.
+    Review {
+        /// Repo paths (default: .)
+        paths: Vec<PathBuf>,
+    },
+
+    /// Trend diff: what appeared, what fixed, what persists across
+    /// stored scans of a root. Requires `argus scan --store` history.
+    Trends {
+        /// Root path to diff.
+        path: PathBuf,
     },
 
     /// License audit: project license detection, manifest mismatch,

@@ -57,8 +57,16 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         sb.reads.push(h.join(".ssh"));
     }
     match &cli.cmd {
-        Cmd::Scan { paths } => {
+        Cmd::Scan { paths } | Cmd::Review { paths } => {
             sb.reads.extend(paths.iter().cloned());
+            // review writes .argusignore in cwd
+            if matches!(cli.cmd, Cmd::Review { .. }) {
+                sb.writes.push(std::path::PathBuf::from(".argusignore"));
+            }
+            if cli.incremental {
+                // shared cache dir keyed by canonical root
+                sb.writes.push(crate::cache::cache_dir());
+            }
             if let Some(r) = &cli.similar {
                 sb.reads.push(r.clone());
             }

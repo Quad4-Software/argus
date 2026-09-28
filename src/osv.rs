@@ -298,7 +298,7 @@ pub fn query_batch(
 }
 
 /// First "fixed" version across the advisory's affected ranges, if any.
-fn fixed_version(v: &serde_json::Value) -> String {
+pub fn fixed_version(v: &serde_json::Value) -> String {
     for a in v["affected"].as_array().into_iter().flatten() {
         for r in a["ranges"].as_array().into_iter().flatten() {
             for e in r["events"].as_array().into_iter().flatten() {
@@ -309,6 +309,13 @@ fn fixed_version(v: &serde_json::Value) -> String {
         }
     }
     String::new()
+}
+
+/// GET /v1/vulns/{id} - full advisory (querybatch returns abbreviated
+/// records only; needed for fixed-version extraction).
+pub fn get_vuln(http: &crate::http::HttpClient, id: &str) -> Option<serde_json::Value> {
+    http.get_json(&format!("https://api.osv.dev/v1/vulns/{id}"))
+        .ok()
 }
 
 #[cfg(test)]

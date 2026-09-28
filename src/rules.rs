@@ -115,6 +115,15 @@ pub enum RuleKindDef {
         #[serde(default)]
         versions: Vec<String>,
     },
+    /// Statement-level taint: tracks variables assigned from `source`-matching
+    /// expressions and fires when a `sink`-matching line references a tainted
+    /// var. Sequential, intra-file; no interproc or branch tracking.
+    Taint {
+        source: String,
+        sink: String,
+        #[serde(default)]
+        path: Option<String>,
+    },
     /// File-level dataflow: fires when a `source` regex and a `sink` regex
     /// BOTH match in the same file (e.g. reads a secret AND reaches a
     /// network/file sink). Coarse - no per-line scoping - but catches the
@@ -193,6 +202,11 @@ pub enum CompiledKind {
         entropy: f64,
         min_len: usize,
     },
+    Taint {
+        source: Regex,
+        sink: Regex,
+        path: Option<Regex>,
+    },
     Dataflow {
         source: Regex,
         sink: Regex,
@@ -233,6 +247,7 @@ impl CompiledRule {
         match &self.kind {
             CompiledKind::Content { path: Some(p), .. } => p.is_match(rel),
             CompiledKind::Dataflow { path: Some(p), .. } => p.is_match(rel),
+            CompiledKind::Taint { path: Some(p), .. } => p.is_match(rel),
             CompiledKind::Package { .. } | CompiledKind::SourceUrl { .. } => {
                 static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
                 RE.get_or_init(|| Regex::new(CompiledRule::DEP_MANIFESTS_RE).unwrap())
@@ -382,6 +397,21 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
                     r#"(?i)(resolved|registry|index[-_]?url|source|url)\s*[=:"]\s*["']?(https?://[^\s"',}\]]+)"#
                 ).map_err(|e| format!("rule {}: source_url regex: {e}", def.id))?,
                 allowed,
+            }
+        }
+        RuleKindDef::Taint { source, sink, path } => {
+            // taint only makes sense on code - default scope to source files
+            let p = path.clone().unwrap_or_else(|| {
+                r"\.(js|ts|mjs|cjs|jsx|tsx|py|rs|go|rb|php|sh|bash|ps1|java|c|cpp|h|hpp)$".into()
+            });
+            CompiledKind::Taint {
+                source: Regex::new(source)
+                    .map_err(|e| format!("rule {}: bad taint source: {e}", def.id))?,
+                sink: Regex::new(sink)
+                    .map_err(|e| format!("rule {}: bad taint sink: {e}", def.id))?,
+                path: Some(
+                    Regex::new(&p).map_err(|e| format!("rule {}: bad taint path: {e}", def.id))?,
+                ),
             }
         }
         RuleKindDef::Dataflow { source, sink, path } => CompiledKind::Dataflow {

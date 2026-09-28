@@ -80,6 +80,44 @@ Scans `git log -p` for secrets committed and later removed (up to 500
 commits). Secrets flagged in history must be rotated - deleting the file
 does not help.
 
+## review [paths]
+
+Interactive triage: runs the normal scan then walks findings one by
+one. `d` shows detail, `s` appends `RULE path` to `.argusignore`, `q`
+quits.
+
+## trends <path>
+
+Diff the two most recent stored scans of a root: `+new`, `-fixed`,
+persistent count. Requires `argus scan <path> --store` to have run at
+least once. Stored in `~/.local/share/argus/argus.db`.
+
+## ruleset signing
+
+Custom `--rules` files can carry detached ed25519 signatures
+(`<file>.toml.sig`). With `--rules-pubkey <file>` argus refuses unsigned
+or tampered rulesets - builtin rules are always trusted.
+
+```text
+argus rules-keygen --privkey key.priv --pubkey key.pub
+argus rules-sign rules.toml --key key.priv
+argus scan . --rules rules.toml --rules-pubkey key.pub
+```
+
+## incremental scans + suppressions
+
+`argus scan <path> --incremental` reuses findings for files whose
+mtime+size and ruleset fingerprint are unchanged. Cache lives in
+`~/.cache/argus/<root-hash>.json`.
+
+`.argusignore` at a scan root suppresses findings:
+
+```text
+SEC-001                    # rule id, everywhere
+SEC-001 tests/fixtures/**  # rule id under a glob
+* vendor/                  # everything under a path
+```
+
 ## verify [paths]
 
 Extract provider-shaped tokens from scan paths and ask the provider
@@ -96,6 +134,11 @@ Dry-run remediation. Without `--write` it prints before/after edits.
 - `--containers`: inject `USER` before CMD/ENTRYPOINT, pin FROM digests
   (via crane/skopeo/docker/podman), add `no-new-privileges` to compose
   services lacking it.
+- `--iac`: flip unsafe IaC booleans - `encrypted`, `deletion_protection`,
+  `skip_final_snapshot`, `map_public_ip_on_launch`, `acl = "public-*"`.
+- `--deps`: rewrite pinned deps (`requirements.txt`, `Cargo.toml`) to
+  the first OSV-fixed version. Queries OSV (fetches full advisories for
+  fix fields); needs network.
 
 ## license [paths]
 
@@ -110,7 +153,25 @@ and internal files that tree scans never notice.
 
 ## sbom [path]
 
-Emit a CycloneDX 1.5 SBOM extracted from lockfiles.
+Emit a CycloneDX 1.5 or SPDX 2.3 SBOM from lockfiles.
+
+```text
+argus sbom .                  # CycloneDX (default)
+argus sbom . --format spdx    # SPDX 2.3
+```
+
+## dependency reachability
+
+OSV hits for deps never referenced in source get downgraded to medium
+and tagged "(no source reference - likely not reachable)". It's a
+content heuristic, not a callgraph - the signal stays honest.
+
+## taint rules
+
+`type = "taint"` tracks variables assigned from `source`-matching
+expressions and fires when a `sink` line references a tainted var.
+Sequential and intra-file only - no interproc or branch tracking, but a
+real upgrade from whole-file co-occurrence.
 
 ## authors [paths]
 

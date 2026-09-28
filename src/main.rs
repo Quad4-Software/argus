@@ -1,6 +1,7 @@
 mod ai;
 mod audit;
 mod baseline;
+mod cache;
 mod cli;
 mod clone;
 mod cmd;
@@ -15,6 +16,7 @@ mod fix;
 mod history;
 mod http;
 mod http_server;
+mod ignore;
 mod image;
 mod ioc;
 mod license;
@@ -26,11 +28,13 @@ mod regimg;
 mod registry;
 mod roam;
 mod rules;
+mod rulesign;
 mod sandbox;
 mod sbom;
 mod scan;
 mod settings;
 mod similar;
+mod store;
 mod sysaudit;
 mod verify;
 mod vex;
@@ -91,6 +95,10 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
 
     let mut extra_rules = cli.rules.clone();
     extra_rules.extend(cfg.defaults.rules_dirs.iter().cloned());
+    // signed-ruleset gate: every custom file/dir must verify
+    if let Some(pk) = &cli.rules_pubkey {
+        cmd::misc::verify_signed_rules(&extra_rules, pk)?;
+    }
     let (mut rules, set_names) = rules::load(&extra_rules, cli.no_builtin_rules)?;
 
     // --ruleset filter / --disable-rule + config equivalents
@@ -145,6 +153,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         include_git: cli.include_git,
         disabled: disabled.clone(),
         only_sets: only.clone(),
+        incremental: cli.incremental,
         #[cfg(feature = "yara")]
         yara: yara_rules,
         ..ScanOptions::default()
@@ -202,6 +211,9 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     // podman/docker manage their own user+mount namespaces, which
     // per-path Landlock grants cannot express (same tradeoff as
     // trivy/grype). Everything else stays sandboxed.
+    if cli.incremental {
+        let _ = std::fs::create_dir_all(crate::cache::cache_dir());
+    }
     let local_runtime = matches!(cli.cmd, Cmd::Image { remote: false, .. });
     let sandboxable = !local_runtime;
     if sandboxable && !cli.no_sandbox && !cfg.defaults.no_sandbox.unwrap_or(false) {
@@ -214,6 +226,14 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     match &cli.cmd {
         Cmd::Rules => {
             print_rules(&rules, &set_names);
+            return Ok(ExitCode::SUCCESS);
+        }
+        Cmd::RulesKeygen { privkey, pubkey } => {
+            println!("{}", rulesign::keygen(privkey, pubkey)?);
+            return Ok(ExitCode::SUCCESS);
+        }
+        Cmd::RulesSign { file, key } => {
+            println!("{}", rulesign::sign(file, key)?);
             return Ok(ExitCode::SUCCESS);
         }
         Cmd::RulesUpdate { feed } => {
@@ -231,7 +251,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         Cmd::Mcp => {
             return mcp::serve(rules, opts);
         }
-        Cmd::Scan { paths } => {
+        Cmd::Scan { paths } | Cmd::Review { paths } => {
             for p in paths {
                 if !p.exists() {
                     report
@@ -319,68 +339,13 @@ exec argus scan --staged --fail-on medium
             paths,
             write,
             containers,
+            iac,
+            deps,
         } => {
-            let roots = if paths.is_empty() {
-                vec![PathBuf::from(".")]
-            } else {
-                paths.clone()
-            };
-            let (mut edits, mut errors) = fix::run(&roots, *write, cli.verbose > 0);
-            if *containers {
-                let (e2, er2) = fix::run_containers(&roots, *write, cli.verbose > 0);
-                edits.extend(e2);
-                errors.extend(er2);
-            }
-            for e in &edits {
-                println!(
-                    "{} {}: {}",
-                    if *write { "fixed " } else { "would  " },
-                    e.file.display(),
-                    e.description
-                );
-                if !e.before.is_empty() {
-                    println!("  - {}", e.before.trim());
-                    println!("  + {}", e.after.trim());
-                } else {
-                    println!("  + {}", e.after.replace('\n', "\n  + "));
-                }
-            }
-            for e in &errors {
-                eprintln!("warn: {e}");
-            }
-            if edits.is_empty() {
-                println!("nothing to fix");
-            } else if !*write {
-                println!(
-                    "{} edit(s) pending - rerun with --write to apply",
-                    edits.len()
-                );
-            }
-            return Ok(ExitCode::SUCCESS);
+            return cmd::misc::fix_cmd(cli, paths, *write, *containers, *iac, *deps);
         }
         Cmd::License { paths, deps } => {
-            let roots = if paths.is_empty() {
-                vec![PathBuf::from(".")]
-            } else {
-                paths.clone()
-            };
-            let http = http::HttpClient::new(vec![]);
-            for root in &roots {
-                let label = root.display().to_string();
-                let mut fs = license::audit(root, &label);
-                if *deps {
-                    let mut dd = Vec::new();
-                    collect_deps(root, "", &opts, &mut dd);
-                    let copyleft = fs.iter().any(|f| f.rule_id == "LIC-004");
-                    fs.extend(license::dep_licenses(&dd, &label, copyleft, &http));
-                }
-                report.findings.extend(fs);
-                report.targets.push(TargetStat {
-                    label,
-                    files: 0,
-                    findings: 0,
-                });
-            }
+            cmd::misc::license_cmd(paths, *deps, &opts, &mut report);
         }
         Cmd::Publish { paths } => {
             let roots = if paths.is_empty() {
@@ -458,7 +423,12 @@ exec argus scan --staged --fail-on medium
                             eprintln!("osv: querying {} os packages in image", deps.len());
                             let http = http::HttpClient::new(vec![]);
                             match osv::query_batch(&http, &deps) {
-                                Ok(hits) => fs.extend(cmd::deps::vuln_findings(&deps, hits, "osv")),
+                                Ok(hits) => {
+                                    // OS packages have no source-level
+                                    // reference - empty map keeps them high
+                                    let reach = Default::default();
+                                    fs.extend(cmd::deps::vuln_findings(&deps, hits, "osv", &reach))
+                                }
                                 Err(e) => report.errors.push(format!("osv: {e}")),
                             }
                         }
@@ -468,6 +438,9 @@ exec argus scan --staged --fail-on medium
             }
             Err(e) => report.errors.push(e),
         },
+        Cmd::Trends { path } => {
+            cmd::trends_cmd::trends_cmd(&path.display().to_string(), &mut report);
+        }
         Cmd::Authors { paths, format: fmt } => {
             return authors_cmd(cli, paths, *fmt, &rules);
         }
@@ -561,6 +534,10 @@ exec argus scan --staged --fail-on medium
     }
 
     report.finalize(min_sev);
+
+    // .argusignore suppressions - read from each scan root + cwd
+    ignore::apply_report(&mut report);
+
     if let Some(vx) = &cli.vex {
         match vex::load(&vx.to_string_lossy()) {
             Ok(stmts) => {
@@ -609,6 +586,21 @@ exec argus scan --staged --fail-on medium
     if let Some(bp) = &cli.write_baseline {
         baseline::write(bp, &report.findings)?;
         eprintln!("baseline written to {}", bp.display());
+    }
+
+    // persist scan for trend diffs
+    if cli.store {
+        for t in &report.targets {
+            if let Err(e) = store::store_scan(&report, &t.label) {
+                report.errors.push(format!("store: {e}"));
+            }
+        }
+    }
+
+    if matches!(cli.cmd, Cmd::Review { .. }) {
+        let s = cmd::review_cmd::review_cmd(cli, &report.findings);
+        print!("{s}");
+        return Ok(ExitCode::SUCCESS);
     }
 
     let rendered = match format {

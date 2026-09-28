@@ -519,3 +519,240 @@ mod container_tests {
         assert!(edits[0].description.contains("service a"));
     }
 }
+
+// ---------------- iac + dep fixes ----------------
+
+/// Mechanical boolean flips for IaC: encryption on, public off,
+/// deletion protection on, public-ip mapping off.
+fn fix_iac_text(file: &Path, text: &str) -> (String, Vec<Edit>) {
+    let mut edits = Vec::new();
+    let mut out = String::with_capacity(text.len());
+    // each entry: (find-regex, replaced fragment, description)
+    static RES: std::sync::OnceLock<Vec<regex::Regex>> = std::sync::OnceLock::new();
+    static RULES: &[(&str, &str, &str)] = &[
+        (
+            r"(?i)encrypted\s*=\s*false",
+            "encrypted = true",
+            "enable encryption at rest",
+        ),
+        (
+            r"(?i)deletion_protection\s*=\s*false",
+            "deletion_protection = true",
+            "enable deletion protection",
+        ),
+        (
+            r"(?i)skip_final_snapshot\s*=\s*true",
+            "skip_final_snapshot = false",
+            "keep a final snapshot on delete",
+        ),
+        (
+            r"(?i)map_public_ip_on_launch\s*=\s*true",
+            "map_public_ip_on_launch = false",
+            "stop auto-assigning public IPs",
+        ),
+        (
+            r#"(?i)acl\s*=\s*"public-read-write""#,
+            r#"acl = "private""#,
+            "make object ACL private",
+        ),
+        (
+            r#"(?i)acl\s*=\s*"public-read""#,
+            r#"acl = "private""#,
+            "make object ACL private",
+        ),
+    ];
+    for line in text.lines() {
+        let mut l = line.to_string();
+        let res = RES.get_or_init(|| {
+            RULES
+                .iter()
+                .map(|(r, ..)| regex::Regex::new(r).unwrap())
+                .collect()
+        });
+        for (idx, (re_s, frag, desc)) in RULES.iter().enumerate() {
+            let _ = re_s;
+            let re = &res[idx];
+            if let Some(m) = re.find(&l) {
+                let before = l.clone();
+                l = format!("{}{}{}", &l[..m.start()], frag, &l[m.end()..]);
+                edits.push(Edit {
+                    file: file.to_path_buf(),
+                    description: desc.to_string(),
+                    before,
+                    after: l.clone(),
+                });
+                break;
+            }
+        }
+        out.push_str(&l);
+        out.push('\n');
+    }
+    (out, edits)
+}
+
+fn iac_files(root: &Path) -> Vec<PathBuf> {
+    let mut out = Vec::new();
+    for p in crate::scan::collect_files(root, false) {
+        let rel = p
+            .strip_prefix(root)
+            .unwrap_or(&p)
+            .to_string_lossy()
+            .to_string();
+        if rel.ends_with(".tf") {
+            out.push(p);
+        }
+    }
+    out
+}
+
+/// Apply IaC boolean fixes across roots.
+pub fn run_iac(roots: &[PathBuf], write: bool) -> (Vec<Edit>, Vec<String>) {
+    let mut edits = Vec::new();
+    let mut errors = Vec::new();
+    for root in roots {
+        for f in iac_files(root) {
+            let Ok(text) = std::fs::read_to_string(&f) else {
+                errors.push(format!("{}: unreadable", f.display()));
+                continue;
+            };
+            let (new, mut es) = fix_iac_text(&f, &text);
+            if es.is_empty() {
+                continue;
+            }
+            if write && let Err(e) = std::fs::write(&f, &new) {
+                errors.push(format!("{}: write failed: {e}", f.display()));
+                continue;
+            }
+            edits.append(&mut es);
+        }
+    }
+    (edits, errors)
+}
+
+/// Bump pinned deps to OSV-fixed versions. Only exact pins are touched:
+/// requirements `==`, Cargo.toml `= "x.y.z"`, package-lock `"version"`.
+/// Queries OSV for the current versions, then rewrites to the first fixed.
+pub fn run_deps(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edit>, Vec<String>) {
+    let mut edits = Vec::new();
+    let mut errors = Vec::new();
+    let opts = crate::scan::ScanOptions::default();
+    static CARGO_RE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let cargo_re = CARGO_RE
+        .get_or_init(|| regex::Regex::new(r#"^([A-Za-z0-9_-]+)\s*=\s*"([0-9][^"]*)""#).unwrap());
+    for root in roots {
+        let mut deps = Vec::new();
+        crate::cmd::deps::collect_deps(root, "", &opts, &mut deps);
+        if deps.is_empty() {
+            continue;
+        }
+        let http = crate::http::HttpClient::new(vec![]);
+        let hits = match crate::osv::query_batch(&http, &deps) {
+            Ok(h) => h,
+            Err(e) => {
+                errors.push(e);
+                continue;
+            }
+        };
+        // dep name -> fixed version; querybatch abbreviates, so fetch
+        // full advisories when the fix field is absent
+        let mut fixmap: std::collections::HashMap<String, String> = Default::default();
+        let mut need_full: Vec<String> = Vec::new();
+        for (i, id, _, fix) in &hits {
+            if fix.is_empty() {
+                need_full.push(id.clone());
+                continue;
+            }
+            let name = deps[*i].name.clone();
+            fixmap.entry(name).or_insert_with(|| fix.clone());
+        }
+        need_full.sort();
+        need_full.dedup();
+        for id in need_full.iter().take(40) {
+            if let Some(v) = crate::osv::get_vuln(&http, id) {
+                // find which dep this advisory belonged to
+                for (i, id2, _, _) in &hits {
+                    if id2 == id {
+                        let fix = crate::osv::fixed_version(&v);
+                        if !fix.is_empty() {
+                            fixmap.insert(deps[*i].name.clone(), fix);
+                        }
+                    }
+                }
+            }
+        }
+        if fixmap.is_empty() {
+            if verbose {
+                eprintln!("fix(deps): no fixed versions available");
+            }
+            continue;
+        }
+        for f in crate::scan::collect_files(root, false) {
+            let rel = f
+                .strip_prefix(root)
+                .unwrap_or(&f)
+                .to_string_lossy()
+                .to_string();
+            let base = rel.rsplit('/').next().unwrap_or(&rel);
+            let kind = match base {
+                n if n.starts_with("requirements") || n == "constraints.txt" => "req",
+                "Cargo.toml" => "cargo",
+                _ => continue,
+            };
+            let Ok(text) = std::fs::read_to_string(&f) else {
+                continue;
+            };
+            let re = cargo_re;
+            let mut out = String::with_capacity(text.len());
+            let mut changed = false;
+            for line in text.lines() {
+                let mut l = line.to_string();
+                if kind == "req" {
+                    // name==version
+                    if let Some((name, ver)) = l.split_once("==") {
+                        let name = name.trim().to_string();
+                        let ver = ver.trim().to_string();
+                        if let Some(fix) = fixmap
+                            .get(&name.to_lowercase())
+                            .or_else(|| fixmap.get(&name))
+                            && *ver != *fix
+                        {
+                            let before = l.clone();
+                            l = format!("{name}=={fix}");
+                            edits.push(Edit {
+                                file: f.clone(),
+                                description: format!("bump {name} to fixed {fix}"),
+                                before,
+                                after: l.clone(),
+                            });
+                            changed = true;
+                        }
+                    }
+                } else if let Some(c) = re.captures(&l) {
+                    {
+                        let name = c[1].to_string();
+                        if let Some(fix) = fixmap.get(&name) {
+                            let before = l.clone();
+                            l = l.replacen(&c[2], fix, 1);
+                            edits.push(Edit {
+                                file: f.clone(),
+                                description: format!("bump {name} to fixed {fix}"),
+                                before,
+                                after: l.clone(),
+                            });
+                            changed = true;
+                        }
+                    }
+                }
+                out.push_str(&l);
+                out.push('\n');
+            }
+            if write
+                && changed
+                && let Err(e) = std::fs::write(&f, &out)
+            {
+                errors.push(format!("{}: write failed: {e}", f.display()));
+            }
+        }
+    }
+    (edits, errors)
+}

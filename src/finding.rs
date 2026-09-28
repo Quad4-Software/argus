@@ -50,7 +50,7 @@ impl fmt::Display for Severity {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Finding {
     pub ruleset: String,
     pub rule_id: String,

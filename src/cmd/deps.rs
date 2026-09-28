@@ -44,11 +44,12 @@ pub(crate) fn osv_scan(cli: &Cli, opts: &ScanOptions, report: &mut Report) -> Re
         Cmd::System { .. } => vec![],
         _ => vec![],
     };
-    for root in roots {
-        collect_deps(&root, "", opts, &mut deps);
+    for root in &roots {
+        collect_deps(root, "", opts, &mut deps);
     }
     // remote scans: deps collected during clone loop get merged here
-    run_osv_queries(cli, deps, report)
+    let reach = dep_reachability(&roots, &deps, opts);
+    run_osv_queries(cli, deps, report, reach)
 }
 
 pub(crate) fn cfg_deps_prefixes() -> Vec<String> {
@@ -80,6 +81,7 @@ pub(crate) fn run_osv_queries(
     cli: &Cli,
     mut deps: Vec<osv::Dep>,
     report: &mut Report,
+    reach: std::collections::HashMap<String, bool>,
 ) -> Result<(), String> {
     deps.extend(REMOTE_DEPS.lock().unwrap().drain(..));
     deps.sort();
@@ -111,25 +113,84 @@ pub(crate) fn run_osv_queries(
     }
     eprintln!("osv: querying {} pinned deps", deps.len());
     let hits = osv::query_batch(&http, &deps)?;
-    report.findings.extend(vuln_findings(&deps, hits, "osv"));
+    report
+        .findings
+        .extend(vuln_findings(&deps, hits, "osv", &reach));
     Ok(())
 }
 
 /// Shared vuln-hit -> finding mapping used by scan --osv and image --deep.
+/// Which dep names are referenced anywhere in source under roots.
+/// Coarse text match - "reachable" means a file mentions the name, not
+/// that the vulnerable function runs. Honest signal, not callgraph.
+pub(crate) fn dep_reachability(
+    roots: &[std::path::PathBuf],
+    deps: &[osv::Dep],
+    opts: &ScanOptions,
+) -> std::collections::HashMap<String, bool> {
+    use std::collections::HashMap;
+    let names: std::collections::HashSet<String> = deps.iter().map(|d| d.name.clone()).collect();
+    let mut seen: HashMap<String, bool> = names.iter().map(|n| (n.clone(), false)).collect();
+    // normalized aliases: hyphens become _ for rust, :: for maven groups
+    let mut pats: HashMap<String, Vec<String>> = HashMap::new();
+    for n in &names {
+        let mut v = vec![n.clone()];
+        v.push(n.replace('-', "_"));
+        if let Some((g, a)) = n.split_once(':') {
+            v.push(g.replace('.', "/")); // maven group path
+            v.push(a.to_string());
+        }
+        pats.insert(n.clone(), v);
+    }
+    static CODE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let code = CODE.get_or_init(|| {
+        regex::Regex::new(
+            r"(?i)\.(py|js|ts|mjs|cjs|jsx|tsx|rs|go|rb|php|java|kt|cs|sh|bash|pl|lua|c|cc|cpp|h|hpp|ex|exs|dart|swift|scala|clj|hs|erl|fs|fsx|nim|zig|sol)$",
+        )
+        .unwrap()
+    });
+    for root in roots {
+        for f in crate::scan::collect_files(root, false) {
+            if !code.is_match(&f.to_string_lossy()) {
+                continue; // manifests name themselves
+            }
+            let Ok(b) = std::fs::read(&f) else { continue };
+            if b.len() > opts.max_file_size as usize || crate::scan::looks_binary(&b) {
+                continue;
+            }
+            let t = String::from_utf8_lossy(&b);
+            for (name, pats) in &pats {
+                if *seen.get(name).unwrap_or(&false) {
+                    continue;
+                }
+                if pats.iter().any(|p| t.contains(p.as_str())) {
+                    seen.insert(name.clone(), true);
+                }
+            }
+        }
+    }
+    seen
+}
+
 pub(crate) fn vuln_findings(
     deps: &[osv::Dep],
     hits: Vec<(usize, String, String, String)>,
     ruleset: &str,
+    reach: &std::collections::HashMap<String, bool>,
 ) -> Vec<Finding> {
     let mut out = Vec::new();
     for (i, id, summary, fix) in hits {
         let d = &deps[i];
         let is_mal = id.starts_with("MAL-");
+        // absent from map = unknown (e.g. image OS pkgs) -> keep reached
+        let reached = reach.get(&d.name).copied().unwrap_or(true);
         out.push(finding::Finding {
             ruleset: ruleset.into(),
             rule_id: id.clone(),
             severity: if is_mal {
                 Severity::Critical
+            } else if !reached {
+                Severity::Medium // present but no source reference
             } else {
                 Severity::High
             },
@@ -138,11 +199,16 @@ pub(crate) fn vuln_findings(
             line: None,
             excerpt: Some(format!("{} {}@{}", d.ecosystem, d.name, d.version)),
             message: format!(
-                "OSV advisory {id} for {} {}@{}{}{}",
+                "OSV advisory {id} for {} {}@{}{}{}{}",
                 d.ecosystem,
                 d.name,
                 d.version,
                 if is_mal { " (malicious package)" } else { "" },
+                if reached {
+                    ""
+                } else {
+                    " (no source reference - likely not reachable)"
+                },
                 if summary.is_empty() {
                     String::new()
                 } else {

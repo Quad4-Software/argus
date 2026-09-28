@@ -534,3 +534,118 @@ pub(crate) fn remote_image(image: &str, report: &mut crate::finding::Report, ver
         Err(e) => report.errors.push(e),
     }
 }
+
+/// --rules-pubkey: every custom ruleset file/dir must verify against
+/// the given ed25519 public key before loading.
+pub(crate) fn verify_signed_rules(
+    extra_rules: &[PathBuf],
+    pk: &std::path::Path,
+) -> Result<(), String> {
+    for extra in extra_rules {
+        let files: Vec<PathBuf> = if extra.is_dir() {
+            std::fs::read_dir(extra)
+                .map(|d| {
+                    d.flatten()
+                        .map(|e| e.path())
+                        .filter(|p| p.extension().is_some_and(|x| x == "toml"))
+                        .collect()
+                })
+                .unwrap_or_default()
+        } else {
+            vec![extra.clone()]
+        };
+        for f in files {
+            crate::rulesign::verify(&f, pk)?;
+        }
+    }
+    Ok(())
+}
+
+/// `argus fix` - run workflow/container/iac/deps fixers and report.
+pub(crate) fn fix_cmd(
+    cli: &crate::cli::Cli,
+    paths: &[PathBuf],
+    write: bool,
+    containers: bool,
+    iac: bool,
+    deps: bool,
+) -> Result<std::process::ExitCode, String> {
+    let roots: Vec<PathBuf> = if paths.is_empty() {
+        vec![PathBuf::from(".")]
+    } else {
+        paths.to_vec()
+    };
+    let (mut edits, mut errors) = crate::fix::run(&roots, write, cli.verbose > 0);
+    if containers {
+        let (e2, er2) = crate::fix::run_containers(&roots, write, cli.verbose > 0);
+        edits.extend(e2);
+        errors.extend(er2);
+    }
+    if iac {
+        let (e2, er2) = crate::fix::run_iac(&roots, write);
+        edits.extend(e2);
+        errors.extend(er2);
+    }
+    if deps {
+        let (e2, er2) = crate::fix::run_deps(&roots, write, cli.verbose > 0);
+        edits.extend(e2);
+        errors.extend(er2);
+    }
+    for e in &edits {
+        println!(
+            "{} {}: {}",
+            if write { "fixed " } else { "would  " },
+            e.file.display(),
+            e.description
+        );
+        if !e.before.is_empty() {
+            println!("  - {}", e.before.trim());
+            println!("  + {}", e.after.trim());
+        } else {
+            println!("  + {}", e.after.replace('\n', "\n  + "));
+        }
+    }
+    for e in &errors {
+        eprintln!("warn: {e}");
+    }
+    if edits.is_empty() {
+        println!("nothing to fix");
+    } else if !write {
+        println!(
+            "{} edit(s) pending - rerun with --write to apply",
+            edits.len()
+        );
+    }
+    Ok(std::process::ExitCode::SUCCESS)
+}
+
+/// `argus license` - per-root license audit + optional dep licenses.
+pub(crate) fn license_cmd(
+    paths: &[PathBuf],
+    deps: bool,
+    opts: &crate::scan::ScanOptions,
+    report: &mut crate::finding::Report,
+) {
+    let roots: Vec<PathBuf> = if paths.is_empty() {
+        vec![PathBuf::from(".")]
+    } else {
+        paths.to_vec()
+    };
+    let http = crate::http::HttpClient::new(vec![]);
+    for root in &roots {
+        let label = root.display().to_string();
+        let mut fs = crate::license::audit(root, &label);
+        if deps {
+            let mut dd = Vec::new();
+            crate::cmd::deps::collect_deps(root, "", opts, &mut dd);
+            let copyleft = fs.iter().any(|f| f.rule_id == "LIC-004");
+            fs.extend(crate::license::dep_licenses(&dd, &label, copyleft, &http));
+        }
+        report.findings.extend(fs);
+        report.targets.push(crate::finding::TargetStat {
+            label,
+            files: 0,
+            findings: 0,
+        });
+    }
+}
