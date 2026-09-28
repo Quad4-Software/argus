@@ -5,7 +5,7 @@
 use crate::finding::Severity;
 use crate::rules::CompiledRule;
 use crate::scan::ScanOptions;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
 

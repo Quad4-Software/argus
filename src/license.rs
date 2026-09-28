@@ -96,40 +96,40 @@ const LICENSE_FILES: &[&str] = &[
 /// Declared license fields in manifests: (file, key path).
 fn manifest_license(root: &Path) -> Vec<(String, String)> {
     let mut out = Vec::new();
-    if let Ok(b) = std::fs::read(root.join("package.json")) {
-        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b) {
-            if let Some(l) = v["license"].as_str() {
-                out.push(("package.json".into(), l.to_string()));
-            }
-            if let Some(l) = v["license"]["type"].as_str() {
-                out.push(("package.json".into(), l.to_string()));
+    if let Ok(b) = std::fs::read(root.join("package.json"))
+        && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&b)
+    {
+        if let Some(l) = v["license"].as_str() {
+            out.push(("package.json".into(), l.to_string()));
+        }
+        if let Some(l) = v["license"]["type"].as_str() {
+            out.push(("package.json".into(), l.to_string()));
+        }
+    }
+    if let Ok(t) = std::fs::read_to_string(root.join("Cargo.toml"))
+        && let Ok(v) = t.parse::<toml::Value>()
+    {
+        for path in [
+            &["package", "license"][..],
+            &["workspace", "package", "license"][..],
+        ] {
+            if let Some(l) = path
+                .iter()
+                .try_fold(&v, |acc, k| acc.get(*k))
+                .and_then(|x| x.as_str())
+            {
+                out.push(("Cargo.toml".into(), l.to_string()));
             }
         }
     }
-    if let Ok(t) = std::fs::read_to_string(root.join("Cargo.toml")) {
-        if let Ok(v) = t.parse::<toml::Value>() {
-            for path in [
-                &["package", "license"][..],
-                &["workspace", "package", "license"][..],
-            ] {
-                if let Some(l) = path
-                    .iter()
-                    .try_fold(&v, |acc, k| acc.get(*k))
-                    .and_then(|x| x.as_str())
-                {
-                    out.push(("Cargo.toml".into(), l.to_string()));
-                }
-            }
-        }
-    }
-    if let Ok(t) = std::fs::read_to_string(root.join("pyproject.toml")) {
-        if let Ok(v) = t.parse::<toml::Value>() {
-            let lic = v.get("project").and_then(|p| p.get("license"));
-            if let Some(l) = lic.and_then(|x| x.get("text")).and_then(|x| x.as_str()) {
-                out.push(("pyproject.toml".into(), l.to_string()));
-            } else if let Some(l) = lic.and_then(|x| x.as_str()) {
-                out.push(("pyproject.toml".into(), l.to_string()));
-            }
+    if let Ok(t) = std::fs::read_to_string(root.join("pyproject.toml"))
+        && let Ok(v) = t.parse::<toml::Value>()
+    {
+        let lic = v.get("project").and_then(|p| p.get("license"));
+        if let Some(l) = lic.and_then(|x| x.get("text")).and_then(|x| x.as_str()) {
+            out.push(("pyproject.toml".into(), l.to_string()));
+        } else if let Some(l) = lic.and_then(|x| x.as_str()) {
+            out.push(("pyproject.toml".into(), l.to_string()));
         }
     }
     out
@@ -184,16 +184,16 @@ pub fn audit(root: &Path, target: &str) -> Vec<Finding> {
             }
         }
     }
-    if let Some((lf, spdx)) = &file_license {
-        if is_copyleft(spdx) {
-            out.push(finding(
-                target,
-                lf,
-                "LIC-004",
-                Severity::Info,
-                format!("project license is copyleft ({spdx}) - dependents inherit obligations"),
-            ));
-        }
+    if let Some((lf, spdx)) = &file_license
+        && is_copyleft(spdx)
+    {
+        out.push(finding(
+            target,
+            lf,
+            "LIC-004",
+            Severity::Info,
+            format!("project license is copyleft ({spdx}) - dependents inherit obligations"),
+        ));
     }
     out
 }
@@ -236,20 +236,22 @@ pub fn dep_licenses(
         let results = std::sync::Mutex::new(Vec::new());
         std::thread::scope(|s| {
             for _ in 0..8 {
-                s.spawn(|| loop {
-                    let i = {
-                        let mut q = queue.lock().unwrap();
-                        let before = q.len();
-                        q.next();
-                        if before == 0 {
-                            None
-                        } else {
-                            Some(unique.len() - before)
+                s.spawn(|| {
+                    loop {
+                        let i = {
+                            let mut q = queue.lock().unwrap();
+                            let before = q.len();
+                            q.next();
+                            if before == 0 {
+                                None
+                            } else {
+                                Some(unique.len() - before)
+                            }
+                        };
+                        let Some(i) = i else { break };
+                        if let Ok(info) = crate::registry::lookup(http, unique[i]) {
+                            results.lock().unwrap().push((i, info));
                         }
-                    };
-                    let Some(i) = i else { break };
-                    if let Ok(info) = crate::registry::lookup(http, unique[i]) {
-                        results.lock().unwrap().push((i, info));
                     }
                 });
             }

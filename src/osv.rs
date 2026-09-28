@@ -28,15 +28,14 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
                             .rsplit("node_modules/")
                             .next()
                             .filter(|n| !n.is_empty() && *n != *k && k.contains("node_modules/"))
+                            && let Some(ver) = meta.get("version").and_then(|v| v.as_str())
                         {
-                            if let Some(ver) = meta.get("version").and_then(|v| v.as_str()) {
-                                out.push(Dep {
-                                    ecosystem: "npm",
-                                    name: name.into(),
-                                    version: ver.into(),
-                                    path: rel.into(),
-                                });
-                            }
+                            out.push(Dep {
+                                ecosystem: "npm",
+                                name: name.into(),
+                                version: ver.into(),
+                                path: rel.into(),
+                            });
                         }
                     }
                 }

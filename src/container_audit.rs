@@ -143,8 +143,7 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
             if !img.eq_ignore_ascii_case("scratch")
                 && (tag.is_none() || tag == Some("latest"))
                 && !line.to_uppercase().contains(" AS ")
-            {
-                if let Some(f) = mk(
+                && let Some(f) = mk(
                     "CNT-004",
                     Severity::Medium,
                     rel,
@@ -153,13 +152,14 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                     "Pin to a digest (FROM img@sha256:...) or at least a version tag.",
                     OWASP_DOCKER,
                     disabled,
-                ) {
-                    out.push(f);
-                }
+                )
+            {
+                out.push(f);
             }
         }
-        if upper.starts_with("ADD ") && (line.contains("http://") || line.contains("https://")) {
-            if let Some(f) = mk(
+        if upper.starts_with("ADD ")
+            && (line.contains("http://") || line.contains("https://"))
+            && let Some(f) = mk(
                 "CNT-003",
                 Severity::Medium,
                 rel,
@@ -168,9 +168,9 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 "Use COPY for local files; fetch artifacts with curl + checksum instead.",
                 OWASP_DOCKER,
                 disabled,
-            ) {
-                out.push(f);
-            }
+            )
+        {
+            out.push(f);
         }
         if (upper.starts_with("RUN ")
             || upper.starts_with("CMD ")
@@ -180,8 +180,7 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 || line.contains("|sh")
                 || line.contains("| bash")
                 || line.contains("|bash"))
-        {
-            if let Some(f) = mk(
+            && let Some(f) = mk(
                 "CNT-002",
                 Severity::High,
                 rel,
@@ -190,9 +189,9 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 "Download the artifact, verify a checksum/signature, then run it.",
                 OWASP_DOCKER,
                 disabled,
-            ) {
-                out.push(f);
-            }
+            )
+        {
+            out.push(f);
         }
         for instr in ["ENV ", "ARG "] {
             if upper.starts_with(instr) {
@@ -202,20 +201,24 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                         Some(x) => x,
                         None => (kv, ""),
                     };
-                    if secretish(k) && !v.is_empty() && !v.starts_with('$') && !v.starts_with("${")
-                    {
-                        if let Some(f) = mk(
+                    if secretish(k)
+                        && !v.is_empty()
+                        && !v.starts_with('$')
+                        && !v.starts_with("${")
+                        && let Some(f) = mk(
                             "CNT-005",
                             Severity::Critical,
                             rel,
                             target,
-                            format!("{instr}assigns a literal value to {k} - secrets bake into image layers and history"),
+                            format!(
+                                "{instr}assigns a literal value to {k} - secrets bake into image layers and history"
+                            ),
                             "Pass secrets at runtime (docker -e, secrets manager) or use --secret mounts for build-time needs.",
                             OWASP_DOCKER,
                             disabled,
-                        ) {
-                            out.push(f);
-                        }
+                        )
+                    {
+                        out.push(f);
                     }
                 }
             }
@@ -231,8 +234,8 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 ".netrc",
                 "kubeconfig",
             ] {
-                if low.contains(bad) {
-                    if let Some(f) = mk(
+                if low.contains(bad)
+                    && let Some(f) = mk(
                         "CNT-009",
                         Severity::High,
                         rel,
@@ -241,14 +244,14 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                         "Exclude with .dockerignore; inject credentials at runtime.",
                         OWASP_DOCKER,
                         disabled,
-                    ) {
-                        out.push(f);
-                    }
+                    )
+                {
+                    out.push(f);
                 }
             }
         }
-        if upper.contains("CHMOD 777") || upper.contains("CHMOD -R 777") {
-            if let Some(f) = mk(
+        if (upper.contains("CHMOD 777") || upper.contains("CHMOD -R 777"))
+            && let Some(f) = mk(
                 "CNT-006",
                 Severity::Low,
                 rel,
@@ -257,12 +260,12 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 "Set the narrowest ownership/permission needed.",
                 OWASP_DOCKER,
                 disabled,
-            ) {
-                out.push(f);
-            }
+            )
+        {
+            out.push(f);
         }
-        if upper.starts_with("EXPOSE 22") {
-            if let Some(f) = mk(
+        if upper.starts_with("EXPOSE 22")
+            && let Some(f) = mk(
                 "CNT-010",
                 Severity::Medium,
                 rel,
@@ -271,13 +274,14 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                 "Prefer docker exec / orchestrator shells over sshd in images.",
                 OWASP_DOCKER,
                 disabled,
-            ) {
-                out.push(f);
-            }
+            )
+        {
+            out.push(f);
         }
     }
-    if from_lines > 0 && !has_user {
-        if let Some(f) = mk(
+    if from_lines > 0
+        && !has_user
+        && let Some(f) = mk(
             "CNT-001",
             Severity::High,
             rel,
@@ -286,9 +290,9 @@ fn dockerfile(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
             "Create an unprivileged user and add USER before the entrypoint.",
             OWASP_DOCKER,
             disabled,
-        ) {
-            out.push(f);
-        }
+        )
+    {
+        out.push(f);
     }
     out
 }
@@ -303,8 +307,11 @@ fn service_env_secret(
     out: &mut Vec<Finding>,
     disabled: &HashSet<String>,
 ) {
-    if secretish(name) && !val.is_empty() && !val.starts_with('$') && !val.starts_with("${") {
-        if let Some(f) = mk(
+    if secretish(name)
+        && !val.is_empty()
+        && !val.starts_with('$')
+        && !val.starts_with("${")
+        && let Some(f) = mk(
             "CNT-105",
             Severity::High,
             rel,
@@ -313,9 +320,9 @@ fn service_env_secret(
             "Use env_file, secrets:, or runtime injection instead of literals in compose.",
             OWASP_DOCKER,
             disabled,
-        ) {
-            out.push(f);
-        }
+        )
+    {
+        out.push(f);
     }
 }
 
@@ -332,15 +339,25 @@ fn compose(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -> V
         };
         for (name, svc) in map {
             let svc_name = name.as_str().unwrap_or("?");
-            if svc["privileged"].as_bool() == Some(true) {
-                if let Some(f) = mk("CNT-101", Severity::High, rel, target,
-                    format!("service {svc_name} runs privileged (OWASP rule #3: full host capabilities)"),
+            if svc["privileged"].as_bool() == Some(true)
+                && let Some(f) = mk(
+                    "CNT-101",
+                    Severity::High,
+                    rel,
+                    target,
+                    format!(
+                        "service {svc_name} runs privileged (OWASP rule #3: full host capabilities)"
+                    ),
                     "Drop privileged; grant only the capabilities the service needs.",
-                    OWASP_DOCKER, disabled) { out.push(f); }
+                    OWASP_DOCKER,
+                    disabled,
+                )
+            {
+                out.push(f);
             }
             for ns in ["network_mode", "pid", "ipc", "uts"] {
-                if svc[ns].as_str() == Some("host") || svc[ns].as_str() == Some("host:") {
-                    if let Some(f) = mk(
+                if (svc[ns].as_str() == Some("host") || svc[ns].as_str() == Some("host:"))
+                    && let Some(f) = mk(
                         "CNT-103",
                         Severity::Medium,
                         rel,
@@ -349,21 +366,31 @@ fn compose(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -> V
                         "Host namespaces break container isolation; avoid unless required.",
                         OWASP_DOCKER,
                         disabled,
-                    ) {
-                        out.push(f);
-                    }
+                    )
+                {
+                    out.push(f);
                 }
             }
             for vol in svc["volumes"].as_vec().into_iter().flatten() {
                 let v = vol.as_str().unwrap_or("");
-                if v.contains("/var/run/docker.sock") {
-                    if let Some(f) = mk("CNT-102", Severity::High, rel, target,
-                        format!("service {svc_name} mounts the docker socket (container escape to full host control)"),
+                if v.contains("/var/run/docker.sock")
+                    && let Some(f) = mk(
+                        "CNT-102",
+                        Severity::High,
+                        rel,
+                        target,
+                        format!(
+                            "service {svc_name} mounts the docker socket (container escape to full host control)"
+                        ),
                         "Avoid the docker socket; use a proxy (socket-proxy) with restricted API if needed.",
-                        OWASP_DOCKER, disabled) { out.push(f); }
+                        OWASP_DOCKER,
+                        disabled,
+                    )
+                {
+                    out.push(f);
                 }
-                if v == "/:/host" || v.starts_with("/:/") || v == "/:/host:ro" {
-                    if let Some(f) = mk(
+                if (v == "/:/host" || v.starts_with("/:/") || v == "/:/host:ro")
+                    && let Some(f) = mk(
                         "CNT-102",
                         Severity::High,
                         rel,
@@ -372,26 +399,26 @@ fn compose(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -> V
                         "Mount only the specific directories required.",
                         OWASP_DOCKER,
                         disabled,
-                    ) {
-                        out.push(f);
-                    }
+                    )
+                {
+                    out.push(f);
                 }
             }
-            if let Some(img) = svc["image"].as_str() {
-                if !img.contains('@') && (image_tag(img).is_none() || img.ends_with(":latest")) {
-                    if let Some(f) = mk(
-                        "CNT-104",
-                        Severity::Medium,
-                        rel,
-                        target,
-                        format!("service {svc_name} uses mutable image tag {img}"),
-                        "Pin image versions or digests for reproducible deploys.",
-                        OWASP_DOCKER,
-                        disabled,
-                    ) {
-                        out.push(f);
-                    }
-                }
+            if let Some(img) = svc["image"].as_str()
+                && !img.contains('@')
+                && (image_tag(img).is_none() || img.ends_with(":latest"))
+                && let Some(f) = mk(
+                    "CNT-104",
+                    Severity::Medium,
+                    rel,
+                    target,
+                    format!("service {svc_name} uses mutable image tag {img}"),
+                    "Pin image versions or digests for reproducible deploys.",
+                    OWASP_DOCKER,
+                    disabled,
+                )
+            {
+                out.push(f);
             }
             for kv in svc["environment"].as_hash().into_iter().flatten() {
                 if let (Some(k), Some(v)) = (kv.0.as_str(), kv.1.as_str()) {
@@ -399,54 +426,66 @@ fn compose(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -> V
                 }
             }
             for e in svc["environment"].as_vec().into_iter().flatten() {
-                if let Some(s) = e.as_str() {
-                    if let Some((k, v)) = s.split_once('=') {
-                        service_env_secret(k, v, rel, target, &mut out, disabled);
-                    }
+                if let Some(s) = e.as_str()
+                    && let Some((k, v)) = s.split_once('=')
+                {
+                    service_env_secret(k, v, rel, target, &mut out, disabled);
                 }
             }
             for cap in svc["cap_add"].as_vec().into_iter().flatten() {
-                if let Some(c) = cap.as_str() {
-                    if matches!(
+                if let Some(c) = cap.as_str()
+                    && matches!(
                         c,
                         "SYS_ADMIN" | "ALL" | "NET_ADMIN" | "SYS_MODULE" | "SYS_PTRACE"
-                    ) {
-                        if let Some(f) = mk(
-                            "CNT-106",
-                            Severity::High,
-                            rel,
-                            target,
-                            format!("service {svc_name} adds dangerous capability {c}"),
-                            "Grant the minimum capability set; SYS_ADMIN/ALL is near-privileged.",
-                            OWASP_DOCKER,
-                            disabled,
-                        ) {
-                            out.push(f);
-                        }
-                    }
+                    )
+                    && let Some(f) = mk(
+                        "CNT-106",
+                        Severity::High,
+                        rel,
+                        target,
+                        format!("service {svc_name} adds dangerous capability {c}"),
+                        "Grant the minimum capability set; SYS_ADMIN/ALL is near-privileged.",
+                        OWASP_DOCKER,
+                        disabled,
+                    )
+                {
+                    out.push(f);
                 }
             }
             for so in svc["security_opt"].as_vec().into_iter().flatten() {
-                if let Some(s) = so.as_str() {
-                    if s.contains("unconfined")
+                if let Some(s) = so.as_str()
+                    && (s.contains("unconfined")
                         || s.contains("seccomp=unconfined")
-                        || s == "apparmor=unconfined"
-                    {
-                        if let Some(f) = mk("CNT-106", Severity::High, rel, target,
-                            format!("service {svc_name} disables syscall confinement ({s})"),
-                            "Keep default seccomp/apparmor profiles; drop them only for a proven need.",
-                            OWASP_DOCKER, disabled) { out.push(f); }
-                    }
+                        || s == "apparmor=unconfined")
+                    && let Some(f) = mk(
+                        "CNT-106",
+                        Severity::High,
+                        rel,
+                        target,
+                        format!("service {svc_name} disables syscall confinement ({s})"),
+                        "Keep default seccomp/apparmor profiles; drop them only for a proven need.",
+                        OWASP_DOCKER,
+                        disabled,
+                    )
+                {
+                    out.push(f);
                 }
             }
             for p in svc["ports"].as_vec().into_iter().flatten() {
-                if let Some(s) = p.as_str() {
-                    if s.contains("2375") {
-                        if let Some(f) = mk("CNT-107", Severity::High, rel, target,
-                            format!("service {svc_name} publishes unencrypted docker API port {s}"),
-                            "The docker API must be TLS-protected (2376) or unix-socket only; 2375 is remote root.",
-                            OWASP_DOCKER, disabled) { out.push(f); }
-                    }
+                if let Some(s) = p.as_str()
+                    && s.contains("2375")
+                    && let Some(f) = mk(
+                        "CNT-107",
+                        Severity::High,
+                        rel,
+                        target,
+                        format!("service {svc_name} publishes unencrypted docker API port {s}"),
+                        "The docker API must be TLS-protected (2376) or unix-socket only; 2375 is remote root.",
+                        OWASP_DOCKER,
+                        disabled,
+                    )
+                {
+                    out.push(f);
                 }
             }
         }
@@ -495,8 +534,8 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
         for c in cs {
             let cname = c["name"].as_str().unwrap_or(name);
             let sc = &c["securityContext"];
-            if sc["privileged"].as_bool() == Some(true) {
-                if let Some(f) = mk(
+            if sc["privileged"].as_bool() == Some(true)
+                && let Some(f) = mk(
                     "CNT-201",
                     Severity::High,
                     rel,
@@ -505,18 +544,26 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                     "Drop privileged; grant specific capabilities instead.",
                     OWASP_K8S,
                     disabled,
-                ) {
-                    out.push(f);
-                }
+                )
+            {
+                out.push(f);
             }
-            if sc["allowPrivilegeEscalation"].as_bool() == Some(true) {
-                if let Some(f) = mk("CNT-207", Severity::Medium, rel, target,
+            if sc["allowPrivilegeEscalation"].as_bool() == Some(true)
+                && let Some(f) = mk(
+                    "CNT-207",
+                    Severity::Medium,
+                    rel,
+                    target,
                     format!("container {cname} allows privilege escalation"),
                     "Set allowPrivilegeEscalation: false and drop ALL capabilities then add back what is needed.",
-                    OWASP_K8S, disabled) { out.push(f); }
+                    OWASP_K8S,
+                    disabled,
+                )
+            {
+                out.push(f);
             }
-            if sc["runAsUser"].as_i64() == Some(0) {
-                if let Some(f) = mk(
+            if sc["runAsUser"].as_i64() == Some(0)
+                && let Some(f) = mk(
                     "CNT-202",
                     Severity::Medium,
                     rel,
@@ -525,31 +572,32 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                     "Set runAsNonRoot: true and a non-zero runAsUser.",
                     OWASP_K8S,
                     disabled,
-                ) {
-                    out.push(f);
-                }
+                )
+            {
+                out.push(f);
             }
-            if let Some(img) = c["image"].as_str() {
-                if !img.contains('@') && (image_tag(img).is_none() || img.ends_with(":latest")) {
-                    if let Some(f) = mk(
-                        "CNT-205",
-                        Severity::Medium,
-                        rel,
-                        target,
-                        format!("container {cname} uses mutable image tag {img}"),
-                        "Pin image digests; consider an admission policy requiring them.",
-                        OWASP_K8S,
-                        disabled,
-                    ) {
-                        out.push(f);
-                    }
-                }
+            if let Some(img) = c["image"].as_str()
+                && !img.contains('@')
+                && (image_tag(img).is_none() || img.ends_with(":latest"))
+                && let Some(f) = mk(
+                    "CNT-205",
+                    Severity::Medium,
+                    rel,
+                    target,
+                    format!("container {cname} uses mutable image tag {img}"),
+                    "Pin image digests; consider an admission policy requiring them.",
+                    OWASP_K8S,
+                    disabled,
+                )
+            {
+                out.push(f);
             }
             for kv in c["env"].as_vec().into_iter().flatten() {
                 let n = kv["name"].as_str().unwrap_or("");
                 let v = kv["value"].as_str().unwrap_or("");
-                if secretish(n) && !v.is_empty() {
-                    if let Some(f) = mk(
+                if secretish(n)
+                    && !v.is_empty()
+                    && let Some(f) = mk(
                         "CNT-206",
                         Severity::High,
                         rel,
@@ -558,15 +606,15 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                         "Use a Secret + valueFrom.secretKeyRef (or an external-secrets operator).",
                         OWASP_K8S,
                         disabled,
-                    ) {
-                        out.push(f);
-                    }
+                    )
+                {
+                    out.push(f);
                 }
             }
             for vm in c["volumeMounts"].as_vec().into_iter().flatten() {
                 let p = vm["mountPath"].as_str().unwrap_or("");
-                if p == "/var/run/docker.sock" {
-                    if let Some(f) = mk(
+                if p == "/var/run/docker.sock"
+                    && let Some(f) = mk(
                         "CNT-204",
                         Severity::High,
                         rel,
@@ -575,17 +623,17 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                         "Containerd/k8s clusters should never expose the runtime socket to pods.",
                         OWASP_K8S,
                         disabled,
-                    ) {
-                        out.push(f);
-                    }
+                    )
+                {
+                    out.push(f);
                 }
             }
         }
         let spec = &doc["spec"]["template"]["spec"];
         let host_spec = if spec.is_null() { &doc["spec"] } else { spec };
         for ns in ["hostNetwork", "hostPID", "hostIPC"] {
-            if host_spec[ns].as_bool() == Some(true) {
-                if let Some(f) = mk(
+            if host_spec[ns].as_bool() == Some(true)
+                && let Some(f) = mk(
                     "CNT-203",
                     Severity::Medium,
                     rel,
@@ -594,29 +642,27 @@ fn kubernetes(rel: &str, text: &str, target: &str, disabled: &HashSet<String>) -
                     "Host namespaces break pod isolation; avoid unless strictly required.",
                     OWASP_K8S,
                     disabled,
-                ) {
-                    out.push(f);
-                }
+                )
+            {
+                out.push(f);
             }
         }
         for v in host_spec["volumes"].as_vec().into_iter().flatten() {
-            if let Some(p) = v["hostPath"]["path"].as_str() {
-                if matches!(p, "/" | "/etc" | "/root" | "/var/run" | "/var/lib/kubelet")
-                    || p.contains("docker.sock")
-                {
-                    if let Some(f) = mk(
-                        "CNT-204",
-                        Severity::High,
-                        rel,
-                        target,
-                        format!("{kind}/{name} mounts sensitive host path {p}"),
-                        "Restrict hostPath mounts; prefer projected/configMap/secret volumes.",
-                        OWASP_K8S,
-                        disabled,
-                    ) {
-                        out.push(f);
-                    }
-                }
+            if let Some(p) = v["hostPath"]["path"].as_str()
+                && (matches!(p, "/" | "/etc" | "/root" | "/var/run" | "/var/lib/kubelet")
+                    || p.contains("docker.sock"))
+                && let Some(f) = mk(
+                    "CNT-204",
+                    Severity::High,
+                    rel,
+                    target,
+                    format!("{kind}/{name} mounts sensitive host path {p}"),
+                    "Restrict hostPath mounts; prefer projected/configMap/secret volumes.",
+                    OWASP_K8S,
+                    disabled,
+                )
+            {
+                out.push(f);
             }
         }
     }

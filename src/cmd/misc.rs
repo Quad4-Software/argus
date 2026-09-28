@@ -48,13 +48,13 @@ pub(crate) fn scan_system(
     }
     for base in ["/root", "/home"] {
         let b = PathBuf::from(base);
-        if b.is_dir() {
-            if let Ok(rd) = std::fs::read_dir(&b) {
-                for e in rd.flatten() {
-                    let p = e.path();
-                    if p.is_dir() && !homes.contains(&p) {
-                        homes.push(p);
-                    }
+        if b.is_dir()
+            && let Ok(rd) = std::fs::read_dir(&b)
+        {
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_dir() && !homes.contains(&p) {
+                    homes.push(p);
                 }
             }
         }
@@ -245,14 +245,13 @@ pub(crate) fn staged_files(repo: &Path) -> Vec<String> {
             .args(["-C", &r])
             .args(&args)
             .output()
+            && o.status.success()
         {
-            if o.status.success() {
-                out.extend(
-                    String::from_utf8_lossy(&o.stdout)
-                        .lines()
-                        .map(|l| l.to_string()),
-                );
-            }
+            out.extend(
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .map(|l| l.to_string()),
+            );
         }
     }
     out.sort();
@@ -277,14 +276,13 @@ pub(crate) fn changed_files(repo: &Path, base: &str) -> Vec<String> {
             .args(["-C", &r])
             .args(&args)
             .output()
+            && o.status.success()
         {
-            if o.status.success() {
-                out.extend(
-                    String::from_utf8_lossy(&o.stdout)
-                        .lines()
-                        .map(|l| l.to_string()),
-                );
-            }
+            out.extend(
+                String::from_utf8_lossy(&o.stdout)
+                    .lines()
+                    .map(|l| l.to_string()),
+            );
         }
     }
     out.sort();
@@ -395,8 +393,12 @@ pub(crate) fn young_repo_finding(repo: &RepoSpec) -> Option<finding::Finding> {
         path: "-".into(),
         line: None,
         excerpt: None,
-        message: format!("repository created {days} day(s) ago ({created}) - new repos cloned into supply-chain positions are a throwaway-account pattern"),
-        remediation: Some("Check the publisher account age and history before trusting this code.".into()),
+        message: format!(
+            "repository created {days} day(s) ago ({created}) - new repos cloned into supply-chain positions are a throwaway-account pattern"
+        ),
+        remediation: Some(
+            "Check the publisher account age and history before trusting this code.".into(),
+        ),
         reference: None,
         window: None,
     })

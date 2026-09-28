@@ -6,7 +6,7 @@
 
 use crate::finding::{Finding, Severity};
 use crate::rules::CompiledRule;
-use crate::scan::{scan_file, ScanOptions};
+use crate::scan::{ScanOptions, scan_file};
 use std::collections::HashSet;
 use ureq::ResponseExt;
 
@@ -331,34 +331,34 @@ pub fn scan(
         ));
     }
     for h in ["server", "x-powered-by", "x-aspnet-version", "x-generator"] {
-        if let Some(v) = header(&r.headers, h) {
-            if !v.is_empty() {
-                out.push(mk(
-                    "WEB-016",
-                    Severity::Info,
-                    &target,
-                    "/",
-                    format!("{h} header exposes stack detail: {v}"),
-                    "Suppress or genericize the banner.",
-                ));
-            }
+        if let Some(v) = header(&r.headers, h)
+            && !v.is_empty()
+        {
+            out.push(mk(
+                "WEB-016",
+                Severity::Info,
+                &target,
+                "/",
+                format!("{h} header exposes stack detail: {v}"),
+                "Suppress or genericize the banner.",
+            ));
         }
     }
     // CORS
     if let (Some(acao), Some(acc)) = (
         header(&r.headers, "access-control-allow-origin"),
         header(&r.headers, "access-control-allow-credentials"),
-    ) {
-        if acao.trim() == "*" && acc.trim().eq_ignore_ascii_case("true") {
-            out.push(mk(
-                "WEB-017",
-                Severity::High,
-                &target,
-                "/",
-                "CORS allows any origin WITH credentials",
-                "Browsers refuse this combo but the config signals careless CORS; pin origins.",
-            ));
-        }
+    ) && acao.trim() == "*"
+        && acc.trim().eq_ignore_ascii_case("true")
+    {
+        out.push(mk(
+            "WEB-017",
+            Severity::High,
+            &target,
+            "/",
+            "CORS allows any origin WITH credentials",
+            "Browsers refuse this combo but the config signals careless CORS; pin origins.",
+        ));
     }
 
     // ---- cookies ----
@@ -427,10 +427,11 @@ pub fn scan(
     let mut frontier: Vec<(String, usize)> = Vec::new();
     if depth > 0 {
         for l in page_links(&r.body, &target) {
-            if let Some(u) = join(&r.final_url, &l) {
-                if host_of(&u) == target && pages_seen.insert(u.clone()) {
-                    frontier.push((u, 1));
-                }
+            if let Some(u) = join(&r.final_url, &l)
+                && host_of(&u) == target
+                && pages_seen.insert(u.clone())
+            {
+                frontier.push((u, 1));
             }
         }
     }
@@ -465,10 +466,11 @@ pub fn scan(
             form_checks(&p.body, &target, &rel, &mut out);
             if d < depth {
                 for l in page_links(&p.body, &target) {
-                    if let Some(u2) = join(&p.final_url, &l) {
-                        if host_of(&u2) == target && pages_seen.insert(u2.clone()) {
-                            frontier.push((u2, d + 1));
-                        }
+                    if let Some(u2) = join(&p.final_url, &l)
+                        && host_of(&u2) == target
+                        && pages_seen.insert(u2.clone())
+                    {
+                        frontier.push((u2, d + 1));
                     }
                 }
             }
@@ -498,41 +500,43 @@ pub fn scan(
         if verbose {
             eprintln!("web: fetch asset {u}");
         }
-        if let Ok(a) = get(u) {
-            if a.status == 200 && !a.body.is_empty() {
-                assets += 1;
-                let rel = format!("/js/{}", u.rsplit('/').next().unwrap_or("bundle.js"));
-                web_secrets(&rel, &a.body, &target, &mut out);
+        if let Ok(a) = get(u)
+            && a.status == 200
+            && !a.body.is_empty()
+        {
+            assets += 1;
+            let rel = format!("/js/{}", u.rsplit('/').next().unwrap_or("bundle.js"));
+            web_secrets(&rel, &a.body, &target, &mut out);
+            out.extend(scan_file(
+                &rel,
+                Some(&a.body),
+                None,
+                &applicable,
+                opts,
+                &target,
+            ));
+            // source map ships full source - and often more secrets
+            if let Ok(m) = get(&format!("{u}.map"))
+                && m.status == 200
+                && m.body.contains("sourcesContent")
+            {
+                out.push(mk(
+                    "WEB-040",
+                    Severity::Low,
+                    &target,
+                    &format!("{rel}.map"),
+                    "source map ships original source to every visitor",
+                    "Publish maps to an internal host or drop them in production.",
+                ));
+                web_secrets(&format!("{rel}.map"), &m.body, &target, &mut out);
                 out.extend(scan_file(
-                    &rel,
-                    Some(&a.body),
+                    &format!("{rel}.map"),
+                    Some(&m.body),
                     None,
                     &applicable,
                     opts,
                     &target,
                 ));
-                // source map ships full source - and often more secrets
-                if let Ok(m) = get(&format!("{u}.map")) {
-                    if m.status == 200 && m.body.contains("sourcesContent") {
-                        out.push(mk(
-                            "WEB-040",
-                            Severity::Low,
-                            &target,
-                            &format!("{rel}.map"),
-                            "source map ships original source to every visitor",
-                            "Publish maps to an internal host or drop them in production.",
-                        ));
-                        web_secrets(&format!("{rel}.map"), &m.body, &target, &mut out);
-                        out.extend(scan_file(
-                            &format!("{rel}.map"),
-                            Some(&m.body),
-                            None,
-                            &applicable,
-                            opts,
-                            &target,
-                        ));
-                    }
-                }
             }
         }
     }
@@ -586,22 +590,22 @@ pub fn scan(
     }
 
     // ---- robots / security.txt ----
-    if let Ok(p) = get(&format!("{base}/robots.txt")) {
-        if p.status == 200 {
-            let interesting = regex::Regex::new(
+    if let Ok(p) = get(&format!("{base}/robots.txt"))
+        && p.status == 200
+    {
+        let interesting = regex::Regex::new(
                 r"(?im)^\s*Disallow:\s*(/(?:admin|internal|private|backup|backoffice|staging|dashboard|api|config)[^\s]*)",
             )
             .unwrap();
-            for c in interesting.captures_iter(&p.body).take(10) {
-                out.push(mk(
-                    "WEB-035",
-                    Severity::Info,
-                    &target,
-                    "/robots.txt",
-                    format!("robots.txt discloses sensitive path {}", &c[1]),
-                    "robots.txt is a roadmap, not a control; keep sensitive paths unlisted.",
-                ));
-            }
+        for c in interesting.captures_iter(&p.body).take(10) {
+            out.push(mk(
+                "WEB-035",
+                Severity::Info,
+                &target,
+                "/robots.txt",
+                format!("robots.txt discloses sensitive path {}", &c[1]),
+                "robots.txt is a roadmap, not a control; keep sensitive paths unlisted.",
+            ));
         }
     }
     let sec_txt = get(&format!("{base}/.well-known/security.txt"))
@@ -622,27 +626,25 @@ pub fn scan(
     }
 
     // ---- TLS certificate expiry ----
-    if is_https {
-        if let Some(days) = cert_days_left(&target) {
-            if days <= 0 {
-                out.push(mk(
-                    "WEB-045",
-                    Severity::High,
-                    &target,
-                    "/",
-                    "TLS certificate is expired",
-                    "Renew the certificate immediately.",
-                ));
-            } else if days <= 30 {
-                out.push(mk(
-                    "WEB-045",
-                    Severity::Medium,
-                    &target,
-                    "/",
-                    format!("TLS certificate expires in {days} days"),
-                    "Renew soon or automate renewal (ACME).",
-                ));
-            }
+    if is_https && let Some(days) = cert_days_left(&target) {
+        if days <= 0 {
+            out.push(mk(
+                "WEB-045",
+                Severity::High,
+                &target,
+                "/",
+                "TLS certificate is expired",
+                "Renew the certificate immediately.",
+            ));
+        } else if days <= 30 {
+            out.push(mk(
+                "WEB-045",
+                Severity::Medium,
+                &target,
+                "/",
+                format!("TLS certificate expires in {days} days"),
+                "Renew soon or automate renewal (ACME).",
+            ));
         }
     }
 
@@ -673,16 +675,43 @@ fn cert_days_left(host: &str) -> Option<i64> {
     // openssl x509 -enddate gives a cleaner date but needs the cert piped;
     // s_client prints "verify return" lines only, so do a second pass.
     let _ = text;
-    let out2 = std::process::Command::new("sh")
+    let out2 = std::process::Command::new("openssl")
         .args([
-            "-c",
-            &format!(
-                "echo | openssl s_client -connect {host}:443 -servername {host} 2>/dev/null | openssl x509 -noout -enddate"
-            ),
+            "s_client",
+            "-connect",
+            &format!("{host}:443"),
+            "-servername",
+            host,
         ])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .output()
         .ok()?;
-    let t = String::from_utf8_lossy(&out2.stdout);
+    // extract the first PEM cert and ask x509 for its expiry
+    let pem: String = String::from_utf8_lossy(&out2.stdout).to_string();
+    let cert = pem
+        .find("-----BEGIN CERTIFICATE-----")
+        .and_then(|s| {
+            pem[s..]
+                .find("-----END CERTIFICATE-----")
+                .map(|e| pem[s..s + e + 25].to_string())
+        })
+        .unwrap_or_default();
+    let mut x = std::process::Command::new("openssl")
+        .args(["x509", "-noout", "-enddate"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .ok()?;
+    if let Some(mut stdin) = x.stdin.take() {
+        use std::io::Write;
+        let _ = stdin.write_all(cert.as_bytes());
+        let _ = stdin.flush();
+        drop(stdin);
+    }
+    let out3 = x.wait_with_output().ok()?;
+    let t = String::from_utf8_lossy(&out3.stdout);
     let date = t.trim().strip_prefix("notAfter=")?;
     // "Dec  3 12:00:00 2025 GMT"
     let parts: Vec<&str> = date.split_whitespace().collect();

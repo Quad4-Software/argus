@@ -32,10 +32,11 @@ pub fn sbom(root: &Path, opts: &ScanOptions) -> String {
         if !manifest_re.is_match(&rel) {
             continue;
         }
-        if let Ok(b) = std::fs::read(&f) {
-            if !b.is_empty() && b.len() <= opts.max_file_size as usize {
-                deps.extend(crate::osv::extract_deps(&rel, &String::from_utf8_lossy(&b)));
-            }
+        if let Ok(b) = std::fs::read(&f)
+            && !b.is_empty()
+            && b.len() <= opts.max_file_size as usize
+        {
+            deps.extend(crate::osv::extract_deps(&rel, &String::from_utf8_lossy(&b)));
         }
     }
     deps.sort();

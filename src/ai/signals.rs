@@ -98,10 +98,10 @@ pub(crate) fn loc_per_commit(root: &Path, n: usize) -> Vec<u64> {
         if in_c {
             let mut parts = line.splitn(3, '\t');
             let (adds, path) = (parts.next().unwrap_or("0"), parts.nth(1).unwrap_or(""));
-            if !is_generated_name(path) {
-                if let Ok(v) = adds.parse::<u64>() {
-                    cur += v;
-                }
+            if !is_generated_name(path)
+                && let Ok(v) = adds.parse::<u64>()
+            {
+                cur += v;
             }
         }
     }
@@ -576,10 +576,10 @@ pub(crate) fn anti_disclosure_policy(root: &Path) -> Option<AiEvidence> {
             }
             continue;
         }
-        if let Ok(b) = std::fs::read(&p) {
-            if let Some(ev) = check(d, String::from_utf8_lossy(&b).into_owned()) {
-                return Some(ev);
-            }
+        if let Ok(b) = std::fs::read(&p)
+            && let Some(ev) = check(d, String::from_utf8_lossy(&b).into_owned())
+        {
+            return Some(ev);
         }
     }
     None

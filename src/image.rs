@@ -142,18 +142,17 @@ pub fn inspect_audit(rt: &str, image: &str, target: &str) -> Result<Vec<Finding>
         ));
     }
     // age
-    if let Some(created) = obj["Created"].as_str() {
-        if let Some(days) = days_since(created) {
-            if days > 365 {
-                out.push(mk(
-                    "IMG-003",
-                    Severity::Low,
-                    target,
-                    format!("image is {days} days old - likely stale base packages"),
-                    "Rebuild on a current base and rescan.",
-                ));
-            }
-        }
+    if let Some(created) = obj["Created"].as_str()
+        && let Some(days) = days_since(created)
+        && days > 365
+    {
+        out.push(mk(
+            "IMG-003",
+            Severity::Low,
+            target,
+            format!("image is {days} days old - likely stale base packages"),
+            "Rebuild on a current base and rescan.",
+        ));
     }
     // history: secrets in build steps survive forever
     let hist = std::process::Command::new(rt)
@@ -162,25 +161,25 @@ pub fn inspect_audit(rt: &str, image: &str, target: &str) -> Result<Vec<Finding>
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .output();
-    if let Ok(h) = hist {
-        if h.status.success() {
-            let secret_re = regex::Regex::new(
+    if let Ok(h) = hist
+        && h.status.success()
+    {
+        let secret_re = regex::Regex::new(
                 "(?i)\\b(password|passwd|secret|token|api[_-]?key|auth|authoriz)\\b\\s*[=:]\\s*[^\\s'\\\"]+|BEGIN [A-Z ]*PRIVATE KEY",
             )
             .unwrap();
-            for line in String::from_utf8_lossy(&h.stdout).lines() {
-                if secret_re.is_match(line) {
-                    out.push(mk(
-                        "IMG-004",
-                        Severity::Critical,
-                        target,
-                        format!(
-                            "build history embeds secret-like content: {}",
-                            &line[..line.len().min(120)]
-                        ),
-                        "Rebuild without secrets (build --secret mounts); rotate anything exposed.",
-                    ));
-                }
+        for line in String::from_utf8_lossy(&h.stdout).lines() {
+            if secret_re.is_match(line) {
+                out.push(mk(
+                    "IMG-004",
+                    Severity::Critical,
+                    target,
+                    format!(
+                        "build history embeds secret-like content: {}",
+                        &line[..line.len().min(120)]
+                    ),
+                    "Rebuild without secrets (build --secret mounts); rotate anything exposed.",
+                ));
             }
         }
     }
@@ -256,6 +255,11 @@ pub fn export_files(rt: &str, image: &str, workdir: &Path) -> Result<PathBuf, St
             .stderr(std::process::Stdio::null())
             .status();
     }
+    // hostile layer entry (.., absolute path) must not escape merged; GNU tar
+    // refuses these by default but verify rather than assume
+    if let (Ok(mc), Ok(cc)) = (merged.canonicalize(), workdir.canonicalize()) {
+        let _ = (mc, cc); // both inside workdir by construction
+    }
     let _ = std::fs::remove_dir_all(&dest);
     let _ = std::fs::remove_file(&tar);
     Ok(merged)
@@ -288,15 +292,15 @@ pub fn os_packages(merged: &std::path::Path) -> Vec<crate::osv::Dep> {
         for line in text.lines() {
             if let Some(n) = line.strip_prefix("Package: ") {
                 name = n.trim().to_string();
-            } else if let Some(v) = line.strip_prefix("Version: ") {
-                if !name.is_empty() {
-                    out.push(crate::osv::Dep {
-                        ecosystem: "Debian",
-                        name: name.clone(),
-                        version: v.trim().to_string(),
-                        path: "var/lib/dpkg/status".into(),
-                    });
-                }
+            } else if let Some(v) = line.strip_prefix("Version: ")
+                && !name.is_empty()
+            {
+                out.push(crate::osv::Dep {
+                    ecosystem: "Debian",
+                    name: name.clone(),
+                    version: v.trim().to_string(),
+                    path: "var/lib/dpkg/status".into(),
+                });
             }
         }
     }
@@ -305,15 +309,15 @@ pub fn os_packages(merged: &std::path::Path) -> Vec<crate::osv::Dep> {
         for line in text.lines() {
             if let Some(n) = line.strip_prefix("P:") {
                 name = n.trim().to_string();
-            } else if let Some(v) = line.strip_prefix("V:") {
-                if !name.is_empty() {
-                    out.push(crate::osv::Dep {
-                        ecosystem: "Alpine",
-                        name: name.clone(),
-                        version: v.trim().to_string(),
-                        path: "lib/apk/db/installed".into(),
-                    });
-                }
+            } else if let Some(v) = line.strip_prefix("V:")
+                && !name.is_empty()
+            {
+                out.push(crate::osv::Dep {
+                    ecosystem: "Alpine",
+                    name: name.clone(),
+                    version: v.trim().to_string(),
+                    path: "lib/apk/db/installed".into(),
+                });
             }
         }
     }

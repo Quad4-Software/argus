@@ -82,16 +82,16 @@ pub fn scan_bytes(rel: &str, bytes: &[u8], rules: &yara_x::Rules, target: &str) 
 
 fn meta_severity(r: &yara_x::Rule<'_, '_>) -> Severity {
     for (k, v) in r.metadata() {
-        if k == "severity" {
-            if let yara_x::MetaValue::String(s) = v {
-                return match s.to_ascii_lowercase().as_str() {
-                    "critical" => Severity::Critical,
-                    "high" => Severity::High,
-                    "medium" => Severity::Medium,
-                    "low" => Severity::Low,
-                    _ => Severity::Info,
-                };
-            }
+        if k == "severity"
+            && let yara_x::MetaValue::String(s) = v
+        {
+            return match s.to_ascii_lowercase().as_str() {
+                "critical" => Severity::Critical,
+                "high" => Severity::High,
+                "medium" => Severity::Medium,
+                "low" => Severity::Low,
+                _ => Severity::Info,
+            };
         }
     }
     Severity::Medium
@@ -99,10 +99,10 @@ fn meta_severity(r: &yara_x::Rule<'_, '_>) -> Severity {
 
 fn meta_str(r: &yara_x::Rule<'_, '_>, want: &str) -> Option<String> {
     for (k, v) in r.metadata() {
-        if k == want {
-            if let yara_x::MetaValue::String(s) = v {
-                return Some(s.to_string());
-            }
+        if k == want
+            && let yara_x::MetaValue::String(s) = v
+        {
+            return Some(s.to_string());
         }
     }
     None

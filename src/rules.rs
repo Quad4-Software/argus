@@ -318,7 +318,7 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
                     return Err(format!(
                         "rule {}: unknown typosquat list {other:?} (npm|pypi|crates)",
                         def.id
-                    ))
+                    ));
                 }
             };
             for n in builtin.lines().chain(names.iter().map(|s| s.as_str())) {

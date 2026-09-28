@@ -72,30 +72,30 @@ pub fn collect(root: &Path, verbose: bool) -> Result<PublishSet, String> {
             })
             .output()
             .map_err(|e| format!("spawn npm: {e}"))?;
-        if out.status.success() {
-            if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout) {
-                // npm >=10 emits {"name": {files:[]}}; older emits [{files:[]}]
-                let pkg = if v.is_object() {
-                    v.as_object().and_then(|o| o.values().next())
-                } else {
-                    v.get(0)
-                };
-                let files: Vec<String> = pkg
-                    .and_then(|p| p["files"].as_array())
-                    .map(|a| {
-                        a.iter()
-                            .filter_map(|f| f["path"].as_str().map(str::to_string))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                if !files.is_empty() {
-                    return Ok(PublishSet {
-                        kind: "npm",
-                        root: root.into(),
-                        files,
-                        method: "npm pack --dry-run".into(),
-                    });
-                }
+        if out.status.success()
+            && let Ok(v) = serde_json::from_slice::<serde_json::Value>(&out.stdout)
+        {
+            // npm >=10 emits {"name": {files:[]}}; older emits [{files:[]}]
+            let pkg = if v.is_object() {
+                v.as_object().and_then(|o| o.values().next())
+            } else {
+                v.get(0)
+            };
+            let files: Vec<String> = pkg
+                .and_then(|p| p["files"].as_array())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|f| f["path"].as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            if !files.is_empty() {
+                return Ok(PublishSet {
+                    kind: "npm",
+                    root: root.into(),
+                    files,
+                    method: "npm pack --dry-run".into(),
+                });
             }
         }
         // npm failed: package.json "files" field or git-files proxy

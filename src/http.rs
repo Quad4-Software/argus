@@ -132,7 +132,7 @@ impl HttpClient {
                     return Err(format!(
                         "{url}: expected JSON array, got {}",
                         kind_of(other)
-                    ))
+                    ));
                 }
             };
             let n = arr.len();

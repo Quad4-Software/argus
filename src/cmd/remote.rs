@@ -1,5 +1,5 @@
 use crate::cli::{Cli, Cmd, RemoteArgs};
-use crate::cmd::deps::{collect_deps, REMOTE_DEPS};
+use crate::cmd::deps::{REMOTE_DEPS, collect_deps};
 use crate::cmd::*;
 use crate::finding::{Report, TargetStat};
 use crate::provider::{RepoSpec, Selector};
@@ -188,29 +188,32 @@ pub(crate) fn clone_scan_pool(
         for _ in 0..opts.jobs.max(1) {
             let queue = &queue;
             let acc = &acc;
-            scope.spawn(move || loop {
-                let repo = {
-                    let mut q = queue.lock().unwrap();
-                    q.next()
-                };
-                let Some(repo) = repo else { break };
-                let dest = workdir.join(repo.full_name.replace('/', "__"));
-                let entry: Result<(Vec<finding::Finding>, usize), String> = (|| {
-                    clone::clone_repo(
-                        &repo.clone_url,
-                        &dest,
-                        auth.as_ref(),
-                        workdir,
-                        cli.verbose > 1,
-                    )?;
-                    let (f, n) = scan::scan_root(&dest, &repo.full_name, rules, opts);
-                    if osv_flag {
-                        let mut v = REMOTE_DEPS.lock().unwrap();
-                        collect_deps(&dest, &repo.full_name, opts, &mut v);
-                    }
-                    Ok((f, n))
-                })();
-                acc.lock().unwrap().push((repo, entry));
+            scope.spawn(move || {
+                loop {
+                    let repo = {
+                        let mut q = queue.lock().unwrap();
+                        q.next()
+                    };
+                    let Some(repo) = repo else { break };
+                    let dest = workdir.join(repo.full_name.replace('/', "__"));
+                    let entry: Result<(Vec<finding::Finding>, usize), String> = (|| {
+                        clone::clone_repo(
+                            &repo.clone_url,
+                            &dest,
+                            auth.as_ref(),
+                            workdir,
+                            cli.verbose > 1,
+                        )?;
+                        let (f, n) = scan::scan_root(&dest, &repo.full_name, rules, opts);
+                        if osv_flag {
+                            let mut v = REMOTE_DEPS.lock().unwrap();
+                            collect_deps(&dest, &repo.full_name, opts, &mut v);
+                        }
+                        Ok((f, n))
+                    })(
+                    );
+                    acc.lock().unwrap().push((repo, entry));
+                }
             });
         }
     });

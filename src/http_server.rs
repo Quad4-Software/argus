@@ -22,11 +22,19 @@ impl Request {
 
 /// Read one request; returns None on malformed input.
 fn read_request(stream: &mut TcpStream) -> Option<Request> {
+    // bound the whole request read so a slowloris client cannot pin a thread
+    stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+        .ok()?;
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     let mut buf = Vec::with_capacity(4096);
     let mut tmp = [0u8; 8192];
     // read headers
     let mut header_end = None;
     while header_end.is_none() && buf.len() < 1 << 20 {
+        if std::time::Instant::now() > deadline {
+            return None;
+        }
         let n = stream.read(&mut tmp).ok()?;
         if n == 0 {
             return None;
@@ -53,6 +61,9 @@ fn read_request(stream: &mut TcpStream) -> Option<Request> {
     }
     let mut body = buf[he + 4..].to_vec();
     while body.len() < clen {
+        if std::time::Instant::now() > deadline {
+            return None;
+        }
         let n = stream.read(&mut tmp).ok()?;
         if n == 0 {
             break;

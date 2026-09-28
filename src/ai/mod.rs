@@ -282,16 +282,16 @@ pub fn analyze(root: &Path) -> AiReport {
             });
         }
         // compressed history: a mature project's worth of commits in ~2 weeks
-        if n >= 150 {
-            if let (Some(&newest), Some(&oldest)) = (ts.last(), ts.first()) {
-                let span_days = (newest - oldest).max(1) / 86400;
-                if span_days <= 14 {
-                    ev.push(AiEvidence {
-                        kind: "compressed history",
-                        tier: "medium",
-                        detail: format!("{n} commits compressed into {span_days} day(s)"),
-                    });
-                }
+        if n >= 150
+            && let (Some(&newest), Some(&oldest)) = (ts.last(), ts.first())
+        {
+            let span_days = (newest - oldest).max(1) / 86400;
+            if span_days <= 14 {
+                ev.push(AiEvidence {
+                    kind: "compressed history",
+                    tier: "medium",
+                    detail: format!("{n} commits compressed into {span_days} day(s)"),
+                });
             }
         }
         // big-bang first commit: an entire project appearing at once
@@ -315,12 +315,12 @@ pub fn analyze(root: &Path) -> AiReport {
         }
         // volume needs a real history window; shallow samples produce a
         // fake "1 day" span that makes every repo look superhuman
-        if n >= 50 {
-            if let (Some(&newest), Some(&oldest)) = (ts.last(), ts.first()) {
-                let span = ((newest - oldest) / 86400).max(1) as u64;
-                if let Some(e) = superhuman_volume(root, span) {
-                    ev.push(e);
-                }
+        if n >= 50
+            && let (Some(&newest), Some(&oldest)) = (ts.last(), ts.first())
+        {
+            let span = ((newest - oldest) / 86400).max(1) as u64;
+            if let Some(e) = superhuman_volume(root, span) {
+                ev.push(e);
             }
         }
     }

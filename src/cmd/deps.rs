@@ -22,14 +22,15 @@ pub(crate) fn collect_deps(
         if !manifest_re.is_match(&rel) && !is_wf {
             continue;
         }
-        if let Ok(b) = std::fs::read(&f) {
-            if !b.is_empty() && b.len() <= opts.max_file_size as usize {
-                for mut d in osv::extract_deps(&rel, &String::from_utf8_lossy(&b)) {
-                    if !prefix.is_empty() {
-                        d.path = format!("{prefix}/{}", d.path);
-                    }
-                    deps.push(d);
+        if let Ok(b) = std::fs::read(&f)
+            && !b.is_empty()
+            && b.len() <= opts.max_file_size as usize
+        {
+            for mut d in osv::extract_deps(&rel, &String::from_utf8_lossy(&b)) {
+                if !prefix.is_empty() {
+                    d.path = format!("{prefix}/{}", d.path);
                 }
+                deps.push(d);
             }
         }
     }

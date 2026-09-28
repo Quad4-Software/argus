@@ -358,18 +358,19 @@ fn image_audit(
         Yaml::Hash(_) => y["image"].as_str().map(String::from),
         _ => None,
     };
-    if let Some(img) = img {
-        if !img.contains("@sha256:") && !img.is_empty() {
-            out.push(mk(
-                "WFA-008",
-                Severity::Info,
-                rel,
-                target,
-                format!("container image `{img}` for `{scope}` is not digest-pinned"),
-                "Pin service/container images by sha256 digest.",
-                disabled,
-            ));
-        }
+    if let Some(img) = img
+        && !img.contains("@sha256:")
+        && !img.is_empty()
+    {
+        out.push(mk(
+            "WFA-008",
+            Severity::Info,
+            rel,
+            target,
+            format!("container image `{img}` for `{scope}` is not digest-pinned"),
+            "Pin service/container images by sha256 digest.",
+            disabled,
+        ));
     }
 }
 

@@ -56,10 +56,10 @@ pub fn lookup(http: &HttpClient, dep: &Dep) -> Result<RegistryInfo, String> {
     let key = format!("{}:{}", dep.ecosystem, dep.name);
     {
         let c = cache.lock().unwrap();
-        if let Some((ts, info)) = c.entries.get(&key) {
-            if now().saturating_sub(*ts) < TTL {
-                return Ok(info.clone());
-            }
+        if let Some((ts, info)) = c.entries.get(&key)
+            && now().saturating_sub(*ts) < TTL
+        {
+            return Ok(info.clone());
         }
     }
     let info = match dep.ecosystem {
@@ -145,23 +145,23 @@ fn pypi(http: &HttpClient, name: &str) -> Result<RegistryInfo, String> {
     };
     // newest upload across the latest release's files
     let mut newest: Option<u64> = None;
-    if let Some(ver) = v["info"]["version"].as_str() {
-        if let Some(files) = v["releases"][ver].as_array() {
-            for f in files {
-                if let Some(t) = f["upload_time_iso_8601"].as_str() {
-                    if let Some(d) = parse_time_days(t) {
-                        newest = Some(newest.map_or(d, |n: u64| n.min(d)));
-                    }
-                }
+    if let Some(ver) = v["info"]["version"].as_str()
+        && let Some(files) = v["releases"][ver].as_array()
+    {
+        for f in files {
+            if let Some(t) = f["upload_time_iso_8601"].as_str()
+                && let Some(d) = parse_time_days(t)
+            {
+                newest = Some(newest.map_or(d, |n: u64| n.min(d)));
             }
         }
     }
     info.last_release_days = newest;
     for k in ["author_email", "maintainer_email", "author", "maintainer"] {
-        if let Some(s) = v["info"][k].as_str() {
-            if !s.is_empty() {
-                info.maintainers.push(s.to_string());
-            }
+        if let Some(s) = v["info"][k].as_str()
+            && !s.is_empty()
+        {
+            info.maintainers.push(s.to_string());
         }
     }
     info.maintainers.sort();
@@ -199,14 +199,13 @@ fn crates(http: &HttpClient, name: &str) -> Result<RegistryInfo, String> {
     info.license = v["crate"]["license"].as_str().map(str::to_string);
     if let Ok((200, o)) =
         http.get_status_json(&format!("https://crates.io/api/v1/crates/{name}/owners"))
+        && let Some(users) = o["users"].as_array()
     {
-        if let Some(users) = o["users"].as_array() {
-            info.maintainers = users
-                .iter()
-                .filter_map(|u| u["login"].as_str().map(str::to_string))
-                .collect();
-            info.maintainers.sort();
-        }
+        info.maintainers = users
+            .iter()
+            .filter_map(|u| u["login"].as_str().map(str::to_string))
+            .collect();
+        info.maintainers.sort();
     }
     Ok(info)
 }

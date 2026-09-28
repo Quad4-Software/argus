@@ -65,8 +65,17 @@ pub fn collect_files(root: &Path, include_git: bool) -> Vec<PathBuf> {
                 Err(_) => continue,
             };
             if ft.is_symlink() {
-                // Follow symlinked files only; skip dirs to avoid loops.
-                if p.is_file() {
+                // Follow symlinked files only; skip dirs to avoid loops, and
+                // only when the target stays under root - a checkout must not
+                // make argus read /etc or other outside paths into findings.
+                let Ok(root_canon) = root.canonicalize() else {
+                    continue;
+                };
+                if p.is_file()
+                    && p.canonicalize()
+                        .map(|c| c.starts_with(&root_canon))
+                        .unwrap_or(false)
+                {
                     out.push(p);
                 }
                 continue;
@@ -213,10 +222,10 @@ fn check_file(
                 Some(t) => t,
                 None => return hits,
             };
-            if let Some(u) = unless {
-                if u.is_match(text) {
-                    return hits;
-                }
+            if let Some(u) = unless
+                && u.is_match(text)
+            {
+                return hits;
             }
             if *contains_all
                 && !contains.is_empty()
@@ -243,19 +252,19 @@ fn check_file(
                 }
             } else if *contains_all {
                 // All present: report position of the first one.
-                if let Some(first) = contains.first() {
-                    if let Some(off) = text.find(first.as_str()) {
-                        hits.push(FileHit {
-                            line: Some(line_of(text, off)),
-                            excerpt: Some(line_excerpt(text, off)),
-                            message: format!(
-                                "{}: all {} markers present",
-                                rule.description,
-                                contains.len()
-                            ),
-                            severity_override: None,
-                        });
-                    }
+                if let Some(first) = contains.first()
+                    && let Some(off) = text.find(first.as_str())
+                {
+                    hits.push(FileHit {
+                        line: Some(line_of(text, off)),
+                        excerpt: Some(line_excerpt(text, off)),
+                        message: format!(
+                            "{}: all {} markers present",
+                            rule.description,
+                            contains.len()
+                        ),
+                        severity_override: None,
+                    });
                 }
             }
             if let Some(re) = regex {
@@ -484,10 +493,10 @@ pub fn scan_file(
             if suppressed(text, hit.line, &rule.id) {
                 continue;
             }
-            if rule.set == "secrets" {
-                if let Some(ex) = &hit.excerpt {
-                    hit.excerpt = Some(mask_tokens(ex));
-                }
+            if rule.set == "secrets"
+                && let Some(ex) = &hit.excerpt
+            {
+                hit.excerpt = Some(mask_tokens(ex));
             }
             let key = (
                 rule.id.clone(),
@@ -557,92 +566,94 @@ fn run_pool(
 
     std::thread::scope(|scope| {
         for _ in 0..jobs {
-            scope.spawn(|| loop {
-                let file = {
-                    let mut q = queue.lock().unwrap();
-                    q.next()
-                };
-                let Some(file) = file else { break };
-                let rel = rel_path(root, &file);
-                if opts.exclude.iter().any(|re| re.is_match(&rel)) {
-                    continue;
-                }
-                let applicable: Vec<&CompiledRule> =
-                    rules.iter().filter(|r| r.path_in_scope(&rel)).collect();
-                if applicable.is_empty() {
-                    continue;
-                }
-                let needs_text = applicable
-                    .iter()
-                    .any(|r| r.needs_content() && !r.needs_bytes());
-                #[cfg(feature = "yara")]
-                let has_yara = opts.yara.is_some();
-                #[cfg(not(feature = "yara"))]
-                let has_yara = false;
-                let needs_bytes = applicable.iter().any(|r| r.needs_bytes()) || has_yara;
-                let (text, bytes) = if needs_text || needs_bytes {
-                    match std::fs::metadata(&file) {
-                        Ok(m) if m.len() <= opts.max_file_size => match std::fs::read(&file) {
-                            Ok(b) => {
-                                let t = if needs_text {
-                                    Some(if looks_binary(&b) {
-                                        extract_strings(&b)
+            scope.spawn(|| {
+                loop {
+                    let file = {
+                        let mut q = queue.lock().unwrap();
+                        q.next()
+                    };
+                    let Some(file) = file else { break };
+                    let rel = rel_path(root, &file);
+                    if opts.exclude.iter().any(|re| re.is_match(&rel)) {
+                        continue;
+                    }
+                    let applicable: Vec<&CompiledRule> =
+                        rules.iter().filter(|r| r.path_in_scope(&rel)).collect();
+                    if applicable.is_empty() {
+                        continue;
+                    }
+                    let needs_text = applicable
+                        .iter()
+                        .any(|r| r.needs_content() && !r.needs_bytes());
+                    #[cfg(feature = "yara")]
+                    let has_yara = opts.yara.is_some();
+                    #[cfg(not(feature = "yara"))]
+                    let has_yara = false;
+                    let needs_bytes = applicable.iter().any(|r| r.needs_bytes()) || has_yara;
+                    let (text, bytes) = if needs_text || needs_bytes {
+                        match std::fs::metadata(&file) {
+                            Ok(m) if m.len() <= opts.max_file_size => match std::fs::read(&file) {
+                                Ok(b) => {
+                                    let t = if needs_text {
+                                        Some(if looks_binary(&b) {
+                                            extract_strings(&b)
+                                        } else {
+                                            String::from_utf8_lossy(&b).into_owned()
+                                        })
                                     } else {
-                                        String::from_utf8_lossy(&b).into_owned()
-                                    })
-                                } else {
-                                    None
-                                };
-                                (t, Some(b))
-                            }
-                            Err(_) => (None, None),
-                        },
-                        _ => (None, None),
+                                        None
+                                    };
+                                    (t, Some(b))
+                                }
+                                Err(_) => (None, None),
+                            },
+                            _ => (None, None),
+                        }
+                    } else {
+                        (None, None)
+                    };
+                    let binary = bytes.as_deref().is_some_and(looks_binary);
+                    let mut found = scan_file(
+                        &rel,
+                        text.as_deref(),
+                        bytes.as_deref(),
+                        &applicable,
+                        opts,
+                        target,
+                    );
+                    if binary {
+                        // literal secret patterns inside binaries are test
+                        // vectors (every distro lib carries them); real
+                        // embedded credentials are encoded and string rules
+                        // would FP constantly
+                        found.retain(|f| f.ruleset != "secrets");
                     }
-                } else {
-                    (None, None)
-                };
-                let binary = bytes.as_deref().is_some_and(looks_binary);
-                let mut found = scan_file(
-                    &rel,
-                    text.as_deref(),
-                    bytes.as_deref(),
-                    &applicable,
-                    opts,
-                    target,
-                );
-                if binary {
-                    // literal secret patterns inside binaries are test
-                    // vectors (every distro lib carries them); real
-                    // embedded credentials are encoded and string rules
-                    // would FP constantly
-                    found.retain(|f| f.ruleset != "secrets");
-                }
-                if let Some(t) = text.as_deref() {
-                    if audit_enabled(opts, &rel) {
-                        found.extend(crate::workflow_audit::audit(
-                            &rel,
-                            t,
-                            target,
-                            &opts.disabled,
-                        ));
+                    if let Some(t) = text.as_deref() {
+                        if audit_enabled(opts, &rel) {
+                            found.extend(crate::workflow_audit::audit(
+                                &rel,
+                                t,
+                                target,
+                                &opts.disabled,
+                            ));
+                        }
+                        if container_enabled(opts, &rel) {
+                            found.extend(crate::container_audit::audit(
+                                &rel,
+                                t,
+                                target,
+                                &opts.disabled,
+                            ));
+                        }
                     }
-                    if container_enabled(opts, &rel) {
-                        found.extend(crate::container_audit::audit(
-                            &rel,
-                            t,
-                            target,
-                            &opts.disabled,
-                        ));
+                    #[cfg(feature = "yara")]
+                    if let (Some(ruleset), Some(b)) = (opts.yara.as_ref(), bytes.as_deref()) {
+                        found.extend(crate::yarascan::scan_bytes(&rel, b, ruleset, target));
                     }
-                }
-                #[cfg(feature = "yara")]
-                if let (Some(ruleset), Some(b)) = (opts.yara.as_ref(), bytes.as_deref()) {
-                    found.extend(crate::yarascan::scan_bytes(&rel, b, ruleset, target));
-                }
-                let found = found;
-                if !found.is_empty() {
-                    results.lock().unwrap().extend(found);
+                    let found = found;
+                    if !found.is_empty() {
+                        results.lock().unwrap().extend(found);
+                    }
                 }
             });
         }
@@ -766,10 +777,11 @@ fn dep_name_candidates(rel: &str, text: &str) -> Vec<(String, usize)> {
             // lockfile: packages."node_modules/<name>" keys
             if let Some(o) = v.get("packages").and_then(|s| s.as_object()) {
                 for k in o.keys() {
-                    if let Some(n) = k.rsplit("node_modules/").next() {
-                        if !n.is_empty() && n != *k {
-                            names.push(n.to_string());
-                        }
+                    if let Some(n) = k.rsplit("node_modules/").next()
+                        && !n.is_empty()
+                        && n != *k
+                    {
+                        names.push(n.to_string());
                     }
                 }
             }

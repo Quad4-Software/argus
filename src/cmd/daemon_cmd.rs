@@ -223,35 +223,35 @@ pub(crate) fn daemon_cmd(
             }
         }
         for repo in &repos {
-            if let Ok(sha) = watch::remote_head(&repo.clone_url) {
-                if state2.heads.get(&repo.full_name) != Some(&sha) {
-                    let had = state2.heads.contains_key(&repo.full_name);
-                    state2.heads.insert(repo.full_name.clone(), sha.clone());
-                    state
-                        .state
-                        .lock()
-                        .unwrap()
-                        .heads
-                        .insert(repo.full_name.clone(), sha);
-                    if had {
-                        eprintln!("{}: push detected via poll", repo.full_name);
-                        match rescan(&repo.full_name, &repo.clone_url) {
-                            Ok(new) if !new.is_empty() => {
-                                eprintln!("{}: {} new findings", repo.full_name, new.len());
-                                if let Some(u) = &a.notify_url {
-                                    let _ = daemon::notify(
-                                        u,
-                                        &format!(
-                                            "argus: {} new findings in {}",
-                                            new.len(),
-                                            repo.full_name
-                                        ),
-                                        &new,
-                                    );
-                                }
+            if let Ok(sha) = watch::remote_head(&repo.clone_url)
+                && state2.heads.get(&repo.full_name) != Some(&sha)
+            {
+                let had = state2.heads.contains_key(&repo.full_name);
+                state2.heads.insert(repo.full_name.clone(), sha.clone());
+                state
+                    .state
+                    .lock()
+                    .unwrap()
+                    .heads
+                    .insert(repo.full_name.clone(), sha);
+                if had {
+                    eprintln!("{}: push detected via poll", repo.full_name);
+                    match rescan(&repo.full_name, &repo.clone_url) {
+                        Ok(new) if !new.is_empty() => {
+                            eprintln!("{}: {} new findings", repo.full_name, new.len());
+                            if let Some(u) = &a.notify_url {
+                                let _ = daemon::notify(
+                                    u,
+                                    &format!(
+                                        "argus: {} new findings in {}",
+                                        new.len(),
+                                        repo.full_name
+                                    ),
+                                    &new,
+                                );
                             }
-                            _ => {}
                         }
+                        _ => {}
                     }
                 }
             }

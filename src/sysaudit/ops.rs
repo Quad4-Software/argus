@@ -70,16 +70,16 @@ pub(crate) fn scheduler(out: &mut Vec<Finding>) {
     ] {
         if let Ok(rd) = std::fs::read_dir(d) {
             for e in rd.flatten() {
-                if let Some(m) = mode_of(&e.path().to_string_lossy()) {
-                    if m & 0o022 != 0 {
-                        out.push(mk(
+                if let Some(m) = mode_of(&e.path().to_string_lossy())
+                    && m & 0o022 != 0
+                {
+                    out.push(mk(
                             "SYS-CRON-03",
                             Severity::High,
                             &e.path().to_string_lossy(),
                             format!("cron file {} is writable by non-owner ({m:04o}) - privilege escalation", e.file_name().to_string_lossy()),
                             "chmod 644 root:root at minimum; cron jobs run as their owner (often root).",
                         ));
-                    }
                 }
             }
         }
@@ -120,10 +120,8 @@ pub(crate) fn integrity(out: &mut Vec<Finding>) {
             "no AppArmor or SELinux - no MAC layer between a compromised daemon and the box",
             "Enable AppArmor (easier) or SELinux and apply profiles to exposed services.",
         ));
-    } else if aa {
-        if let Some(s) = cmd("aa-status", &["--enabled"]) {
-            let _ = s;
-        }
+    } else if aa && let Some(s) = cmd("aa-status", &["--enabled"]) {
+        let _ = s;
     }
     // time sync
     if cmd("systemctl", &["is-active", "systemd-timesyncd"]).map(|s| s.trim() == "active")
@@ -174,16 +172,16 @@ pub(crate) fn homes(out: &mut Vec<Finding>) {
             }
             let ssh = home.join(".ssh");
             if ssh.is_dir() {
-                if let Some(sm) = mode_of(&ssh.to_string_lossy()) {
-                    if sm & 0o077 != 0 {
-                        out.push(mk(
-                            "SYS-HOME-02",
-                            Severity::High,
-                            &ssh.to_string_lossy(),
-                            format!("~/.ssh mode {sm:04o} readable by others"),
-                            "chmod 700 ~/.ssh.",
-                        ));
-                    }
+                if let Some(sm) = mode_of(&ssh.to_string_lossy())
+                    && sm & 0o077 != 0
+                {
+                    out.push(mk(
+                        "SYS-HOME-02",
+                        Severity::High,
+                        &ssh.to_string_lossy(),
+                        format!("~/.ssh mode {sm:04o} readable by others"),
+                        "chmod 700 ~/.ssh.",
+                    ));
                 }
                 for f in [
                     "id_rsa",
@@ -233,23 +231,23 @@ pub(crate) fn malware(out: &mut Vec<Finding>) {
     if let Ok(rd) = std::fs::read_dir("/proc") {
         for e in rd.flatten() {
             let name = e.file_name();
-            if name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
-                if let Ok(exe) = std::fs::read_link(e.path().join("exe")) {
-                    let ex = exe.to_string_lossy();
-                    if ex.starts_with("/tmp")
-                        || ex.starts_with("/dev/shm")
-                        || ex.starts_with("/var/tmp")
-                    {
-                        let comm =
-                            read_trim(&e.path().join("comm").to_string_lossy()).unwrap_or_default();
-                        out.push(mk(
+            if name.to_string_lossy().chars().all(|c| c.is_ascii_digit())
+                && let Ok(exe) = std::fs::read_link(e.path().join("exe"))
+            {
+                let ex = exe.to_string_lossy();
+                if ex.starts_with("/tmp")
+                    || ex.starts_with("/dev/shm")
+                    || ex.starts_with("/var/tmp")
+                {
+                    let comm =
+                        read_trim(&e.path().join("comm").to_string_lossy()).unwrap_or_default();
+                    out.push(mk(
                             "SYS-MAL-02",
                             Severity::High,
                             &e.path().to_string_lossy(),
                             format!("process {comm} (pid {}) executes from {ex} - classic dropper location", name.to_string_lossy()),
                             "Inspect the binary and its parent; /tmp execution is near-always malicious or ad-hoc.",
                         ));
-                    }
                 }
             }
         }
@@ -258,18 +256,17 @@ pub(crate) fn malware(out: &mut Vec<Finding>) {
     if let Ok(rd) = std::fs::read_dir("/proc") {
         for e in rd.flatten() {
             let name = e.file_name();
-            if name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
-                if let Ok(exe) = std::fs::read_link(e.path().join("exe")) {
-                    if exe.to_string_lossy().ends_with(" (deleted)") {
-                        out.push(mk(
+            if name.to_string_lossy().chars().all(|c| c.is_ascii_digit())
+                && let Ok(exe) = std::fs::read_link(e.path().join("exe"))
+                && exe.to_string_lossy().ends_with(" (deleted)")
+            {
+                out.push(mk(
                             "SYS-MAL-03",
                             Severity::Medium,
                             &e.path().to_string_lossy(),
                             format!("pid {} runs a deleted binary ({}) - self-cleaning payload or crashed update", name.to_string_lossy(), exe.to_string_lossy()),
                             "Check the process tree; deleted executables are a common malware trick.",
                         ));
-                    }
-                }
             }
         }
     }

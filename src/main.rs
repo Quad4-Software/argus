@@ -502,16 +502,16 @@ exec argus scan --staged --fail-on medium
     }
 
     // git history audit (local repo paths only; remote clones are depth-1)
-    if cli.audit_history || cfg.defaults.audit_history.unwrap_or(false) {
-        if let Cmd::Scan { paths } = &cli.cmd {
-            for p in paths {
-                audit::audit_history(
-                    p,
-                    &p.display().to_string(),
-                    &mut report.findings,
-                    cli.verbose,
-                );
-            }
+    if (cli.audit_history || cfg.defaults.audit_history.unwrap_or(false))
+        && let Cmd::Scan { paths } = &cli.cmd
+    {
+        for p in paths {
+            audit::audit_history(
+                p,
+                &p.display().to_string(),
+                &mut report.findings,
+                cli.verbose,
+            );
         }
     }
 
@@ -521,10 +521,11 @@ exec argus scan --staged --fail-on medium
     }
 
     // OSV advisories for pinned deps
-    if !offline && (cli.osv || cli.dep_check || cfg.defaults.osv.unwrap_or(false)) {
-        if let Err(e) = osv_scan(cli, &opts, &mut report) {
-            report.errors.push(format!("osv: {e}"));
-        }
+    if !offline
+        && (cli.osv || cli.dep_check || cfg.defaults.osv.unwrap_or(false))
+        && let Err(e) = osv_scan(cli, &opts, &mut report)
+    {
+        report.errors.push(format!("osv: {e}"));
     }
 
     report.finalize(min_sev);

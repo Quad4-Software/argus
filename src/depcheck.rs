@@ -75,18 +75,20 @@ pub fn check(
         let results = std::sync::Mutex::new(Vec::new());
         std::thread::scope(|s| {
             for _ in 0..8 {
-                s.spawn(|| loop {
-                    let idx = {
-                        let mut q = queue.lock().unwrap();
-                        {
-                            let before = q.len();
-                            q.next();
-                            (before > 0).then(|| unique.len() - before)
+                s.spawn(|| {
+                    loop {
+                        let idx = {
+                            let mut q = queue.lock().unwrap();
+                            {
+                                let before = q.len();
+                                q.next();
+                                (before > 0).then(|| unique.len() - before)
+                            }
+                        };
+                        let Some(i) = idx else { break };
+                        if let Ok(info) = crate::registry::lookup(http, unique[i]) {
+                            results.lock().unwrap().push(Some((i, info)));
                         }
-                    };
-                    let Some(i) = idx else { break };
-                    if let Ok(info) = crate::registry::lookup(http, unique[i]) {
-                        results.lock().unwrap().push(Some((i, info)));
                     }
                 });
             }
@@ -127,9 +129,10 @@ pub fn check(
                 "Publish/claim the name publicly, force private-registry resolution (.npmrc/pip.conf), or alias to a vendored copy.",
             ));
         }
-        if let Some(days) = info.last_release_days {
-            if days > 730 {
-                out.push(finding(
+        if let Some(days) = info.last_release_days
+            && days > 730
+        {
+            out.push(finding(
                     target,
                     d,
                     "DEP-010",
@@ -142,24 +145,22 @@ pub fn check(
                     ),
                     "Pin exact versions, watch the package for maintainer changes, or plan a maintained replacement.",
                 ));
-            }
         }
         // archived upstream repo: only probe a bounded number to keep runs fast
-        if upstream_checked < 20 {
-            if let (Some(url), Some(probe)) = (&info.repo_url, upstream_probe) {
-                if let Some(repo_path) = github_repo_path(url) {
-                    upstream_checked += 1;
-                    if probe(&repo_path) == Some(true) {
-                        out.push(finding(
-                            target,
-                            d,
-                            "DEP-011",
-                            Severity::Medium,
-                            format!("upstream repository for {} is archived/read-only", d.name),
-                            "Treat as unmaintained: pin the version and monitor for forks.",
-                        ));
-                    }
-                }
+        if upstream_checked < 20
+            && let (Some(url), Some(probe)) = (&info.repo_url, upstream_probe)
+            && let Some(repo_path) = github_repo_path(url)
+        {
+            upstream_checked += 1;
+            if probe(&repo_path) == Some(true) {
+                out.push(finding(
+                    target,
+                    d,
+                    "DEP-011",
+                    Severity::Medium,
+                    format!("upstream repository for {} is archived/read-only", d.name),
+                    "Treat as unmaintained: pin the version and monitor for forks.",
+                ));
             }
         }
     }
@@ -173,10 +174,11 @@ pub fn github_repo_path(url: &str) -> Option<String> {
         if let Some(pos) = u.find(pat) {
             let rest = &u[pos + pat.len()..];
             let mut parts = rest.split('/');
-            if let (Some(o), Some(r)) = (parts.next(), parts.next()) {
-                if !o.is_empty() && !r.is_empty() {
-                    return Some(format!("{o}/{r}"));
-                }
+            if let (Some(o), Some(r)) = (parts.next(), parts.next())
+                && !o.is_empty()
+                && !r.is_empty()
+            {
+                return Some(format!("{o}/{r}"));
             }
         }
     }

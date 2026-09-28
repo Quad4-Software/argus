@@ -23,8 +23,8 @@ pub struct Sandbox {
 #[cfg(target_os = "linux")]
 pub fn apply(sb: &Sandbox) -> Result<(), String> {
     use landlock::{
-        Access, AccessFs, AccessNet, CompatLevel, Compatible, NetPort, PathBeneath, PathFd,
-        Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus, ABI,
+        ABI, Access, AccessFs, AccessNet, CompatLevel, Compatible, NetPort, PathBeneath, PathFd,
+        Ruleset, RulesetAttr, RulesetCreatedAttr, RulesetStatus,
     };
     let abi = ABI::V5;
     // Govern everything EXCEPT Execute: subprocesses (git etc.) must still run.

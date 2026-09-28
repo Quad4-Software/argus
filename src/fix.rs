@@ -113,40 +113,40 @@ fn fix_workflow_text(
                 c[3].to_string(),
                 c[4].to_string(),
             );
-            if !is_sha(&refname) && !action.starts_with("./") && !action.starts_with("docker") {
-                if let Some(sha) = resolve(&action, &refname) {
-                    let comment = if post.contains('#') {
-                        post.clone()
-                    } else {
-                        format!("{post} # {refname}").trim_end().to_string()
-                    };
-                    let newline = format!("{pre}{action}@{sha}{comment}");
-                    edits.push(Edit {
-                        file: path.to_path_buf(),
-                        description: format!("pin {action}@{refname} to {sha}"),
-                        before: line.to_string(),
-                        after: newline.clone(),
-                    });
-                    out.push_str(&newline);
-                    out.push('\n');
-                    continue;
-                }
+            if !is_sha(&refname)
+                && !action.starts_with("./")
+                && !action.starts_with("docker")
+                && let Some(sha) = resolve(&action, &refname)
+            {
+                let comment = if post.contains('#') {
+                    post.clone()
+                } else {
+                    format!("{post} # {refname}").trim_end().to_string()
+                };
+                let newline = format!("{pre}{action}@{sha}{comment}");
+                edits.push(Edit {
+                    file: path.to_path_buf(),
+                    description: format!("pin {action}@{refname} to {sha}"),
+                    before: line.to_string(),
+                    after: newline.clone(),
+                });
+                out.push_str(&newline);
+                out.push('\n');
+                continue;
             }
         }
         out.push_str(line);
         out.push('\n');
     }
-    if !has_permissions {
-        if let Some(pos) = insert_at {
-            let block = "# least privilege: declare per-job permissions or keep this empty\npermissions: {}\n\n";
-            out.insert_str(pos, block);
-            edits.push(Edit {
-                file: path.to_path_buf(),
-                description: "add empty top-level permissions block".into(),
-                before: String::new(),
-                after: block.trim_end().to_string(),
-            });
-        }
+    if !has_permissions && let Some(pos) = insert_at {
+        let block = "# least privilege: declare per-job permissions or keep this empty\npermissions: {}\n\n";
+        out.insert_str(pos, block);
+        edits.push(Edit {
+            file: path.to_path_buf(),
+            description: "add empty top-level permissions block".into(),
+            before: String::new(),
+            after: block.trim_end().to_string(),
+        });
     }
     (out, edits)
 }
@@ -167,11 +167,9 @@ pub fn run(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edit>, Vec<Str
             if es.is_empty() {
                 continue;
             }
-            if write {
-                if let Err(e) = std::fs::write(&wf, &new) {
-                    errors.push(format!("{}: write failed: {e}", wf.display()));
-                    continue;
-                }
+            if write && let Err(e) = std::fs::write(&wf, &new) {
+                errors.push(format!("{}: write failed: {e}", wf.display()));
+                continue;
             }
             edits.append(&mut es);
         }
@@ -319,18 +317,16 @@ fn fix_dockerfile_text(
             let mutable = !img.eq_ignore_ascii_case("scratch")
                 && !pinned
                 && (img_tag(img).is_none() || img_tag(img) == Some("latest"));
-            if mutable {
-                if let Some(d) = resolve(img) {
-                    let newl = format!("FROM {img}@{d}");
-                    edits.push(Edit {
-                        file: path.to_path_buf(),
-                        description: format!("pin base image {img} to digest"),
-                        before: line.to_string(),
-                        after: newl.clone(),
-                    });
-                    pending_lines.push(newl);
-                    continue;
-                }
+            if mutable && let Some(d) = resolve(img) {
+                let newl = format!("FROM {img}@{d}");
+                edits.push(Edit {
+                    file: path.to_path_buf(),
+                    description: format!("pin base image {img} to digest"),
+                    before: line.to_string(),
+                    after: newl.clone(),
+                });
+                pending_lines.push(newl);
+                continue;
             }
         }
         if upper.starts_with("CMD ") || upper.starts_with("ENTRYPOINT") {
@@ -393,20 +389,18 @@ fn fix_compose_text(path: &Path, text: &str) -> (String, Vec<Edit>) {
                     insert_idx = Some(j);
                     j += 1;
                 }
-                if !has_nnp {
-                    if let Some(at) = insert_idx {
-                        lines.insert(at + 1, "    security_opt: [no-new-privileges:true]".into());
-                        edits.push(Edit {
-                            file: path.to_path_buf(),
-                            description: format!(
-                                "add no-new-privileges to service {}",
-                                t.trim_end_matches(':')
-                            ),
-                            before: String::new(),
-                            after: "security_opt: [no-new-privileges:true]".into(),
-                        });
-                        i += 1;
-                    }
+                if !has_nnp && let Some(at) = insert_idx {
+                    lines.insert(at + 1, "    security_opt: [no-new-privileges:true]".into());
+                    edits.push(Edit {
+                        file: path.to_path_buf(),
+                        description: format!(
+                            "add no-new-privileges to service {}",
+                            t.trim_end_matches(':')
+                        ),
+                        before: String::new(),
+                        after: "security_opt: [no-new-privileges:true]".into(),
+                    });
+                    i += 1;
                 }
             }
         }
@@ -447,7 +441,7 @@ fn container_files(root: &Path) -> Vec<PathBuf> {
                     .unwrap_or(&p)
                     .to_string_lossy()
                     .to_string();
-                use crate::container_audit::{kind_of, Kind};
+                use crate::container_audit::{Kind, kind_of};
                 match kind_of(&rel) {
                     Kind::Dockerfile | Kind::Compose => out.push(p),
                     _ => {}
@@ -475,7 +469,7 @@ pub fn run_containers(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edi
                 .unwrap_or(&f)
                 .to_string_lossy()
                 .to_string();
-            use crate::container_audit::{kind_of, Kind};
+            use crate::container_audit::{Kind, kind_of};
             let (new, mut es) = match kind_of(&rel) {
                 Kind::Dockerfile => fix_dockerfile_text(&f, &text, &mut |img| {
                     digest_cache
@@ -489,11 +483,9 @@ pub fn run_containers(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edi
             if es.is_empty() {
                 continue;
             }
-            if write {
-                if let Err(e) = std::fs::write(&f, &new) {
-                    errors.push(format!("{}: write failed: {e}", f.display()));
-                    continue;
-                }
+            if write && let Err(e) = std::fs::write(&f, &new) {
+                errors.push(format!("{}: write failed: {e}", f.display()));
+                continue;
             }
             edits.append(&mut es);
         }

@@ -73,9 +73,10 @@ pub fn audit_github(
 
 fn org_findings(http: &HttpClient, api: &str, org: &str, out: &mut Vec<Finding>) {
     let t = format!("org:{org}");
-    if let Ok((st, v)) = http.get_status_json(&format!("{api}/orgs/{org}")) {
-        if st == 200 {
-            match v["default_repository_permission"].as_str() {
+    if let Ok((st, v)) = http.get_status_json(&format!("{api}/orgs/{org}"))
+        && st == 200
+    {
+        match v["default_repository_permission"].as_str() {
                 Some("write") | Some("admin") => out.push(finding(
                     &t,
                     "RST-101",
@@ -89,24 +90,23 @@ fn org_findings(http: &HttpClient, api: &str, org: &str, out: &mut Vec<Finding>)
                 Some(_) => {}
                 None => {}
             }
-            if v["members_can_create_repositories"].as_bool() == Some(true) {
-                out.push(finding(
-                    &t,
-                    "RST-102",
-                    Severity::Info,
-                    "org members can create repositories - repos may appear outside review".into(),
-                    "Disable member repo creation or set it to private-only.",
-                ));
-            }
-            if v["two_factor_requirement_enabled"].as_bool() == Some(false) {
-                out.push(finding(
-                    &t,
-                    "RST-103",
-                    Severity::Medium,
-                    "org does not require two-factor authentication".into(),
-                    "Enable 2FA requirement in org security settings.",
-                ));
-            }
+        if v["members_can_create_repositories"].as_bool() == Some(true) {
+            out.push(finding(
+                &t,
+                "RST-102",
+                Severity::Info,
+                "org members can create repositories - repos may appear outside review".into(),
+                "Disable member repo creation or set it to private-only.",
+            ));
+        }
+        if v["two_factor_requirement_enabled"].as_bool() == Some(false) {
+            out.push(finding(
+                &t,
+                "RST-103",
+                Severity::Medium,
+                "org does not require two-factor authentication".into(),
+                "Enable 2FA requirement in org security settings.",
+            ));
         }
     }
     match http.get_status_json(&format!("{api}/orgs/{org}/actions/permissions")) {
@@ -129,32 +129,30 @@ fn org_findings(http: &HttpClient, api: &str, org: &str, out: &mut Vec<Finding>)
 fn repo_findings(http: &HttpClient, api: &str, repo: &RepoSpec, out: &mut Vec<Finding>) {
     let t = &repo.full_name;
     let mut default_branch = "main".to_string();
-    if let Ok((st, v)) = http.get_status_json(&format!("{api}/repos/{t}")) {
-        if st == 200 {
-            if let Some(b) = v["default_branch"].as_str() {
-                default_branch = b.to_string();
-            }
-            if repo.private && v["allow_forking"].as_bool() == Some(true) {
-                out.push(finding(
-                    t,
-                    "RST-201",
-                    Severity::Medium,
-                    "private repo allows forking - members can copy code outside the org".into(),
-                    "Disable forking on the repo or org policy.",
-                ));
-            }
-            if v["web_commit_signoff_required"].as_bool() == Some(false)
-                && !repo.fork
-                && !repo.archived
-            {
-                out.push(finding(
+    if let Ok((st, v)) = http.get_status_json(&format!("{api}/repos/{t}"))
+        && st == 200
+    {
+        if let Some(b) = v["default_branch"].as_str() {
+            default_branch = b.to_string();
+        }
+        if repo.private && v["allow_forking"].as_bool() == Some(true) {
+            out.push(finding(
+                t,
+                "RST-201",
+                Severity::Medium,
+                "private repo allows forking - members can copy code outside the org".into(),
+                "Disable forking on the repo or org policy.",
+            ));
+        }
+        if v["web_commit_signoff_required"].as_bool() == Some(false) && !repo.fork && !repo.archived
+        {
+            out.push(finding(
                     t,
                     "RST-202",
                     Severity::Info,
                     "web commits do not require signoff (DCO)".into(),
                     "Enable 'Require contributors to sign off on web-based commits' if the project wants DCO provenance.",
                 ));
-            }
         }
     }
     match http.get_status_json(&format!(
@@ -182,15 +180,15 @@ fn repo_findings(http: &HttpClient, api: &str, repo: &RepoSpec, out: &mut Vec<Fi
         }
         _ => {} // 401/403: cannot determine, stay quiet
     }
-    if let Ok((200, v)) = http.get_status_json(&format!("{api}/repos/{t}/actions/permissions")) {
-        if v["allowed_actions"].as_str() == Some("all") {
-            out.push(finding(
+    if let Ok((200, v)) = http.get_status_json(&format!("{api}/repos/{t}/actions/permissions"))
+        && v["allowed_actions"].as_str() == Some("all")
+    {
+        out.push(finding(
                 t,
                 "RST-220",
                 Severity::Medium,
                 "Actions policy allows all actions - unpinned third-party actions run with repo secrets".into(),
                 "Set 'Allow actions created by GitHub and verified Marketplace creators' or a selected allowlist.",
             ));
-        }
     }
 }

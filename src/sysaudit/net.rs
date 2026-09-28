@@ -108,16 +108,16 @@ pub(crate) fn filesystem(out: &mut Vec<Finding>) {
     }
     // world-writable dirs without sticky bit
     for d in ["/tmp", "/var/tmp", "/dev/shm"] {
-        if let Some(m) = mode_of(d) {
-            if m & 0o1000 == 0 {
-                out.push(mk(
-                    "SYS-FS-10",
-                    Severity::Medium,
-                    d,
-                    format!("{d} lacks the sticky bit - users can delete each other's files"),
-                    "chmod +t.",
-                ));
-            }
+        if let Some(m) = mode_of(d)
+            && m & 0o1000 == 0
+        {
+            out.push(mk(
+                "SYS-FS-10",
+                Severity::Medium,
+                d,
+                format!("{d} lacks the sticky bit - users can delete each other's files"),
+                "chmod +t.",
+            ));
         }
     }
 }
@@ -201,18 +201,17 @@ pub(crate) fn services(out: &mut Vec<Finding>) {
     if let Some(sec) = cmd("systemd-analyze", &["security"]) {
         for line in sec.lines().skip(1).take(5) {
             let mut c = line.split_whitespace();
-            if let (Some(unit), Some(score)) = (c.next(), c.next()) {
-                if let Ok(s) = score.parse::<f32>() {
-                    if s >= 8.0 {
-                        out.push(mk(
-                            "SYS-SVC-SEC",
-                            Severity::Low,
-                            unit,
-                            format!("{unit} runs UNSAFE (exposure {s}/10) - no sandboxing"),
-                            "Harden with ProtectSystem/PrivateTmp/NoNewPrivileges in the unit.",
-                        ));
-                    }
-                }
+            if let (Some(unit), Some(score)) = (c.next(), c.next())
+                && let Ok(s) = score.parse::<f32>()
+                && s >= 8.0
+            {
+                out.push(mk(
+                    "SYS-SVC-SEC",
+                    Severity::Low,
+                    unit,
+                    format!("{unit} runs UNSAFE (exposure {s}/10) - no sandboxing"),
+                    "Harden with ProtectSystem/PrivateTmp/NoNewPrivileges in the unit.",
+                ));
             }
         }
     }

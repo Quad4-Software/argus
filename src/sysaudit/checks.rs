@@ -115,31 +115,30 @@ pub(crate) fn kernel(out: &mut Vec<Finding>) {
         // missing keys mean the module/knob is not loaded - skip
     }
     // core_pattern piped to a helper is a data-exfil + persistence primitive
-    if let Some(cp) = sysctl("kernel.core_pattern") {
-        if cp.starts_with('|') {
-            out.push(mk(
+    if let Some(cp) = sysctl("kernel.core_pattern")
+        && cp.starts_with('|')
+    {
+        out.push(mk(
                 "SYS-KERN-08",
                 Severity::Medium,
                 "/proc/sys/kernel/core_pattern",
                 format!("core_pattern pipes to a helper ({cp}) - crash data leaves the box and the pipe runs as root"),
                 "Use a plain file pattern or disable cores for suid/PII workloads.",
             ));
-        }
     }
     // unprivileged userns on Ubuntu-style knob too
-    if let Some(v) = sysctl("user.max_user_namespaces") {
-        if v.parse::<u64>().unwrap_or(0) > 1000
-            && sysctl("kernel.unprivileged_userns_clone").is_none()
-        {
-            // high cap with no clone knob visible: common default, report low
-            out.push(mk(
+    if let Some(v) = sysctl("user.max_user_namespaces")
+        && v.parse::<u64>().unwrap_or(0) > 1000
+        && sysctl("kernel.unprivileged_userns_clone").is_none()
+    {
+        // high cap with no clone knob visible: common default, report low
+        out.push(mk(
                 "SYS-KERN-06",
                 Severity::Low,
                 "/proc/sys/user/max_user_namespaces",
                 format!("user.max_user_namespaces={v} - unprivileged userns is wide open (container-escape primitive)"),
                 "Restrict with kernel.unprivileged_userns_clone=0 or a small max_user_namespaces.",
             ));
-        }
     }
     // secure boot
     if Path::new("/sys/firmware/efi").exists() {
@@ -261,32 +260,32 @@ pub(crate) fn auth(out: &mut Vec<Finding>) {
         ("/etc/passwd", 0o644, "SYS-AUTH-10"),
         ("/etc/group", 0o644, "SYS-AUTH-11"),
     ] {
-        if let Some(m) = mode_of(path) {
-            if m & 0o022 != 0 || m > max {
-                out.push(mk(
-                    id,
-                    Severity::High,
-                    path,
-                    format!("{path} mode {m:04o} is writable beyond root"),
-                    "chmod 644.",
-                ));
-            }
+        if let Some(m) = mode_of(path)
+            && (m & 0o022 != 0 || m > max)
+        {
+            out.push(mk(
+                id,
+                Severity::High,
+                path,
+                format!("{path} mode {m:04o} is writable beyond root"),
+                "chmod 644.",
+            ));
         }
     }
     for (path, max, id) in [
         ("/etc/shadow", 0o640, "SYS-AUTH-12"),
         ("/etc/gshadow", 0o640, "SYS-AUTH-13"),
     ] {
-        if let Some(m) = mode_of(path) {
-            if m & 0o027 != 0 || m > max {
-                out.push(mk(
-                    id,
-                    Severity::High,
-                    path,
-                    format!("{path} mode {m:04o} exposes password hashes"),
-                    "chmod 640 root:shadow.",
-                ));
-            }
+        if let Some(m) = mode_of(path)
+            && (m & 0o027 != 0 || m > max)
+        {
+            out.push(mk(
+                id,
+                Severity::High,
+                path,
+                format!("{path} mode {m:04o} exposes password hashes"),
+                "chmod 640 root:shadow.",
+            ));
         }
     }
 
@@ -360,16 +359,16 @@ pub(crate) fn collect_sudo_rules(p: &str, out: &mut Vec<Finding>) {
         }
     }
     // sudoers.d perms must be 440/750-ish, not world-readable
-    if let Some(m) = mode_of("/etc/sudoers") {
-        if m & 0o077 != 0 {
-            out.push(mk(
-                "SYS-AUTH-32",
-                Severity::Medium,
-                "/etc/sudoers",
-                format!("sudoers mode {m:04o} readable by others"),
-                "chmod 440 /etc/sudoers.",
-            ));
-        }
+    if let Some(m) = mode_of("/etc/sudoers")
+        && m & 0o077 != 0
+    {
+        out.push(mk(
+            "SYS-AUTH-32",
+            Severity::Medium,
+            "/etc/sudoers",
+            format!("sudoers mode {m:04o} readable by others"),
+            "chmod 440 /etc/sudoers.",
+        ));
     }
 }
 

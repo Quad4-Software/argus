@@ -1,7 +1,7 @@
 //! Hardening tests: adversarial inputs, fault injection, determinism (races),
 //! chaos fuzzing, suppression markers, baseline round-trips.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -571,7 +571,8 @@ fn mock_server(resps: Vec<String>) -> (String, std::sync::Arc<std::sync::atomic:
             let body = &resps[i.min(resps.len() - 1)];
             let resp = format!(
                 "HTTP/1.1 200 OK\r\ncontent-length: {}\r\ncontent-type: application/json\r\nconnection: close\r\n\r\n{}",
-                body.len(), body
+                body.len(),
+                body
             );
             let _ = s.write_all(resp.as_bytes());
         }

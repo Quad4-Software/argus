@@ -149,10 +149,10 @@ pub fn resolve_token(
         return Some(t.to_string());
     }
     for e in envs {
-        if let Ok(v) = std::env::var(e) {
-            if !v.is_empty() {
-                return Some(v);
-            }
+        if let Ok(v) = std::env::var(e)
+            && !v.is_empty()
+        {
+            return Some(v);
         }
     }
     cfg.filter(|s| !s.is_empty()).map(str::to_string)

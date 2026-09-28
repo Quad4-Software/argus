@@ -195,33 +195,33 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         }
         _ => {}
     }
-    if let Some(out) = &cli.output {
-        if let Some(parent) = out.parent() {
-            sb.writes.push(parent.to_path_buf());
-        }
+    if let Some(out) = &cli.output
+        && let Some(parent) = out.parent()
+    {
+        sb.writes.push(parent.to_path_buf());
     }
     if let Some(vx) = &cli.vex {
         sb.reads.push(vx.clone());
     }
-    if let Some(vout) = &cli.vex_out {
-        if let Some(parent) = vout.parent() {
-            sb.writes.push(parent.to_path_buf());
-        }
+    if let Some(vout) = &cli.vex_out
+        && let Some(parent) = vout.parent()
+    {
+        sb.writes.push(parent.to_path_buf());
     }
-    if let Some(bp) = &cli.baseline {
-        if let Some(parent) = bp.parent() {
-            sb.reads.push(parent.to_path_buf());
-        }
+    if let Some(bp) = &cli.baseline
+        && let Some(parent) = bp.parent()
+    {
+        sb.reads.push(parent.to_path_buf());
     }
-    if let Some(bp) = &cli.baseline {
-        if let Some(parent) = bp.parent() {
-            sb.reads.push(parent.to_path_buf());
-        }
+    if let Some(bp) = &cli.baseline
+        && let Some(parent) = bp.parent()
+    {
+        sb.reads.push(parent.to_path_buf());
     }
-    if let Some(bp) = &cli.write_baseline {
-        if let Some(parent) = bp.parent() {
-            sb.writes.push(parent.to_path_buf());
-        }
+    if let Some(bp) = &cli.write_baseline
+        && let Some(parent) = bp.parent()
+    {
+        sb.writes.push(parent.to_path_buf());
     }
     let _ = opts;
     if let Err(e) = sandbox::apply(&sb) {
