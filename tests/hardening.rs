@@ -61,7 +61,8 @@ fn adversarial_files_no_panic() {
         let _ = std::os::unix::fs::symlink(".", d.join("loop"));
         let _ = std::os::unix::fs::symlink("loop", d.join("loop"));
     }
-    // name collisions / unicode names
+    // name collisions / unicode names (control chars are unix-only filenames)
+    #[cfg(unix)]
     std::fs::write(d.join("weird \tname\nfile.txt"), "t.m-kosche.com").unwrap();
 
     let out = bin()
@@ -484,10 +485,9 @@ fn sandbox_denies_symlink_escape() {
 
     let v = scan_json(&d);
     let n = v["summary"]["critical"].as_u64().unwrap();
-    #[cfg(target_os = "linux")]
-    assert_eq!(n, 1, "sandbox should deny the symlink escape (got {n})");
-    #[cfg(not(target_os = "linux"))]
-    assert_eq!(n, 2);
+    // collect_files refuses out-of-root symlink targets on every platform;
+    // on windows the unix-gated symlink was never created at all
+    assert_eq!(n, 1, "symlink escape must stay inside the root (got {n})");
     let _ = std::fs::remove_dir_all(&d);
     let _ = std::fs::remove_dir_all(outside.parent().unwrap());
 }
