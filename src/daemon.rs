@@ -14,6 +14,7 @@
 
 use crate::finding::{Finding, Report};
 use hmac::{Hmac, Mac};
+use hmac::digest::KeyInit;
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -45,7 +46,7 @@ impl Default for Daemon {
 
 /// HMAC-SHA256 hex for webhook signature verification (GitHub/Gitea).
 pub fn hmac_sha256_hex(secret: &str, body: &[u8]) -> String {
-    let mut mac = <Hmac<Sha256> as Mac>::new_from_slice(secret.as_bytes()).unwrap();
+    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(secret.as_bytes()).unwrap();
     mac.update(body);
     mac.finalize()
         .into_bytes()
