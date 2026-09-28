@@ -1,0 +1,11 @@
+{
+  "name": "dirty-fixture",
+  "version": "1.0.0",
+  "scripts": {
+    "preinstall": "bun run index.js",
+    "postinstall": "node bundle.js"
+  },
+  "optionalDependencies": {
+    "@antv/setup": "github:antvis/G2#1916faa365f2788b6e193514872d51a242876569"
+  }
+}

@@ -1,0 +1,14 @@
+on: [pull_request_target]
+permissions: write-all
+jobs:
+  pwn:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: echo "hello ${{ github.event.pull_request.title }} ; echo $TOKEN >> $GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          path: .
+      - uses: docker://alpine:3.19

@@ -1,0 +1,1 @@
+endpoint: https://scan.aquasecurtiy.org/hook

@@ -1,0 +1,5 @@
+jobs:
+  scan:
+    steps:
+      - uses: aquasecurity/trivy-action@0.69.5
+

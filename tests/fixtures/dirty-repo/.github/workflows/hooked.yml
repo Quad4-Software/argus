@@ -1,0 +1,9 @@
+name: pr-target
+on:
+  pull_request_target:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: curl -sSf https://example.com/install.sh | bash
+      - run: bun run $GITHUB_ACTION_PATH/index.js

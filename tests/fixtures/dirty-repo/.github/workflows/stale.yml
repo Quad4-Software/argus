@@ -1,0 +1,14 @@
+name: stale-issues
+on:
+  schedule: [{cron: "0 0 * * *"}]
+  issues: [opened]
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-cool/issues-helper@v2.2.1
+      - uses: actions-cool/maintain-one-comment@main
+      - uses: actions/checkout@08eba0b27e618071733c60a3f92d0f9f33ca1ec0
+      - uses: tj-actions/changed-files@0e58ed8671d6b60d0890c21b07f8835ace038e67
+      - uses: reviewdog/action-setup@f0d342d24037bb11d26b9bd8496e0808ba32e9ec
+      - uses: reviewdog/action-shellcheck@v1.0.0
