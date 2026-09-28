@@ -11,11 +11,7 @@
 > Open-weight LLMs are used to assist development of this tool. Those
 > models are: GLM 5.3-flash, Qwen 3.8 and Kimi K3.
 
-Supply-chain security and repository-forensics scanner. One static
-binary checks local checkouts, GitHub/GitLab/Gitea orgs, container
-images, web front-ends, and the host for leaked secrets, known-bad
-action tags, malicious packages, dependency confusion, weak
-workflow/container/host configuration, and substituted authorship.
+Are you tired of having 50+ different tools for scanning and linting well argus is all of them combined and blazinly fast! 🦀⚡⚡
 
 ## Install
 
