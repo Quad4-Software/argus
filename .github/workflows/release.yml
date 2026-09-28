@@ -20,7 +20,7 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-latest, target: x86_64-unknown-linux-musl, pkg: tar }
-          - { os: macos-13-large, target: x86_64-apple-darwin,     pkg: tar }
+          - { os: macos-15,      target: x86_64-apple-darwin,     pkg: tar, cross: true }
           - { os: macos-15,      target: aarch64-apple-darwin,    pkg: tar }
           - { os: windows-latest, target: x86_64-pc-windows-msvc, pkg: zip }
     steps:
@@ -35,6 +35,9 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y musl-tools
           rustup target add x86_64-unknown-linux-musl
+      - name: cross target (x86 on arm64 mac)
+        if: matrix.cross == true
+        run: rustup target add x86_64-apple-darwin
       - name: build
         run: cargo build --release --locked --target ${{ matrix.target }}
       - name: package
