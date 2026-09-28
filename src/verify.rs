@@ -18,6 +18,8 @@ struct Provider {
     basic: bool,
     /// Body field that must match for "live" (slack style "ok":true).
     ok_field: Option<&'static str>,
+    /// Extra headers the API requires alongside auth (e.g. anthropic-version).
+    extra: &'static [(&'static str, &'static str)],
 }
 
 const PROVIDERS: &[Provider] = &[
@@ -28,6 +30,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "GitLab",
@@ -36,6 +39,7 @@ const PROVIDERS: &[Provider] = &[
         header: "PRIVATE-TOKEN",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "Telegram",
@@ -44,6 +48,7 @@ const PROVIDERS: &[Provider] = &[
         header: "",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "npm",
@@ -52,6 +57,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "Slack",
@@ -60,6 +66,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: Some("ok"),
+        extra: &[],
     },
     Provider {
         name: "HuggingFace",
@@ -68,6 +75,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "Stripe",
@@ -76,6 +84,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: true,
         ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "SendGrid",
@@ -84,6 +93,61 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: None,
+        extra: &[],
+    },
+    Provider {
+        name: "OpenAI",
+        re: r"sk-proj-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{40,}",
+        url: "https://api.openai.com/v1/models",
+        header: "Authorization",
+        basic: false,
+        ok_field: None,
+        extra: &[],
+    },
+    Provider {
+        name: "Anthropic",
+        re: r"sk-ant-[A-Za-z0-9_-]{30,}",
+        url: "https://api.anthropic.com/v1/models",
+        header: "x-api-key",
+        basic: false,
+        ok_field: None,
+        extra: &[("anthropic-version", "2023-06-01")],
+    },
+    Provider {
+        name: "Cloudflare",
+        re: r"[A-Za-z0-9_-]{40}",
+        url: "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        header: "Authorization",
+        basic: false,
+        ok_field: Some("success"),
+        extra: &[],
+    },
+    Provider {
+        name: "DigitalOcean",
+        re: r"dop_v1_[A-Za-z0-9]{60,}",
+        url: "https://api.digitalocean.com/v2/user",
+        header: "Authorization",
+        basic: false,
+        ok_field: None,
+        extra: &[],
+    },
+    Provider {
+        name: "PyPI",
+        re: r"pypi-[A-Za-z0-9_-]{30,}",
+        url: "https://pypi.org/pypi/legacy/",
+        header: "Authorization",
+        basic: false,
+        ok_field: None,
+        extra: &[],
+    },
+    Provider {
+        name: "crates.io",
+        re: r"cio[A-Za-z0-9]{20,}",
+        url: "https://crates.io/api/v1/me",
+        header: "Authorization",
+        basic: false,
+        ok_field: None,
+        extra: &[],
     },
     Provider {
         name: "OpenAI",
@@ -92,6 +156,7 @@ const PROVIDERS: &[Provider] = &[
         header: "Authorization",
         basic: false,
         ok_field: None,
+        extra: &[],
     },
 ];
 
@@ -215,6 +280,7 @@ pub fn verify(roots: &[PathBuf], verbose: bool) -> (Vec<Finding>, usize) {
                                 url: p.url,
                                 header: p.header,
                                 basic: p.basic,
+                                extra: p.extra,
                                 ok_field: p.ok_field,
                             },
                             tok,

@@ -283,8 +283,31 @@ pub fn audit(
 }
 
 /// OS packages inside an exported rootfs, for OSV queries.
-/// Supports dpkg (var/lib/dpkg/status) and apk (lib/apk/db/installed).
-/// rpm's binary BDB cannot be parsed without librpm - skipped.
+/// Supports dpkg, apk, and modern rpmdb.sqlite (rhel8+/fedora/opensuse).
+/// rpm's legacy binary BDB cannot be parsed without librpm - skipped.
+/// rpm sqlite db: Packages table holds name+version per row.
+fn rpm_pkgs(db: &std::path::Path) -> Result<Vec<crate::osv::Dep>, String> {
+    let conn =
+        rusqlite::Connection::open_with_flags(db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .map_err(|e| e.to_string())?;
+    let mut st = conn
+        .prepare("SELECT name, version FROM Packages")
+        .map_err(|e| e.to_string())?;
+    let rows = st
+        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for r in rows.flatten() {
+        out.push(crate::osv::Dep {
+            ecosystem: "Red Hat",
+            name: r.0,
+            version: r.1,
+            path: "usr/lib/sysimage/rpm/rpmdb.sqlite".into(),
+        });
+    }
+    Ok(out)
+}
+
 pub fn os_packages(merged: &std::path::Path) -> Vec<crate::osv::Dep> {
     let mut out = Vec::new();
     if let Ok(text) = std::fs::read_to_string(merged.join("var/lib/dpkg/status")) {
@@ -321,5 +344,41 @@ pub fn os_packages(merged: &std::path::Path) -> Vec<crate::osv::Dep> {
             }
         }
     }
+    // rpm-based distros: modern rpmdb.sqlite (fedora/rhel8+/opensuse)
+    for c in [
+        merged.join("usr/lib/sysimage/rpm/rpmdb.sqlite"),
+        merged.join("var/lib/rpm/rpmdb.sqlite"),
+    ] {
+        if c.is_file() {
+            if let Ok(d) = rpm_pkgs(&c) {
+                out.extend(d);
+            }
+            break;
+        }
+    }
     out
+}
+
+#[cfg(test)]
+mod rpm_tests {
+    #[test]
+    fn rpm_sqlite_extracts_packages() {
+        let d = std::env::temp_dir().join(format!("argus-rpm-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("var/lib/rpm")).unwrap();
+        let db = d.join("var/lib/rpm/rpmdb.sqlite");
+        let conn = rusqlite::Connection::open(&db).unwrap();
+        conn.execute("CREATE TABLE Packages (name TEXT, version TEXT)", [])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO Packages VALUES ('bash','5.2.15'),('openssl','3.0.9')",
+            [],
+        )
+        .unwrap();
+        drop(conn);
+        let pkgs = super::os_packages(&d);
+        assert_eq!(pkgs.len(), 2);
+        assert_eq!(pkgs[0].ecosystem, "Red Hat");
+        assert_eq!(pkgs[0].name, "bash");
+        let _ = std::fs::remove_dir_all(&d);
+    }
 }

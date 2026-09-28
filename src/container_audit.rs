@@ -56,7 +56,7 @@ fn image_tag(img: &str) -> Option<&str> {
 
 /// Secret-looking variable names: a literal value assigned to these is
 /// almost always a leaked credential.
-fn secretish(name: &str) -> bool {
+pub(crate) fn secretish(name: &str) -> bool {
     let n = name.to_uppercase();
     for m in [
         "PASSWORD",

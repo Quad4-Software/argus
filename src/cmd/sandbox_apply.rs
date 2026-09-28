@@ -147,7 +147,7 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             sb.reads.push("/".into());
         }
         Cmd::Authors { paths, .. } => sb.reads.extend(paths.iter().cloned()),
-        Cmd::Sbom { path } => sb.reads.push(path.clone()),
+        Cmd::Sbom { path, .. } => sb.reads.push(path.clone()),
         Cmd::Ai { paths } => sb.reads.extend(paths.iter().cloned()),
         Cmd::License { paths, .. } => sb.reads.extend(paths.iter().cloned()),
         Cmd::Publish { paths } => {
@@ -177,6 +177,9 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             if *write {
                 sb.writes.extend(paths.iter().cloned());
             }
+        }
+        Cmd::Image { remote: true, .. } => {
+            sb.net_open = true; // registry api on arbitrary hosts/ports
         }
         Cmd::Image { deep, .. } => {
             sb.reads.push("/var/run".into());

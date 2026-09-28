@@ -70,6 +70,7 @@ pub fn audit() -> Vec<Finding> {
     network(&mut out);
     filesystem(&mut out);
     services(&mut out);
+    services_cfg(&mut out);
     logging(&mut out);
     scheduler(&mut out);
     integrity(&mut out);

@@ -19,6 +19,7 @@ ureq = "3.4"
 clap_complete = "4.6"
 yara-x = { version = "1", optional = true }
 yaml-rust2 = "0.13.0"
+rusqlite = { version = "0.40", features = ["bundled"] }
 hmac = "0.13"
 
 [features]

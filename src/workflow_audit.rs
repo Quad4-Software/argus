@@ -292,6 +292,16 @@ fn audit_step(
                     "Cache entries are attacker-controllable across PR runs; don't restore executable content.", disabled));
             }
         }
+        // artipacked-credentials (WFA-013): checkout persists creds so later
+        // steps (and uploaded artifacts) carry them
+        if u.starts_with("actions/checkout") {
+            let pc = &step["with"]["persist-credentials"];
+            if pc.as_bool() == Some(true) {
+                out.push(mk("WFA-013", Severity::Medium, rel, target,
+                    "actions/checkout with persist-credentials: true - token leaks into .git for the whole job",
+                    "Set persist-credentials: false; the default already covers it for read-only jobs.", disabled));
+            }
+        }
         // ref-confusion (WFA-009): checkout of PR head under pull_request_target
         if u.starts_with("actions/checkout") {
             let r = step["with"]["ref"].as_str().unwrap_or("");

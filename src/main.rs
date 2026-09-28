@@ -9,8 +9,10 @@ mod config;
 mod container_audit;
 mod daemon;
 mod depcheck;
+mod entropy;
 mod finding;
 mod fix;
+mod history;
 mod http;
 mod http_server;
 mod image;
@@ -20,6 +22,7 @@ mod mcp;
 mod osv;
 mod provider;
 mod publish;
+mod regimg;
 mod registry;
 mod roam;
 mod rules;
@@ -199,10 +202,11 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     // podman/docker manage their own user+mount namespaces, which
     // per-path Landlock grants cannot express (same tradeoff as
     // trivy/grype). Everything else stays sandboxed.
-    let sandboxable = !matches!(cli.cmd, Cmd::Image { .. });
+    let local_runtime = matches!(cli.cmd, Cmd::Image { remote: false, .. });
+    let sandboxable = !local_runtime;
     if sandboxable && !cli.no_sandbox && !cfg.defaults.no_sandbox.unwrap_or(false) {
         apply_sandbox(cli, &opts);
-    } else if matches!(cli.cmd, Cmd::Image { .. }) && cli.verbose > 0 {
+    } else if local_runtime && cli.verbose > 0 {
         eprintln!("note: image audit runs the container runtime unsandboxed");
     }
 
@@ -255,6 +259,9 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
                     findings: findings.len(),
                 });
                 report.findings.append(&mut findings);
+            }
+            if cli.history_secrets {
+                cmd::misc::history_secrets(paths, &rules, &opts, &mut report, cli.verbose);
             }
             if let Some(refpath) = &cli.similar {
                 crate::cmd::similar_cmd::vendored_check(
@@ -428,7 +435,15 @@ exec argus scan --staged --fail-on medium
             }
             Err(e) => report.errors.push(e),
         },
-        Cmd::Image { image, deep } => match image::audit(image, *deep, cli.verbose > 1) {
+        Cmd::Image { image, remote, .. } if *remote => {
+            // OCI registry API - no container runtime, network required
+            cmd::misc::remote_image(image, &mut report, cli.verbose);
+        }
+        Cmd::Image {
+            image,
+            deep,
+            remote: _,
+        } => match image::audit(image, *deep, cli.verbose > 1) {
             Ok((mut fs, export, _rt)) => {
                 if let Some(root) = &export {
                     let (mut more, n) = scan::scan_root(root, image, &rules, &opts);
@@ -456,8 +471,12 @@ exec argus scan --staged --fail-on medium
         Cmd::Authors { paths, format: fmt } => {
             return authors_cmd(cli, paths, *fmt, &rules);
         }
-        Cmd::Sbom { path } => {
-            println!("{}", sbom::sbom(path, &opts));
+        Cmd::Sbom { path, sbom_format } => {
+            let out = match sbom_format {
+                cli::SbomFmt::Cyclonedx => sbom::sbom(path, &opts),
+                cli::SbomFmt::Spdx => sbom::sbom_spdx(path, &opts),
+            };
+            println!("{out}");
             return Ok(ExitCode::SUCCESS);
         }
         Cmd::Ai { paths } => {

@@ -6,6 +6,13 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum SbomFmt {
+    #[default]
+    Cyclonedx,
+    Spdx,
+}
+
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
 pub enum Format {
     #[default]
     Text,
@@ -194,6 +201,13 @@ pub struct Cli {
     pub dep_check: bool,
 
     #[arg(
+        long = "history-secrets",
+        global = true,
+        help = "Scan git history diffs for secrets committed and later removed (up to 500 commits)"
+    )]
+    pub history_secrets: bool,
+
+    #[arg(
         long = "similar",
         global = true,
         value_name = "PATH",
@@ -328,8 +342,14 @@ pub enum Cmd {
     /// Daemon: HTTP control plane + webhook receiver + watch loop.
     Daemon(DaemonArgs),
 
-    /// Emit a CycloneDX 1.5 SBOM (JSON) for a path's lockfiles/manifests.
-    Sbom { path: PathBuf },
+    /// Emit an SBOM (CycloneDX 1.5 or SPDX 2.3) for a path's lockfiles.
+    Sbom {
+        /// Root path to inventory.
+        path: PathBuf,
+        /// SBOM spec: cyclonedx (default) or spdx.
+        #[arg(long, value_enum, default_value = "cyclonedx")]
+        sbom_format: SbomFmt,
+    },
 
     /// AI-provenance analysis: agent trailers, commit velocity, prose tells.
     Ai {
@@ -399,11 +419,14 @@ pub enum Cmd {
     /// Audit a container image: baked-in secrets, root user, history
     /// leakage; --deep also exports and scans every layer's files.
     Image {
-        /// Image reference (docker/podman must be installed).
+        /// Image reference (docker/podman must be installed, or use --remote).
         image: String,
         /// Export the image and run the full scanner over its filesystem.
         #[arg(long)]
         deep: bool,
+        /// Query the registry directly over the OCI API (no container runtime).
+        #[arg(long)]
+        remote: bool,
     },
 
     /// List git commit authors (name/email/count) per repo, flagging watchlist identities.

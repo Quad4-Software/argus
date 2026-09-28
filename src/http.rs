@@ -2,6 +2,13 @@
 
 use std::time::Duration;
 
+/// Response body for get_raw: text plus the WWW-Authenticate challenge
+/// (registries send 401 + Bearer realm for anonymous token flow).
+pub struct RawBody {
+    pub text: String,
+    pub challenge: Option<String>,
+}
+
 pub struct HttpClient {
     agent: ureq::Agent,
     headers: Vec<(String, String)>,
@@ -44,6 +51,55 @@ impl HttpClient {
             }
         }
         Err(last)
+    }
+
+    /// Raw GET with extra request headers; returns
+    /// (status, body, www-authenticate header if present).
+    pub fn get_raw(&self, url: &str, extra: &[(String, String)]) -> Result<(u16, RawBody), String> {
+        let mut req = self.agent.get(url);
+        for (k, v) in &self.headers {
+            req = req.header(k.as_str(), v.as_str());
+        }
+        for (k, v) in extra {
+            req = req.header(k.as_str(), v.as_str());
+        }
+        let mut resp = req.call().map_err(|e| format!("{url}: {e}"))?;
+        let status = resp.status().as_u16();
+        let challenge = resp
+            .headers()
+            .get("www-authenticate")
+            .and_then(|v| v.to_str().ok())
+            .map(str::to_string);
+        let body = resp
+            .body_mut()
+            .read_to_string()
+            .map_err(|e| format!("{url}: {e}"))?;
+        Ok((
+            status,
+            RawBody {
+                text: body,
+                challenge,
+            },
+        ))
+    }
+
+    /// Plain-text GET.
+    pub fn get(&self, url: &str) -> Result<String, String> {
+        let (st, b) = self.get_raw(url, &[])?;
+        if st == 200 {
+            Ok(b.text)
+        } else {
+            Err(format!("{url}: {st}"))
+        }
+    }
+
+    /// GET with custom headers, returns (status, RawBody).
+    pub fn get_headers(
+        &self,
+        url: &str,
+        headers: &[(String, String)],
+    ) -> Result<(u16, RawBody), String> {
+        self.get_raw(url, headers)
     }
 
     fn get_once(&self, url: &str) -> Result<serde_json::Value, HttpErr> {

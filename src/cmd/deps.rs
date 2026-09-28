@@ -118,11 +118,11 @@ pub(crate) fn run_osv_queries(
 /// Shared vuln-hit -> finding mapping used by scan --osv and image --deep.
 pub(crate) fn vuln_findings(
     deps: &[osv::Dep],
-    hits: Vec<(usize, String, String)>,
+    hits: Vec<(usize, String, String, String)>,
     ruleset: &str,
 ) -> Vec<Finding> {
     let mut out = Vec::new();
-    for (i, id, summary) in hits {
+    for (i, id, summary, fix) in hits {
         let d = &deps[i];
         let is_mal = id.starts_with("MAL-");
         out.push(finding::Finding {
@@ -152,8 +152,10 @@ pub(crate) fn vuln_findings(
             remediation: Some(if is_mal {
                 "Malicious package version; do not install, rotate credentials on hosts that did."
                     .into()
-            } else {
+            } else if fix.is_empty() {
                 "Review the advisory and upgrade if affected.".into()
+            } else {
+                format!("Upgrade to {fix} or later.")
             }),
             reference: Some(format!("https://osv.dev/vulnerability/{id}")),
             window: None,

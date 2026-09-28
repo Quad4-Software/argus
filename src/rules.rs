@@ -115,6 +115,17 @@ pub enum RuleKindDef {
         #[serde(default)]
         versions: Vec<String>,
     },
+    /// File-level dataflow: fires when a `source` regex and a `sink` regex
+    /// BOTH match in the same file (e.g. reads a secret AND reaches a
+    /// network/file sink). Coarse - no per-line scoping - but catches the
+    /// "collect + exfiltrate" shape single-regex rules miss.
+    Dataflow {
+        source: String,
+        sink: String,
+        /// Optional path scope.
+        #[serde(default)]
+        path: Option<String>,
+    },
     /// Fire on the presence of a matching repo-relative path.
     Path { regex: String },
 }
@@ -182,6 +193,11 @@ pub enum CompiledKind {
         entropy: f64,
         min_len: usize,
     },
+    Dataflow {
+        source: Regex,
+        sink: Regex,
+        path: Option<Regex>,
+    },
     Path {
         regex: Regex,
     },
@@ -216,6 +232,7 @@ impl CompiledRule {
     pub fn path_in_scope(&self, rel: &str) -> bool {
         match &self.kind {
             CompiledKind::Content { path: Some(p), .. } => p.is_match(rel),
+            CompiledKind::Dataflow { path: Some(p), .. } => p.is_match(rel),
             CompiledKind::Package { .. } | CompiledKind::SourceUrl { .. } => {
                 static RE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
                 RE.get_or_init(|| Regex::new(CompiledRule::DEP_MANIFESTS_RE).unwrap())
@@ -367,6 +384,13 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
                 allowed,
             }
         }
+        RuleKindDef::Dataflow { source, sink, path } => CompiledKind::Dataflow {
+            source: Regex::new(source)
+                .map_err(|e| format!("rule {}: bad dataflow source: {e}", def.id))?,
+            sink: Regex::new(sink)
+                .map_err(|e| format!("rule {}: bad dataflow sink: {e}", def.id))?,
+            path: opt_re(path)?,
+        },
         RuleKindDef::Path { regex } => CompiledKind::Path {
             regex: Regex::new(regex)
                 .map_err(|e| format!("rule {}: bad path regex: {e}", def.id))?,
@@ -433,6 +457,7 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
     ("typosquat", include_str!("../rules/typosquat.toml")),
     ("hygiene", include_str!("../rules/hygiene.toml")),
     ("malware", include_str!("../rules/malware.toml")),
+    ("iac", include_str!("../rules/iac.toml")),
 ];
 
 /// Load builtin rulesets (unless disabled) plus any extra TOML files/dirs.

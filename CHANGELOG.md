@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+- `image --remote`: OCI registry API audit without a container runtime
+- `--history-secrets`: scans git diffs for committed-and-removed secrets
+- RPM rpmdb.sqlite extraction for image OSV lookups
+- Maven, NuGet, Packagist, Hex, Pub dep ecosystems
+- SPDX 2.3 SBOM output (`--sbom-format spdx`)
+- OSV fix versions surface in remediation text
+- Entropy-based secret detection (SEC-090)
+- Typosquat edit-distance checks on dep names (DEP-020)
+- dataflow rule kind: source + sink co-occurrence per file
+- iac ruleset: Terraform/CloudFormation misconfigs
+- 4 more verify providers (Anthropic, DO, PyPI, crates.io)
+- nginx/apache/mysql/postgres/redis service checks in `system`
+- WFA-013: checkout persist-credentials audit
+
 ## [0.1.0] - 2026-09-28
 
 First tagged release. argus is one static binary. Point it at a local

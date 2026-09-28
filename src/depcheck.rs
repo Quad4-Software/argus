@@ -116,6 +116,19 @@ pub fn check(
             ));
             continue;
         }
+        if let Some((victim, dist)) = typosquat(&d.name) {
+            out.push(finding(
+                target,
+                d,
+                "DEP-020",
+                Severity::Medium,
+                format!(
+                    "dep name {} is edit-distance {dist} from popular package {victim}: possible typosquat",
+                    d.name
+                ),
+                "Verify the intended package; a one/two-char difference is the classic squat pattern.",
+            ));
+        }
         if looks_internal(&d.name, internal_prefixes) {
             out.push(finding(
                 target,
@@ -207,5 +220,126 @@ mod tests {
         );
         assert_eq!(github_repo_path("git@github.com:o/r"), Some("o/r".into()));
         assert_eq!(github_repo_path("https://gitlab.com/o/r"), None);
+    }
+}
+
+/// Popular packages by name - the canonical typosquat targets.
+const POPULAR: &[&str] = &[
+    "lodash",
+    "react",
+    "express",
+    "axios",
+    "next",
+    "vue",
+    "angular",
+    "jquery",
+    "typescript",
+    "webpack",
+    "eslint",
+    "babel",
+    "moment",
+    "chalk",
+    "commander",
+    "debug",
+    "request",
+    "fs-extra",
+    "uuid",
+    "dotenv",
+    "minimist",
+    "semver",
+    "yargs",
+    "inquirer",
+    "glob",
+    "rimraf",
+    "mkdirp",
+    "async",
+    "underscore",
+    "bluebird",
+    "styled-components",
+    "tailwindcss",
+    "postcss",
+    "vite",
+    "requests",
+    "numpy",
+    "pandas",
+    "django",
+    "flask",
+    "boto3",
+    "urllib3",
+    "setuptools",
+    "pytest",
+    "sqlalchemy",
+    "matplotlib",
+    "scipy",
+    "pillow",
+    "tensorflow",
+    "torch",
+    "sklearn",
+    "opencv-python",
+    "selenium",
+    "aiohttp",
+    "fastapi",
+    "pydantic",
+    "click",
+    "pyyaml",
+    "cryptography",
+    "tqdm",
+    "serde",
+    "tokio",
+    "rand",
+    "reqwest",
+    "clap",
+    "anyhow",
+    "thiserror",
+    "regex",
+    "chrono",
+    "futures",
+];
+
+/// Nearest popular name within edit distance <= 2 (1 for short names).
+pub(crate) fn typosquat(name: &str) -> Option<(&'static str, usize)> {
+    let l = name.to_lowercase();
+    if POPULAR.contains(&l.as_str()) {
+        return None; // the real package, not a squat
+    }
+    let mut best: Option<(&'static str, usize)> = None;
+    for p in POPULAR {
+        let dist = lev(&l, p);
+        let max = if l.len() < 6 { 1 } else { 2 };
+        if dist > 0 && dist <= max && best.is_none_or(|(_, b)| dist < b) {
+            best = Some((p, dist));
+        }
+    }
+    best
+}
+
+/// Classic Levenshtein with early-exit bound.
+fn lev(a: &str, b: &str) -> usize {
+    if (a.len() as isize - b.len() as isize).unsigned_abs() > 2 {
+        return 3;
+    }
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    for (i, &ca) in a.iter().enumerate() {
+        let mut cur = vec![i + 1];
+        for (j, &cb) in b.iter().enumerate() {
+            cur.push(
+                (prev[j + 1] + 1)
+                    .min(cur[j] + 1)
+                    .min(prev[j] + (ca != cb) as usize),
+            );
+        }
+        prev = cur;
+    }
+    prev[b.len()]
+}
+
+#[cfg(test)]
+mod tq_tests {
+    #[test]
+    fn catches_renamed_requests() {
+        assert_eq!(super::typosquat("reqeusts").map(|x| x.0), Some("requests"));
+        assert!(super::typosquat("some-entirely-different-name").is_none()); // no popular near
+        assert!(super::typosquat("requests").is_none()); // exact match excluded
     }
 }

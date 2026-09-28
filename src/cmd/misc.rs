@@ -507,3 +507,30 @@ pub(crate) fn authors_cmd(
 }
 
 // ---------------- daemon ----------------
+
+/// Scan git history diffs for committed-and-removed secrets.
+pub(crate) fn history_secrets(
+    paths: &[std::path::PathBuf],
+    rules: &[crate::rules::CompiledRule],
+    opts: &crate::scan::ScanOptions,
+    report: &mut crate::finding::Report,
+    verbose: u8,
+) {
+    for p in paths {
+        if p.join(".git").exists() {
+            let label = p.display().to_string();
+            report.findings.extend(crate::history::scan_history(
+                p, rules, opts, &label, verbose,
+            ));
+        }
+    }
+}
+
+/// Registry-side image audit through the OCI API.
+pub(crate) fn remote_image(image: &str, report: &mut crate::finding::Report, verbose: u8) {
+    let http = crate::http::HttpClient::new(vec![]);
+    match crate::regimg::audit_remote(&http, image, verbose) {
+        Ok(fs) => report.findings.extend(fs),
+        Err(e) => report.errors.push(e),
+    }
+}

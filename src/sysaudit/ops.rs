@@ -303,3 +303,132 @@ pub(crate) fn malware(out: &mut Vec<Finding>) {
         }
     }
 }
+
+/// Service config audits: nginx, apache, mysql, postgres, redis.
+/// Only reads files that exist; absent services produce no findings.
+pub(crate) fn services_cfg(out: &mut Vec<Finding>) {
+    // nginx: autoindex, missing ssl on 443 vhosts, allow all on server
+    for p in ["/etc/nginx/nginx.conf", "/etc/nginx/sites-enabled/default"] {
+        let Some(t) = read(p) else { continue };
+        if t.contains("autoindex on") {
+            out.push(mk(
+                "SYS-SVC-01",
+                Severity::Medium,
+                p,
+                "nginx autoindex enabled - directory contents enumerable",
+                "Set autoindex off unless indexing is intentional.",
+            ));
+        }
+        if t.contains("listen 443") && !t.contains("ssl_certificate") && !t.contains("ssl on") {
+            out.push(mk(
+                "SYS-SVC-02",
+                Severity::High,
+                p,
+                "nginx listens on 443 without ssl_certificate",
+                "Point ssl_certificate/ssl_certificate_key at real certs.",
+            ));
+        }
+        if t.contains("allow all") || t.contains("allow 0.0.0.0/0") {
+            out.push(mk(
+                "SYS-SVC-03",
+                Severity::Low,
+                p,
+                "nginx allow all without location scoping",
+                "Scope allow/deny to specific locations or IP ranges.",
+            ));
+        }
+    }
+    // apache
+    for p in [
+        "/etc/apache2/apache2.conf",
+        "/etc/httpd/conf/httpd.conf",
+        "/etc/httpd/conf.d/*.conf",
+    ] {
+        if p.contains('*') {
+            continue; // glob expansion skipped; main files cover the signal
+        }
+        let Some(t) = read(p) else { continue };
+        if t.contains("Options") && t.contains("Indexes") {
+            out.push(mk(
+                "SYS-SVC-11",
+                Severity::Medium,
+                p,
+                "apache Options Indexes - directory listing enabled",
+                "Remove Indexes from Options in production vhosts.",
+            ));
+        }
+        if t.contains("AllowOverride All") {
+            out.push(mk(
+                "SYS-SVC-12",
+                Severity::Low,
+                p,
+                "apache AllowOverride All - .htaccess can reconfigure",
+                "Set AllowOverride None where .htaccess is not needed.",
+            ));
+        }
+    }
+    // mysql/mariadb
+    for p in [
+        "/etc/mysql/my.cnf",
+        "/etc/my.cnf",
+        "/etc/mysql/mariadb.conf.d/50-server.cnf",
+    ] {
+        let Some(t) = read(p) else { continue };
+        let t = t.to_lowercase();
+        if t.contains("bind-address") && t.contains("0.0.0.0") {
+            out.push(mk(
+                "SYS-SVC-21",
+                Severity::High,
+                p,
+                "mysql binds to 0.0.0.0 - reachable on all interfaces",
+                "Bind to 127.0.0.1 or the specific app interface.",
+            ));
+        }
+        if t.contains("skip-grant-tables") {
+            out.push(mk(
+                "SYS-SVC-22",
+                Severity::Critical,
+                p,
+                "mysql skip-grant-tables - authentication bypassed entirely",
+                "Remove it; this disables all account checks.",
+            ));
+        }
+    }
+    // postgres
+    for p in ["/etc/postgresql"] {
+        if let Ok(rd) = std::fs::read_dir(p) {
+            for ent in rd.flatten() {
+                let cf = ent.path().join("main/postgresql.conf");
+                let Some(t) = read(&cf.to_string_lossy()) else {
+                    continue;
+                };
+                for line in t.lines() {
+                    let l = line.trim();
+                    if l.starts_with("listen_addresses") && l.contains('*') {
+                        out.push(mk(
+                            "SYS-SVC-31",
+                            Severity::Medium,
+                            &cf.to_string_lossy(),
+                            "postgres listen_addresses '*' - reachable on all interfaces",
+                            "Restrict to needed interfaces; pair with pg_hba rules.",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    // redis
+    for p in ["/etc/redis/redis.conf", "/etc/redis.conf"] {
+        let Some(t) = read(p) else { continue };
+        let active = |k: &str| t.lines().any(|l| l.trim().starts_with(k));
+        if active("bind 0.0.0.0") || (active("bind *") && !t.contains("requirepass")) {
+            out.push(mk(
+                "SYS-SVC-41",
+                Severity::High,
+                p,
+                "redis bound to all interfaces without requirepass",
+                "Bind loopback or set requirepass + protected-mode.",
+            ));
+        }
+    }
+}

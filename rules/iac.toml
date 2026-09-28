@@ -1,0 +1,98 @@
+# IaC misconfig rules - Terraform, CloudFormation, ARM, Helm values.
+# Pure content rules; structural analysis stays in container_audit for
+# docker/compose/k8s.
+
+[ruleset]
+name = "iac"
+description = "Terraform/CloudFormation misconfiguration"
+
+[[rule]]
+id = "IAC-001"
+type = "content"
+severity = "high"
+path = '\.tf$'
+regex = '0\.0\.0\.0/0'
+description = "security group/firewall rule open to the world"
+remediation = "Restrict ingress CIDRs to needed ranges; use prefix lists/SG references."
+reference = "https://owasp.org/Top10/A05_2021-Security_Misconfiguration/"
+
+[[rule]]
+id = "IAC-002"
+type = "content"
+severity = "high"
+path = '\.tf$'
+regex = '(?i)encrypted\s*=\s*false|encryption\s*=\s*disabled'
+description = "storage/kms encryption explicitly disabled"
+remediation = "Enable encryption at rest (encrypted = true / kms key)."
+
+[[rule]]
+id = "IAC-003"
+type = "content"
+severity = "critical"
+path = '\.tf$'
+regex = '(?i)(aws_access_key|aws_secret|private_key)\s*=\s*"[A-Za-z0-9/+=]{16,}"'
+description = "cloud credential literal in terraform"
+remediation = "Use env vars, terraform cloud variables, or a secrets backend."
+
+[[rule]]
+id = "IAC-004"
+type = "content"
+severity = "medium"
+path = '\.tf$'
+regex = '(?i)public\s*=\s*true|acl\s*=\s*"public-read|acl\s*=\s*"public-read-write'
+description = "bucket/object made public"
+remediation = "Keep ACL private; grant via bucket policies for named principals."
+
+[[rule]]
+id = "IAC-005"
+type = "content"
+severity = "high"
+path = '\.(tf|yaml|yml|json)$'
+regex = '(?i)"?Action"?\s*[:=]\s*"?\*|"?Principal"?\s*[:=]\s*"?\*|kms_admin|iam:\*|"arn:aws:iam::\*'
+description = "wildcard IAM principal/action"
+remediation = "Scope IAM actions and principals to the minimum set."
+
+[[rule]]
+id = "IAC-006"
+type = "content"
+severity = "medium"
+path = '\.(tf|yaml|yml)$'
+regex = '(?i)skip_final_snapshot\s*=\s*true|deletion_protection\s*=\s*false|prevent_destroy\s*=\s*false'
+description = "database/storage deletion protection off"
+remediation = "Keep deletion_protection/final snapshots on production resources."
+
+[[rule]]
+id = "IAC-007"
+type = "content"
+severity = "medium"
+path = '\.(yaml|yml|json)$'
+regex = '(?i)"?(alb|lb|load.?balancer)"?.{0,60}internet-facing|scheme\s*[:=]\s*"?internet-facing'
+description = "public-facing load balancer"
+remediation = "Use internal scheme unless public ingress is intentional."
+
+[[rule]]
+id = "IAC-008"
+type = "content"
+severity = "medium"
+path = '\.tf$'
+regex = '(?i)password\s*=\s*"[A-Za-z0-9!@#$%^&*]{8,}"'
+description = "literal password in terraform"
+remediation = "Use a secrets manager variable; never commit passwords."
+
+[[rule]]
+id = "IAC-009"
+type = "content"
+severity = "high"
+path = '\.(yaml|yml)$'
+regex = '(?i)(SecurityGroupIngress|NetworkInterface).*?GroupSet|IpProtocol\s*[:=]\s*"?-1'
+description = "security group allows all protocols"
+remediation = "Restrict protocol to needed ports only."
+
+[[rule]]
+id = "IAC-010"
+type = "content"
+severity = "medium"
+path = '\.tf$'
+regex = '(?i)enable_dns_hostnames|map_public_ip_on_launch\s*=\s*true'
+description = "subnet auto-assigns public IPs"
+remediation = "Disable map_public_ip_on_launch on private subnets."

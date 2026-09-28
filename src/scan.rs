@@ -284,6 +284,27 @@ fn check_file(
                 }
             }
         }
+        CompiledKind::Dataflow { source, sink, .. } => {
+            let text = match text {
+                Some(t) => t,
+                None => return hits,
+            };
+            let s_hit = source.find(text);
+            let k_hit = sink.find(text);
+            if let (Some(sm), Some(km)) = (s_hit, k_hit) {
+                hits.push(FileHit {
+                    line: Some(line_of(text, sm.start())),
+                    excerpt: Some(line_excerpt(text, km.start())),
+                    message: format!(
+                        "{}: source /{}/ reaches sink /{}/",
+                        rule.description,
+                        sm.as_str(),
+                        km.as_str()
+                    ),
+                    severity_override: None,
+                });
+            }
+        }
         CompiledKind::Package { names_re, versions } => {
             let text = match text {
                 Some(t) => t,
@@ -519,6 +540,39 @@ pub fn scan_file(
                 reference: rule.reference.clone(),
                 window: rule.window.clone(),
             });
+        }
+    }
+    // entropy pass: secrets no shape rule knows - high-entropy tokens on
+    // code-ish files only, with guards for hashes/paths/known-safe files
+    if rules.iter().any(|r| r.set == "secrets")
+        && let Some(t) = text
+        && !crate::entropy::is_lockfile_name(rel)
+    {
+        for (ln, line) in t.lines().enumerate() {
+            for tok in crate::entropy::tokens(line) {
+                if suppressed(text, Some(ln + 1), "SEC-090") {
+                    continue;
+                }
+                if !seen.insert(("SEC-090".into(), Some(ln + 1), tok.clone())) {
+                    continue;
+                }
+                out.push(Finding {
+                    ruleset: "secrets".into(),
+                    rule_id: "SEC-090".into(),
+                    severity: Severity::Medium,
+                    target: target.into(),
+                    path: rel.into(),
+                    line: Some(ln + 1),
+                    excerpt: Some(mask_tokens(&tok)),
+                    message: "high-entropy token - possible unrecognized credential".into(),
+                    remediation: Some(
+                        "Check whether this is a live secret; rotate and move to a manager if so."
+                            .into(),
+                    ),
+                    reference: None,
+                    window: None,
+                });
+            }
         }
     }
     out

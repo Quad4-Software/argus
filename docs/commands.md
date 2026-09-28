@@ -70,6 +70,16 @@ argus similar src/                     # near-dups inside the tree
 argus scan . --similar /opt/reference  # flag files copied FROM the reference
 ```
 
+## secrets / history
+
+```text
+argus scan <repo> --history-secrets
+```
+
+Scans `git log -p` for secrets committed and later removed (up to 500
+commits). Secrets flagged in history must be rotated - deleting the file
+does not help.
+
 ## verify [paths]
 
 Extract provider-shaped tokens from scan paths and ask the provider
