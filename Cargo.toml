@@ -1,9 +1,19 @@
 [package]
-name = "argus"
+name = "argus-scanner"
 version = "0.2.0"
 edition = "2024"
 description = "Fast supply-chain attack indicator scanner for repositories and CI workflows (local, GitHub, GitLab, Gitea)"
 license = "MIT-0"
+repository = "https://github.com/Quad4-Software/argus"
+homepage = "https://quad4-software.github.io/argus/"
+readme = "README.md"
+keywords = ["supply-chain", "security", "secrets", "yara", "scanner"]
+categories = ["command-line-utilities", "development-tools", "security"]
+exclude = ["json"]
+
+[[bin]]
+name = "argus"
+path = "src/main.rs"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4.7"

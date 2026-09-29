@@ -9,7 +9,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - run: cargo install --locked argus || cargo install --locked --git https://github.com/Quad4-Software/argus
+    - run: cargo install --locked argus-scanner || cargo install --locked --git https://github.com/Quad4-Software/argus
       shell: bash
     - run: argus scan ${{ inputs.paths }} --ci --fail-on ${{ inputs.fail-on }} --format ${{ inputs.format }} ${{ inputs.osv == 'true' && '--osv' || '' }}
       shell: bash
