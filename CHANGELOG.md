@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-29
+
 - `image --remote`: OCI registry API audit without a container runtime
 - `--history-secrets`: scans git diffs for committed-and-removed secrets
 - RPM rpmdb.sqlite extraction for image OSV lookups
@@ -36,4 +38,5 @@ SHAs. `verify` checks whether a found token still works. `publish` scans
 the files that would actually ship. `watch` and `daemon` recheck a repo
 when it changes. `sbom` writes CycloneDX.
 
+[0.2.0]: https://github.com/Quad4-Software/argus/tree/v0.2.0
 [0.1.0]: https://github.com/Quad4-Software/argus/tree/v0.1.0
