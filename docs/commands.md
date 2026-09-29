@@ -1,9 +1,12 @@
 # Commands
 
 Global options apply to every command: `--format`, `--output`,
-`--severity`, `--fail-on`, `--color`, `--jobs`, `--exclude`,
-`--offline`, `--no-sandbox`, `--baseline`, `--vex`, `--vex-out`,
-`--staged`, `--diff`, `-v/-vv`.
+`--severity`, `--fail-on`, `--color`, `--progress`, `--jobs`,
+`--exclude`, `--offline`, `--no-sandbox`, `--baseline`, `--vex`,
+`--vex-out`, `--staged`, `--diff`, `-v/-vv`.
+
+`--progress` draws a live spinner with file/finding counters on stderr
+(`auto`: tty only, hidden with `-v`; `always`/`never` force it).
 
 ## scan [paths]
 

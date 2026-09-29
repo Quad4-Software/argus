@@ -88,6 +88,10 @@ pub struct Report {
     pub generated_at: String,
     pub targets: Vec<TargetStat>,
     pub files_scanned: usize,
+    /// Wall time of the scan, set by main before rendering. Display-only:
+    /// skipped in JSON so report bytes stay deterministic across runs.
+    #[serde(skip)]
+    pub duration_ms: u64,
     pub findings: Vec<Finding>,
     pub summary: Summary,
     /// Non-fatal problems (clone failures, unreadable repos, ...).
@@ -196,6 +200,9 @@ impl Report {
                 out.push_str(&format!("        ref: {}\n", st.dim(r)));
             }
         }
+        if self.findings.is_empty() {
+            out.push_str(&format!("{}\n", st.green("  no findings")));
+        }
         let s = &self.summary;
         let n = |sev: Severity, count: usize| -> String {
             let t = format!("{} {}", count, sev);
@@ -206,10 +213,11 @@ impl Report {
             }
         };
         out.push_str(&format!(
-            "\n{} {} files, {} targets | {}\n",
+            "\n{} {} files, {} targets{} | {}\n",
             st.bold("Scan:"),
             self.files_scanned,
             self.targets.len(),
+            st.dim(&fmt_duration(self.duration_ms)),
             [
                 n(Severity::Critical, s.critical),
                 n(Severity::High, s.high),
@@ -249,9 +257,10 @@ impl Report {
         }
         let s = &self.summary;
         out.push_str(&format!(
-            "**Scan** - {} files, {} targets | {} crit, {} high, {} med, {} low, {} info\n",
+            "**Scan** - {} files, {} targets{} | {} crit, {} high, {} med, {} low, {} info\n",
             self.files_scanned,
             self.targets.len(),
+            fmt_duration(self.duration_ms),
             s.critical,
             s.high,
             s.medium,
@@ -509,6 +518,17 @@ fn md5ish(s: &str) -> u64 {
         h = h.wrapping_mul(0x100000001b3);
     }
     h
+}
+
+/// " in 0.4s" style suffix; empty when unset (0 ms).
+fn fmt_duration(ms: u64) -> String {
+    if ms == 0 {
+        String::new()
+    } else if ms < 1000 {
+        format!(" in {ms}ms")
+    } else {
+        format!(" in {:.1}s", ms as f64 / 1000.0)
+    }
 }
 
 fn truncate(s: &str, max: usize) -> String {

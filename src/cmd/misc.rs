@@ -10,6 +10,26 @@ use crate::{clone, config, finding, provider, roam, rules, scan};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
+/// `argus rules`: list loaded rulesets and compiled rules.
+pub(crate) fn print_rules(rules: &[rules::CompiledRule], set_names: &[String], st: &Styles) {
+    let mut out = String::from("rulesets:\n");
+    for n in set_names {
+        out.push_str(&format!("  {n}\n"));
+    }
+    out.push_str(&format!("\nrules ({}):\n", rules.len()));
+    let mut sorted: Vec<&rules::CompiledRule> = rules.iter().collect();
+    sorted.sort_by(|a, b| a.id.cmp(&b.id));
+    for r in sorted {
+        out.push_str(&format!(
+            "  {}  {:<10} {}\n",
+            st.severity(r.severity),
+            r.id,
+            r.description
+        ));
+    }
+    crate::emit(&out);
+}
+
 pub(crate) fn in_ci() -> bool {
     std::env::var_os("ARGUS_CI").is_some()
         || std::env::var_os("GITHUB_ACTIONS").is_some()

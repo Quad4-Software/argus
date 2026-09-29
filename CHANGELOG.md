@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [0.2.1] - Unreleased
+
+- `--progress auto|always|never` + `defaults.progress`: live stderr
+  spinner with file and finding counters while scanning (auto = tty
+  only, hidden under `-v`)
+- elapsed time on the text/markdown `Scan:` summary line (kept out of
+  JSON so report bytes stay deterministic)
+- `argus rules` colorizes the severity column; text output prints a
+  green `no findings` line on a clean run
+- crate renamed to `argus-scanner` for crates.io (binary stays `argus`)
+
 ## [0.2.0] - 2026-09-29
 
 - `image --remote`: OCI registry API audit without a container runtime

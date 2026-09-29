@@ -1,6 +1,7 @@
 //! Command-line surface (clap derive).
 
 use crate::color::ColorMode;
+use crate::progress::ProgressMode;
 use crate::finding::Severity;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
@@ -56,6 +57,14 @@ pub struct Cli {
         help = "Color mode (honors NO_COLOR in auto)"
     )]
     pub color: Option<ColorMode>,
+
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        help = "Progress display on stderr (auto hides it when not a tty or with -v)"
+    )]
+    pub progress: Option<ProgressMode>,
 
     #[arg(
         short = 'j',

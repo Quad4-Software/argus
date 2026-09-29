@@ -9,6 +9,7 @@
 
 # format       = "text"    # text | json
 # color        = "auto"    # auto | always | never  (NO_COLOR env also respected)
+# progress     = "auto"    # auto | always | never  (stderr spinner, auto = tty only)
 # jobs         = 8
 # severity     = "info"    # minimum severity to report: info|low|medium|high|critical
 # fail_on      = "low"     # findings at/above this exit with code 1

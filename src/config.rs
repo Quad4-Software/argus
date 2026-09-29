@@ -3,6 +3,7 @@
 use crate::cli::Format;
 use crate::color::ColorMode;
 use crate::finding::Severity;
+use crate::progress::ProgressMode;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -23,6 +24,7 @@ pub struct ConfigFile {
 pub struct Defaults {
     pub format: Option<Format>,
     pub color: Option<ColorMode>,
+    pub progress: Option<ProgressMode>,
     pub jobs: Option<usize>,
     pub severity: Option<Severity>,
     pub fail_on: Option<Severity>,
@@ -105,6 +107,23 @@ impl<'de> serde::Deserialize<'de> for ColorMode {
             "never" => Ok(ColorMode::Never),
             other => Err(serde::de::Error::custom(format!(
                 "bad color mode {other:?}"
+            ))),
+        }
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for ProgressMode {
+    fn deserialize<D>(d: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(d)?;
+        match s.to_ascii_lowercase().as_str() {
+            "auto" => Ok(ProgressMode::Auto),
+            "always" => Ok(ProgressMode::Always),
+            "never" => Ok(ProgressMode::Never),
+            other => Err(serde::de::Error::custom(format!(
+                "bad progress mode {other:?}"
             ))),
         }
     }

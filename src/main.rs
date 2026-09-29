@@ -22,6 +22,7 @@ mod ioc;
 mod license;
 mod mcp;
 mod osv;
+mod progress;
 mod provider;
 mod publish;
 mod regimg;
@@ -66,6 +67,7 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: &Cli) -> Result<ExitCode, String> {
+    let t0 = std::time::Instant::now();
     let (cfg, _cfg_path) = config::load(cli.config.as_deref())?;
 
     let format = cli.format.or(cfg.defaults.format).unwrap_or_default();
@@ -80,6 +82,28 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             .map(|n| n.get())
             .unwrap_or(4)
     });
+    // live progress only for commands that walk/scan files; -v already
+    // narrates, and machine-facing subcommands keep stderr clean
+    let scans_fs = !matches!(
+        cli.cmd,
+        Cmd::Rules
+            | Cmd::RulesKeygen { .. }
+            | Cmd::RulesSign { .. }
+            | Cmd::RulesUpdate { .. }
+            | Cmd::Completions(_)
+            | Cmd::Mcp
+            | Cmd::Init { .. }
+            | Cmd::Authors { .. }
+            | Cmd::Sbom { .. }
+            | Cmd::Ai { .. }
+    );
+    let progress_on = cli
+        .progress
+        .or(cfg.defaults.progress)
+        .unwrap_or_default()
+        .enabled()
+        && cli.verbose == 0
+        && scans_fs;
     let min_sev = cli
         .severity
         .or(cfg.defaults.severity)
@@ -154,6 +178,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         disabled: disabled.clone(),
         only_sets: only.clone(),
         incremental: cli.incremental,
+        progress: progress_on,
+        styles,
         #[cfg(feature = "yara")]
         yara: yara_rules,
         ..ScanOptions::default()
@@ -225,7 +251,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     let mut report = Report::new();
     match &cli.cmd {
         Cmd::Rules => {
-            print_rules(&rules, &set_names);
+            print_rules(&rules, &set_names, &styles);
             return Ok(ExitCode::SUCCESS);
         }
         Cmd::RulesKeygen { privkey, pubkey } => {
@@ -597,6 +623,8 @@ exec argus scan --staged --fail-on medium
         }
     }
 
+    report.duration_ms = t0.elapsed().as_millis() as u64;
+
     if matches!(cli.cmd, Cmd::Review { .. }) {
         let s = cmd::review_cmd::review_cmd(cli, &report.findings);
         print!("{s}");
@@ -653,25 +681,6 @@ pub(crate) fn emit(text: &str) {
     let _ = out.write_all(text.as_bytes());
     let _ = out.write_all(b"\n");
     let _ = out.flush();
-}
-
-pub(crate) fn print_rules(rules: &[rules::CompiledRule], set_names: &[String]) {
-    let mut out = String::from("rulesets:\n");
-    for n in set_names {
-        out.push_str(&format!("  {n}\n"));
-    }
-    out.push_str(&format!("\nrules ({}):\n", rules.len()));
-    let mut sorted: Vec<&rules::CompiledRule> = rules.iter().collect();
-    sorted.sort_by(|a, b| a.id.cmp(&b.id));
-    for r in sorted {
-        out.push_str(&format!(
-            "  {:>8}  {:<10} {}\n",
-            r.severity.to_string().to_uppercase(),
-            r.id,
-            r.description
-        ));
-    }
-    emit(&out);
 }
 
 /// Pub wrapper for the MCP tool.

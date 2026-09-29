@@ -52,6 +52,9 @@ impl Styles {
     pub fn blue(&self, s: &str) -> String {
         self.wrap("34", s)
     }
+    pub fn green(&self, s: &str) -> String {
+        self.wrap("32", s)
+    }
     pub fn cyan(&self, s: &str) -> String {
         self.wrap("36", s)
     }

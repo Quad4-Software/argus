@@ -18,6 +18,7 @@ gitea = "..."               # or GITEA_TOKEN / FORGEJO_TOKEN
 [defaults]
 jobs = 8                    # scanner parallelism
 color = "auto"              # auto|always|never
+progress = "auto"           # auto|always|never (stderr spinner)
 severity = "info"           # minimum reported severity
 fail_on = "high"            # exit-1 threshold
 osv = false                 # default for --osv

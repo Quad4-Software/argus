@@ -1,6 +1,8 @@
 //! Scan engine: directory walk plus rule matching, parallel via std threads.
 
+use crate::color::Styles;
 use crate::finding::{Finding, Severity};
+use crate::progress::Progress;
 use crate::rules::{CompiledKind, CompiledRule, UnsafeRefs};
 use sha2::Digest;
 use std::collections::HashSet;
@@ -26,6 +28,10 @@ pub struct ScanOptions {
     pub only_sets: std::collections::HashSet<String>,
     /// Reuse findings for unchanged files via .arguscache.json.
     pub incremental: bool,
+    /// Live progress line on stderr while a scan runs.
+    pub progress: bool,
+    /// Style table for the progress line (color-less when disabled).
+    pub styles: Styles,
 }
 
 impl Default for ScanOptions {
@@ -41,6 +47,8 @@ impl Default for ScanOptions {
             disabled: std::collections::HashSet::new(),
             only_sets: std::collections::HashSet::new(),
             incremental: false,
+            progress: false,
+            styles: Styles::new(crate::color::ColorMode::Never),
         }
     }
 }
@@ -578,6 +586,7 @@ fn run_pool(
     let queue = Mutex::new(files.into_iter());
     let results = Mutex::new(Vec::new());
     let jobs = opts.jobs.max(1).min(count.max(1));
+    let prog = Progress::new(target, count, opts.progress, opts.styles);
 
     std::thread::scope(|scope| {
         for _ in 0..jobs {
@@ -588,6 +597,7 @@ fn run_pool(
                         q.next()
                     };
                     let Some(file) = file else { break };
+                    prog.tick();
                     let rel = rel_path(root, &file);
                     if opts.exclude.iter().any(|re| re.is_match(&rel)) {
                         continue;
@@ -605,6 +615,7 @@ fn run_pool(
                         && e.mtime_ns == mt
                         && e.size == sz
                     {
+                        prog.add_findings(e.findings.len());
                         results.lock().unwrap().extend(e.findings.iter().cloned());
                         continue;
                     }
@@ -690,6 +701,7 @@ fn run_pool(
                         );
                     }
                     if !found.is_empty() {
+                        prog.add_findings(found.len());
                         results.lock().unwrap().extend(found);
                     }
                 }
