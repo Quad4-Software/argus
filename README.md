@@ -11,7 +11,7 @@
 > Open-weight LLMs are used to assist development of this tool. Those
 > models are: GLM 5.3-flash, Qwen 3.8 and Kimi K3.
 
-Are you tired of having 50+ different tools for scanning and linting well argus is all of them combined and blazinly fast! 🦀⚡⚡
+Are you tired of having 50+ different tools for scanning and linting? Well Argus is all of them combined and blazinly fast! 🦀⚡⚡
 
 ## Install
 
