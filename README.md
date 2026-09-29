@@ -1,3 +1,7 @@
+<p align="center">
+<img src="docs/mascot.gif" width="140" alt="argus">
+</p>
+
 # argus
 
 [![version](https://img.shields.io/badge/version-0.1.0-1f2430?style=flat-square)](https://github.com/Quad4-Software/argus)

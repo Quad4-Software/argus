@@ -3,6 +3,7 @@
 
 # packaging / releases
 /dist
+/site
 *.tar.gz
 *.zip
 *.sigstore.json

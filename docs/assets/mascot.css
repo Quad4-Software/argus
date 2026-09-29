@@ -1,0 +1,128 @@
+.argus-mascot {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  width: 8.25rem;
+  aspect-ratio: 644 / 563;
+  z-index: 4;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.32));
+  background: url("mascot-body.png") center / 100% 100% no-repeat;
+  animation: argus-float 5.2s ease-in-out infinite;
+}
+
+.argus-eye {
+  position: absolute;
+  overflow: hidden;
+  background: transparent;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transform-origin: center center;
+  -webkit-mask-image: radial-gradient(closest-side at center, #000 84%, transparent 100%);
+  mask-image: radial-gradient(closest-side at center, #000 84%, transparent 100%);
+}
+
+.argus-sclera {
+  position: absolute;
+  inset: 0;
+  background: #f7f8fa;
+  border-radius: 50%;
+}
+
+.argus-mover {
+  position: absolute;
+  inset: 0;
+}
+
+.argus-iris {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 62%;
+  height: 68%;
+  background: #d6a84b;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.argus-pupil {
+  position: absolute;
+  left: 50%;
+  top: 52%;
+  width: 42%;
+  height: 46%;
+  background: #17191e;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.argus-eye-main .argus-pupil {
+  width: 48%;
+  height: 52%;
+  background: #1c140c;
+}
+
+.argus-lid {
+  position: absolute;
+  left: -45%;
+  z-index: 3;
+  width: 190%;
+  height: 190%;
+  background: #292c35;
+  border-radius: 50%;
+}
+
+.argus-lid-top {
+  top: 0;
+  transform: translateY(-104%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+}
+
+.argus-lid-bottom {
+  bottom: 0;
+  transform: translateY(104%);
+  -webkit-mask-image: linear-gradient(to top, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to top, #000 82%, transparent 100%);
+}
+
+.argus-glint {
+  position: absolute;
+  top: 14%;
+  right: 16%;
+  width: 32%;
+  height: 32%;
+  background: #fff;
+  border-radius: 50%;
+}
+
+@keyframes argus-float {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 0 -4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .argus-mascot {
+    animation: none;
+  }
+}
+
+@media (max-width: 48rem) {
+  .argus-mascot {
+    width: 5.5rem;
+    right: 0.65rem;
+    bottom: 0.65rem;
+  }
+}
+
+@media print {
+  .argus-mascot {
+    display: none;
+  }
+}

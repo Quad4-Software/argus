@@ -25,6 +25,12 @@ extra:
     alias: true
     default: latest
 
+extra_css:
+  - assets/mascot.css
+
+extra_javascript:
+  - assets/mascot.js
+
 nav:
   - Overview: index.md
   - Install: install.md
