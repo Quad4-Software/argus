@@ -7,7 +7,7 @@
 [![version](https://img.shields.io/badge/version-0.3.0-1f2430?style=flat-square)](https://github.com/Quad4-Software/argus)
 [![license](https://img.shields.io/badge/license-QSL--1.0--0BSD-1f2430?style=flat-square)](https://quad4.io/licenses)
 [![rust](https://img.shields.io/badge/rust-edition_2024-1f2430?style=flat-square&logo=rust&logoColor=d6a300)](Cargo.toml)
-[![tests](https://img.shields.io/badge/tests-60%20pass-1f2430?style=flat-square)](tests/)
+[![ci](https://img.shields.io/github/actions/workflow/status/Quad4-Software/argus/ci.yml?style=flat-square&label=ci)](https://github.com/Quad4-Software/argus/actions/workflows/ci.yml)
 [![last commit](https://img.shields.io/github/last-commit/Quad4-Software/argus?style=flat-square&color=1f2430&label=last%20commit)](https://github.com/Quad4-Software/argus)
 [![top language](https://img.shields.io/github/languages/top/Quad4-Software/argus?style=flat-square&color=1f2430)](https://github.com/Quad4-Software/argus)
 
@@ -75,4 +75,4 @@ Full documentation lives in [docs/](docs/index.md) and on the
 
 ## License
 
-[QSL-1.0-0BSD](https://quad4.io/licenses). See LICENSE.
+[QSL-1.0-0BSD](https://quad4.io/licenses).

@@ -20,7 +20,14 @@ src/
   osv.rs depcheck.rs registry.rs sbom.rs
   workflow_audit.rs container_audit.rs image.rs sysaudit/ webscan.rs
   fix.rs verify.rs vex.rs license.rs publish.rs
-  ai/                  provenance evidence + analyze()
+  ai/                  git-history provenance evidence + analyze()
+  osint/               public lookups (domain, mail, chat, ip, url, ports, meta)
+  host/                sockets, hash signatures, threat leads
+  webpassive.rs        passive page checks used by webscan.rs
+  search.rs            streaming grep over text, CSV, JSON, SQLite
+  extract.rs media.rs seometa.rs stego.rs style.rs codec.rs
+  similar.rs           winnowing fingerprints for copied code
+  supply.rs store.rs catalog.rs
   audit.rs ioc.rs roam.rs watch.rs daemon.rs mcp.rs settings.rs
   clone.rs config.rs color.rs baseline.rs sandbox.rs yarascan.rs
 ```
@@ -39,4 +46,3 @@ clone/output dirs writable, TCP only for remote work and only on needed
 ports (or open for forge APIs). Missing kernel support degrades to a
 warning. The `image` command skips it because rootless podman/docker
 manage their own user and mount namespaces.
-

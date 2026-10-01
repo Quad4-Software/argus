@@ -1,10 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
 ## [0.3.0] - Unreleased
-
-The next release is 0.3.0. There is no 0.2.1.
 
 - campaign rules for Nx s1ngularity, Shai-Hulud 2.0, the Sept 2025 qix
   phishing wave, the axios RAT, the keyv/cacheable worm, and MemTensor sckit
@@ -80,6 +76,24 @@ The next release is 0.3.0. There is no 0.2.1.
   manifest signature is not checked
 - `python` ruleset covers pickle loads, unsafe `yaml.load`,
   `shell=True`, `eval`/`exec`, disabled TLS checks, and `tempfile.mktemp`
+- language rules for JavaScript, Go, Java, PHP, Ruby, and C# cover command
+  execution, deserialization, SQL built from request values, and TLS checks
+  turned off. `owasp` covers JWT `none` and secrets in logs. `agent` covers
+  model text passed to a shell. These are text matches. They do not decide
+  broken object authorization or prompt injection
+- `web` also reports CORS `*` and `null`, TRACE in the allow-list, mixed
+  content, directory listings, database errors, a cacheable session cookie,
+  and public `server-status`, `actuator/env`, pprof, and `phpinfo.php` pages
+- `email` also reports SPF `+all` or `?all`, DMARC `p=none`, MTA-STS
+  testing mode, and BIMI without a quarantine or reject policy
+- `chat` reads XMPP and IRC SRV records and does not connect
+- `conns` lists sockets with process names and reverse names, and can
+  sample while a command runs. An allow file fails the process on
+  unexpected egress, including cloud metadata addresses
+- `signatures` streams ClamAV main.cvd and daily.cvd hash rows and file heuristics.
+  Bytecode signatures are not executed. Refresh is on unless `--no-update`
+- `threats` looks for preload libraries, cron download cradles, browser
+  files staged under temp, deleted running binaries, and module-list skew
 
 ## [0.2.0] - 2026-09-29
 

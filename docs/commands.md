@@ -54,6 +54,45 @@ argus --format json email argus@quad4.io
 argus email --smtp argus@quad4.io
 ```
 
+Open SPF (`+all`, `?all`), DMARC `p=none`, MTA-STS `testing`, and BIMI without quarantine or reject are called out as their own rows.
+
+## chat &lt;domain&gt;
+
+XMPP and IRC DNS SRV records for one domain: client and server, STARTTLS and direct TLS. A cleartext IRC SRV without an IRC-over-TLS SRV is reported. This command does not connect.
+
+```sh
+argus chat example.com
+```
+
+## conns
+
+Sockets from `/proc/net` on Linux, with the process name when the inode can be matched. Public addresses get a reverse name, up to 16. `--watch N` samples for N seconds. A command after `--` is sampled until it exits, and the process stays unsandboxed so the command can run.
+
+`--allow file` is the CI check. Each line is an IP, `ip:port`, a name, `name:port`, `*:port`, or an IPv4 CIDR. Outbound sockets that are not listed fail the process. Cloud metadata addresses (`169.254.169.254`, `169.254.170.2`, `fd00:ec2::254`) fail even when listed. Names in the allow file are resolved when the command is not `--offline`.
+
+```sh
+argus conns
+argus conns --allow ci-allow.txt -- cargo test
+```
+
+## signatures [path]
+
+Hash signatures plus file heuristics. With no `--db` and no `--no-update`, a cached database older than `--max-age-hours` (default 24) is replaced from the ClamAV daily CVD. That mirror only answers clients whose agent starts with `ClamAV/1`, so the request is `ClamAV/1.4.3 (argus/version)`. `main.cvd` is loaded first and `daily.cvd` is appended. Only `.hsb` and `.hdb` rows are kept. The scan hashes the tree first and streams the signature file once. ClamAV bytecode is not executed. Heuristics cover a double extension, UPX on an executable, a script after image bytes, and high entropy in an executable. Those are leads.
+
+```sh
+argus signatures ./downloads
+argus --offline signatures --no-update --db hashes.txt ./downloads
+```
+
+## threats
+
+Reads a tree (default `/`) for `ld.so.preload`, cron lines that download a script into a shell, browser credential filenames under temp, a process whose executable is deleted, module names present in sysfs and missing from `/proc/modules`, and pinned bpf objects. A hit is a lead.
+
+```sh
+argus threats
+argus threats --root /tmp
+```
+
 ## ip [address]
 
 Geolocation, origin ASN, proxy and VPN classification, reverse DNS, RDAP, Shodan InternetDB, and the Hudson Rock free index for one public address. `--download` saves the DB-IP City Lite database in the cache so later lookups work with `--offline`. That database is CC BY 4.0. Results that use it keep the DB-IP attribution. The VPN row reports the proxycheck.io verdict.
@@ -91,7 +130,7 @@ argus ports quad4.io
 
 ## web &lt;url&gt;
 
-Fetch a URL and audit the response: security headers (including COOP and CORP), cookie flags parsed from attributes, HSTS with a zero max-age, CSP sources that allow unsafe-inline or unsafe-eval, server disclosure, TLS expiry, exposed `/.git`, `/.env`, `/.aws/credentials` (with SPA-fallback detection), `robots.txt`, `security.txt`, generator and description meta, and secrets embedded in inline and bundled JavaScript and source maps. An em dash in a description field is an info lead. `--depth N` crawls same-origin links (max 30 pages).
+Fetch a URL and audit the response. Headers include CSP, HSTS, COOP, CORP, and cookie flags. The body is checked for mixed content, directory listings, stack traces, and a cacheable `Set-Cookie`. CORS `*`, `null`, and TRACE are reported from the headers that came back. Exposed paths include `/.git`, `/.env`, `/.aws/credentials`, Apache `server-status`, Spring `actuator/env`, Go pprof, and `phpinfo.php`, with SPA-fallback detection. `robots.txt`, `security.txt`, generator meta, and secrets in inline and bundled JavaScript are included. An em dash in a description field is an info lead. `--depth N` crawls same-origin links (max 30 pages). This pass does not send attack strings, and it cannot decide broken object authorization.
 
 ## image &lt;ref&gt;
 

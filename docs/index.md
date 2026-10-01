@@ -1,31 +1,34 @@
 # argus
 
-argus is a supply-chain security and repository-forensics scanner. It reads
-repositories, CI workflows, container images, web front-ends, and the host
-itself, then reports concrete problems: leaked secrets, known-bad action
-tags, malicious package versions, dependency-confusion exposure, weak
-workflow and container configuration, and evidence that a repo's history
-does not match its claimed authorship.
+argus is a local security scanner and a defensive OSINT toolkit. It reads
+repositories, CI workflows, container images, web pages, public records,
+and the host it is running on. It reports leaked secrets, known-bad
+packages, weak workflow and container settings, and public facts about a
+domain, mailbox, address, or file you already have.
 
 ## What it does
 
 - Finds secrets and checks whether they still work
-- Detects known compromise campaigns (Shai-Hulud, TeamPCP, litellm)
-- Audits CI workflows for the patterns those campaigns used
-- Checks dependencies against OSV advisories and registry hygiene
-- Audits Dockerfiles, compose files, Kubernetes manifests, and images
-- Audits web responses: headers, cookies, TLS, exposed paths, JS bundles
+- Detects known compromise campaigns (Shai-Hulud, TeamPCP, Nx, axios, and the Python ruleset)
+- Audits CI workflows, Dockerfiles, compose files, Kubernetes manifests, and images
+- Checks dependencies against OSV, including nested and transitive locks
+- Audits web responses: headers, cookie flags, HSTS, CSP, exposed paths, JS bundles
+- Looks up public DNS, mail policy, IP, hash, and URL records
+- Reads local file metadata, provenance markers, and streams searches over large files
+- Scores copied code by winnowing, and prose or code distance as a lead
 - Audits the host: kernel, sshd, accounts, services, logging (Lynis-class)
-- Watches repositories and feeds for new pushes, diffs, maintainer changes
-- Scores repositories for evidence of agent-generated authorship
+- Lists sockets and can fail a CI command on unexpected egress
+- Scans files with hash signatures and heuristics
+- Watches repositories and feeds, and can keep reports in SQLite
 
 ## The 30-second tour
 
 ```sh
-cargo install --path .
+cargo install argus-scanner
 argus scan .                          # this repo, all rulesets
 argus github --org my-org             # everything in the org
 argus web https://example.com         # web audit + client-js secrets
+argus domain example.com              # public records for one name
 argus system                          # host hardening audit
 argus scan . --format sarif -o r.sarif  # CI-ready output
 ```
