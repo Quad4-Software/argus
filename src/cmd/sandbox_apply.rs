@@ -109,6 +109,8 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 "/var/spool/cron",
                 "/proc",
                 "/sys",
+                "/boot",
+                "/run",
             ] {
                 sb.reads.push(p.into());
             }

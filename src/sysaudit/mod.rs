@@ -12,6 +12,7 @@
 mod checks;
 mod net;
 mod ops;
+mod posture;
 use crate::finding::{Finding, Severity};
 use checks::*;
 use net::*;
@@ -79,6 +80,7 @@ pub fn audit() -> Vec<Finding> {
     integrity(&mut out);
     homes(&mut out);
     malware(&mut out);
+    posture::posture(&mut out);
     out
 }
 
