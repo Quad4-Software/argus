@@ -110,7 +110,7 @@ fn encode32(data: &[u8]) -> String {
         let idx = ((buf << (5 - bits)) & 31) as usize;
         out.push(B32[idx] as char);
     }
-    while out.len() % 8 != 0 {
+    while !out.len().is_multiple_of(8) {
         out.push('=');
     }
     out
@@ -133,7 +133,7 @@ fn decode64(text: &str) -> Result<Vec<u8>, String> {
     if clean.is_empty() {
         return Err("empty input".into());
     }
-    if clean.len() % 4 != 0 {
+    if !clean.len().is_multiple_of(4) {
         return Err("base64 length is not a multiple of 4".into());
     }
     let mut out = Vec::new();

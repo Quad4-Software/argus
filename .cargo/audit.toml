@@ -1,15 +1,9 @@
 [advisories]
+# yara-x 1.21 pins wasmtime ^45 and rsa 0.9. Neither range has a
+# patched release that still satisfies those requirements.
 ignore = [
-    # rsa 0.9.10 via yara-x cert parsing: no fixed release exists. The Marvin
-    # attack needs an RSA decryption oracle - argus performs no RSA operations
-    # on untrusted data and holds no private keys.
     "RUSTSEC-2023-0071",
-    # wasmtime 45.x via yara-x 1.20 (latest; upstream has not moved to
-    # wasmtime 46+). Both advisories are unreachable: argus evaluates yara
-    # rules through a single engine and never instantiates WASI modules or
-    # shares stores between engines.
     "RUSTSEC-2026-0222",
     "RUSTSEC-2026-0269",
+    "RUSTSEC-2026-0316",
 ]
-# bincode unmaintained (RUSTSEC-2025-0141) stays a visible warning until
-# yara-x migrates to a maintained serializer.

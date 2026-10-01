@@ -124,11 +124,12 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("argus-supply-{}", std::process::id()));
         let nested = dir.join("apps").join("web");
         std::fs::create_dir_all(&nested).unwrap();
-        std::fs::write(
-            nested.join("package-lock.json"),
-            r#"{"dependencies":{"left-pad":{"version":"1.0.0","dependencies":{"nested-dep":{"version":"2.0.0"}}}}}"#,
-        )
-        .unwrap();
+        let text = r#"{"dependencies":{"left-pad":{"version":"1.0.0","dependencies":{"nested-dep":{"version":"2.0.0"}}}}}"#;
+        std::fs::write(nested.join("package-lock.json"), text).unwrap();
+        assert_eq!(
+            osv::extract_deps(r"apps\web\package-lock.json", text).len(),
+            2
+        );
         let report = scan(&dir).unwrap();
         assert!(report.findings[0].summary.contains("2 pinned"));
         let _ = std::fs::remove_dir_all(&dir);

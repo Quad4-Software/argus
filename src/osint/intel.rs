@@ -425,7 +425,7 @@ pub fn asn(net: &Net, ip: &str) -> Hit {
         "https://stat.ripe.net/data/prefix-overview/data.json?resource={}",
         percent_encode(ip)
     );
-    fetch("asn", net, &url, |body| asn_body(body))
+    fetch("asn", net, &url, asn_body)
 }
 
 pub fn vpn(net: &Net, ip: &str) -> Hit {

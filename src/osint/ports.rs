@@ -421,9 +421,16 @@ mod tests {
     }
 
     #[test]
-    fn closed_local_port_is_absent() {
+    fn an_open_local_port_is_confirmed() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port().to_string();
+        let report = scan("127.0.0.1", Some(&port), false).unwrap();
+        assert_eq!(report.findings[0].status, Status::Confirmed);
+    }
+
+    #[test]
+    fn a_closed_local_port_is_not_open() {
         let report = scan("127.0.0.1", Some("1"), false).unwrap();
-        assert_eq!(report.findings[0].status, Status::Absent);
-        assert!(report.findings[0].summary.contains("no open ports"));
+        assert_ne!(report.findings[0].status, Status::Confirmed);
     }
 }

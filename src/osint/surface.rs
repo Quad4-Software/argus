@@ -598,10 +598,10 @@ fn rdap_dns_base(net: &Net, domain: &str) -> Result<Option<String>, String> {
             if suf.is_empty() {
                 continue;
             }
-            if domain == suf || domain.ends_with(&format!(".{suf}")) {
-                if best.as_ref().is_none_or(|(n, _)| suf.len() > *n) {
-                    best = Some((suf.len(), url.trim_end_matches('/').to_string()));
-                }
+            if (domain == suf || domain.ends_with(&format!(".{suf}")))
+                && best.as_ref().is_none_or(|(n, _)| suf.len() > *n)
+            {
+                best = Some((suf.len(), url.trim_end_matches('/').to_string()));
             }
         }
     }
@@ -855,12 +855,14 @@ pub fn hibp(net: &Net, email: &str) -> Hit {
     hibp_kind(
         net,
         email,
-        "hibp",
-        "breachedaccount",
-        true,
-        "not in Have I Been Pwned",
-        "breach name(s)",
-        "breaches",
+        HibpKind {
+            module: "hibp",
+            path: "breachedaccount",
+            truncate: true,
+            absent: "not in Have I Been Pwned",
+            noun: "breach name(s)",
+            key_name: "breaches",
+        },
     )
 }
 
@@ -868,25 +870,35 @@ pub fn pastes(net: &Net, email: &str) -> Hit {
     hibp_kind(
         net,
         email,
-        "pastes",
-        "pasteaccount",
-        false,
-        "Have I Been Pwned returned no pastes for this address",
-        "paste(s)",
-        "pastes",
+        HibpKind {
+            module: "pastes",
+            path: "pasteaccount",
+            truncate: false,
+            absent: "Have I Been Pwned returned no pastes for this address",
+            noun: "paste(s)",
+            key_name: "pastes",
+        },
     )
 }
 
-fn hibp_kind(
-    net: &Net,
-    email: &str,
-    module: &str,
-    path: &str,
+struct HibpKind<'a> {
+    module: &'a str,
+    path: &'a str,
     truncate: bool,
-    absent: &str,
-    noun: &str,
-    key_name: &str,
-) -> Hit {
+    absent: &'a str,
+    noun: &'a str,
+    key_name: &'a str,
+}
+
+fn hibp_kind(net: &Net, email: &str, kind: HibpKind<'_>) -> Hit {
+    let HibpKind {
+        module,
+        path,
+        truncate,
+        absent,
+        noun,
+        key_name,
+    } = kind;
     let key = std::env::var("HIBP_API_KEY").unwrap_or_default();
     if key.is_empty() {
         return Hit::new(
@@ -1268,10 +1280,11 @@ fn sitemap_locs(body: &str, domain: &str, out: &mut Vec<String>) {
             break;
         };
         let raw = body[start..start + end_rel].trim();
-        if let Some(host) = host_of(raw) {
-            if in_scope(&host, domain) && !out.iter().any(|u| u == raw) {
-                out.push(raw.to_string());
-            }
+        if let Some(host) = host_of(raw)
+            && in_scope(&host, domain)
+            && !out.iter().any(|u| u == raw)
+        {
+            out.push(raw.to_string());
         }
         from = start + end_rel + 6;
         if out.len() == 12 {
@@ -1313,10 +1326,11 @@ fn mailboxes_in(body: &str, domain: &str) -> Vec<String> {
         }
         if start < i && end > i + 1 {
             let addr = &lower[start..end];
-            if let Some((_, host)) = addr.split_once('@') {
-                if in_scope(host, domain) && !out.iter().any(|a| a == addr) {
-                    out.push(addr.to_string());
-                }
+            if let Some((_, host)) = addr.split_once('@')
+                && in_scope(host, domain)
+                && !out.iter().any(|a| a == addr)
+            {
+                out.push(addr.to_string());
             }
         }
         i = end.max(i + 1);

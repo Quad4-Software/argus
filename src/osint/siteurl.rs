@@ -315,18 +315,20 @@ fn split_host(authority: &str, default: u16) -> Result<(String, u16), String> {
         };
         return Ok((host, port));
     }
-    if let Some((host, port)) = authority.rsplit_once(':') {
-        if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) {
-            let port: u16 = port.parse().map_err(|_| "bad port".to_string())?;
-            return Ok((host.to_string(), port));
-        }
+    if let Some((host, port)) = authority.rsplit_once(':')
+        && !port.is_empty()
+        && port.chars().all(|c| c.is_ascii_digit())
+    {
+        let port: u16 = port.parse().map_err(|_| "bad port".to_string())?;
+        return Ok((host.to_string(), port));
     }
     Ok((authority.to_string(), default))
 }
 
-pub(crate) fn fetch_public(
-    raw: &str,
-) -> Result<(u16, String, Vec<(String, String)>, String), String> {
+pub(crate) type Headers = Vec<(String, String)>;
+pub(crate) type Fetched = (u16, String, Headers, String);
+
+pub(crate) fn fetch_public(raw: &str) -> Result<Fetched, String> {
     let start = parse_http_url(raw.trim())?;
     assert_public(&start)?;
     let page = fetch(start)?;

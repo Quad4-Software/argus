@@ -294,15 +294,14 @@ pub(crate) fn redact_config(text: &str) -> String {
     for line in text.lines() {
         let lower = line.to_ascii_lowercase();
         let trimmed = lower.trim_start();
-        if trimmed.starts_with("password")
+        if (trimmed.starts_with("password")
             || trimmed.starts_with("token")
-            || trimmed.starts_with("secret")
+            || trimmed.starts_with("secret"))
+            && let Some((k, _)) = line.split_once('=')
         {
-            if let Some((k, _)) = line.split_once('=') {
-                out.push_str(k.trim_end());
-                out.push_str(" = [redacted]\n");
-                continue;
-            }
+            out.push_str(k.trim_end());
+            out.push_str(" = [redacted]\n");
+            continue;
         }
         if line.contains("://") {
             let mut rewritten = String::new();

@@ -117,7 +117,7 @@ fn check(site: &Site, name: &str) -> Hit {
             let summary = match status {
                 Status::Confirmed => format!("profile API returned the name ({url})"),
                 Status::Absent => "no public profile at this API".into(),
-                Status::Inconclusive => format!("HTTP response was not a clear yes or no"),
+                Status::Inconclusive => "HTTP response was not a clear yes or no".to_string(),
                 Status::Error => "lookup failed".into(),
             };
             Hit::new(site.name, status, summary, None)

@@ -356,7 +356,7 @@ mod tests {
         assert!(inspect("a.jpg", &jpeg)[0].summary.contains("jpeg"));
         let mut gif = b"GIF89a".to_vec();
         gif.extend_from_slice(&[0x3b]);
-        gif.extend(std::iter::repeat(b'Z').take(20));
+        gif.extend(std::iter::repeat_n(b'Z', 20));
         assert!(inspect("a.gif", &gif)[0].summary.contains("gif"));
         let text = format!("hello{}world", "\u{200b}".repeat(6));
         assert!(

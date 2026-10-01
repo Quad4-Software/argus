@@ -214,13 +214,13 @@ fn png_fields(file: &mut File) -> Vec<(String, String)> {
         let kind = &hdr[4..8];
         if kind == b"tEXt" && len > 0 && len < 8192 {
             let mut body = vec![0u8; len as usize];
-            if file.read_exact(&mut body).is_ok() {
-                if let Some(z) = body.iter().position(|b| *b == 0) {
-                    let key = String::from_utf8_lossy(&body[..z]).to_string();
-                    let val = String::from_utf8_lossy(&body[z + 1..]).trim().to_string();
-                    if !val.is_empty() {
-                        out.push((key, val));
-                    }
+            if file.read_exact(&mut body).is_ok()
+                && let Some(z) = body.iter().position(|b| *b == 0)
+            {
+                let key = String::from_utf8_lossy(&body[..z]).to_string();
+                let val = String::from_utf8_lossy(&body[z + 1..]).trim().to_string();
+                if !val.is_empty() {
+                    out.push((key, val));
                 }
             }
             let _ = file.seek(SeekFrom::Current(4));

@@ -152,7 +152,7 @@ pub fn validate_domain(name: &str) -> Result<(), String> {
     {
         return Err("refusing a non-public domain".into());
     }
-    if labels.iter().any(|l| *l == "localhost") {
+    if labels.contains(&"localhost") {
         return Err("refusing a non-public domain".into());
     }
     Ok(())
@@ -181,10 +181,10 @@ pub fn registrable(domain: &str) -> String {
     }
     let mut best: Option<&str> = None;
     for suf in SUFFIXES {
-        if d == *suf || d.ends_with(&format!(".{suf}")) {
-            if best.is_none_or(|b| suf.len() > b.len()) {
-                best = Some(suf);
-            }
+        if (d == *suf || d.ends_with(&format!(".{suf}")))
+            && best.is_none_or(|b| suf.len() > b.len())
+        {
+            best = Some(suf);
         }
     }
     if let Some(suf) = best {

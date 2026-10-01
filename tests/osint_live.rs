@@ -78,6 +78,7 @@ fn rejects_non_public_and_offline() {
 }
 
 #[test]
+#[ignore = "needs public DNS"]
 fn live_public_ip() {
     let (ok, stdout, stderr) = json_cmd(&["ip", "1.1.1.1"]);
     assert!(ok, "{stderr}");
@@ -105,6 +106,7 @@ fn live_public_ip() {
 }
 
 #[test]
+#[ignore = "needs public DNS"]
 fn live_hash_and_url() {
     let eicar = "275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f";
     let (ok, stdout, stderr) = json_cmd(&["hash", eicar]);
@@ -150,6 +152,7 @@ fn ports_refuses_a_range_and_reports_a_closed_port() {
 }
 
 #[test]
+#[ignore = "needs public DNS"]
 fn live_quad4_domain_and_mailbox() {
     let (ok, stdout, stderr) = json_cmd(&["domain", "https://quad4.io/docs"]);
     assert!(ok, "{stderr}");
@@ -241,6 +244,7 @@ fn live_quad4_domain_and_mailbox() {
 }
 
 #[test]
+#[ignore = "needs public DNS"]
 fn live_account_feed_socials_and_exposed_git() {
     let (ok, stdout, stderr) = json_cmd(&["account", "github", "octocat"]);
     assert!(ok, "{stderr}");
@@ -304,6 +308,7 @@ fn live_account_feed_socials_and_exposed_git() {
 }
 
 #[test]
+#[ignore = "needs public DNS"]
 fn live_user_and_favicon() {
     let (ok, stdout, stderr) = json_cmd(&["user", "octocat"]);
     assert!(ok, "{stderr}");

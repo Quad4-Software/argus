@@ -232,7 +232,7 @@ fn jpeg(bytes: &[u8], out: &mut Vec<String>) {
         if matches!(marker, 0xE0 | 0xE1 | 0xED) {
             phrases(payload, "JPEG metadata", out);
         }
-        if matches!(marker, 0xC0 | 0xC1 | 0xC2) && payload.len() >= 7 && size.is_none() {
+        if matches!(marker, 0xC0..=0xC2) && payload.len() >= 7 && size.is_none() {
             let h = u16::from_be_bytes([payload[1], payload[2]]) as u32;
             let w = u16::from_be_bytes([payload[3], payload[4]]) as u32;
             size = Some((w, h));

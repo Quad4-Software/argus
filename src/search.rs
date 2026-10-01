@@ -204,7 +204,7 @@ fn scan_delim(
             break;
         }
         let field = if idx == usize::MAX {
-            rec.join(&if sep == b'\t' { "\t" } else { "," })
+            rec.join(if sep == b'\t' { "\t" } else { "," })
         } else {
             rec.get(idx).cloned().unwrap_or_default()
         };
@@ -376,10 +376,10 @@ fn sqlite_tables(conn: &rusqlite::Connection) -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     for row in rows {
-        if let Ok(name) = row {
-            if ident(&name).is_ok() {
-                out.push(name);
-            }
+        if let Ok(name) = row
+            && ident(&name).is_ok()
+        {
+            out.push(name);
         }
     }
     Ok(out)
@@ -396,10 +396,10 @@ fn sqlite_text_cols(conn: &rusqlite::Connection, table: &str) -> Result<Vec<Stri
     for row in rows {
         let Ok((name, ty)) = row else { continue };
         let ty = ty.to_ascii_lowercase();
-        if ty.is_empty() || ty.contains("char") || ty.contains("text") || ty.contains("clob") {
-            if ident(&name).is_ok() {
-                out.push(name);
-            }
+        if (ty.is_empty() || ty.contains("char") || ty.contains("text") || ty.contains("clob"))
+            && ident(&name).is_ok()
+        {
+            out.push(name);
         }
     }
     Ok(out)
@@ -429,10 +429,10 @@ fn line_hits(text: &str, query: &Query) -> Vec<String> {
             .map(|v| clip(&v))
             .collect();
     }
-    if let Some(re) = &query.pattern {
-        if re.is_match(text) {
-            return vec![clip(text)];
-        }
+    if let Some(re) = &query.pattern
+        && re.is_match(text)
+    {
+        return vec![clip(text)];
     }
     Vec::new()
 }

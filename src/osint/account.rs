@@ -6,7 +6,7 @@
 //! GITLAB_TOKEN. Missing fields stay inconclusive. Tokens are not printed.
 
 use super::net::Net;
-use super::siteurl::fetch_public;
+use super::siteurl::{Fetched, Headers, fetch_public};
 use super::socials::{self, Social};
 use super::{Hit, Report, Status};
 use serde_json::{Value, json};
@@ -158,10 +158,7 @@ fn gitlab(login: &str, host: Option<&str>) -> Result<Vec<Hit>, String> {
     Ok(findings)
 }
 
-fn api_get(
-    url: &str,
-    extra: &[(&str, &str)],
-) -> Result<(u16, Vec<(String, String)>, String), String> {
+fn api_get(url: &str, extra: &[(&str, &str)]) -> Result<(u16, Headers, String), String> {
     if url.starts_with("https://api.github.com/") || url.starts_with("https://gitlab.com/") {
         let net = Net::new();
         let resp = net.get(url, extra)?;
@@ -171,11 +168,7 @@ fn api_get(
     Ok((st, hdrs, body))
 }
 
-fn fetch_token(
-    url: &str,
-    token: Option<&str>,
-    header: &str,
-) -> Result<(u16, String, Vec<(String, String)>, String), String> {
+fn fetch_token(url: &str, token: Option<&str>, header: &str) -> Result<Fetched, String> {
     if token.is_none() {
         return fetch_public(url);
     }
@@ -294,10 +287,10 @@ fn resume_repos(repos: &[Value], name_key: &str, url_key: &str) -> Vec<Hit> {
     for repo in repos {
         let name = repo.get(name_key).and_then(|v| v.as_str()).unwrap_or("");
         let lower = name.to_ascii_lowercase();
-        if lower.contains("resume") || lower == "cv" || lower.contains("curriculum") {
-            if let Some(url) = repo.get(url_key).and_then(|v| v.as_str()) {
-                links.push(url.to_string());
-            }
+        if (lower.contains("resume") || lower == "cv" || lower.contains("curriculum"))
+            && let Some(url) = repo.get(url_key).and_then(|v| v.as_str())
+        {
+            links.push(url.to_string());
         }
     }
     if links.is_empty() {

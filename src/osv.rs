@@ -43,7 +43,7 @@ fn walk_npm(
 /// JSON manifests via serde_json; text formats via regex.
 pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
     let mut out = Vec::new();
-    let base = rel.rsplit('/').next().unwrap_or(rel);
+    let base = rel.rsplit(['/', '\\']).next().unwrap_or(rel);
     match base {
         "package-lock.json" | "npm-shrinkwrap.json" => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(text) {

@@ -80,18 +80,18 @@ pub(crate) fn run(cli: &Cli, offline: bool, format: Format) -> Result<ExitCode, 
             table,
             max,
             ignore_case,
-        } => grep_cmd(
-            pattern.as_deref(),
+        } => grep_cmd(GrepIn {
+            pattern: pattern.as_deref(),
             paths,
-            pick.as_deref(),
-            column.clone(),
-            eq.clone(),
+            pick: pick.as_deref(),
+            column: column.clone(),
+            eq: eq.clone(),
             kind,
-            table.clone(),
-            *max,
-            *ignore_case,
+            table: table.clone(),
+            max: *max,
+            ignore_case: *ignore_case,
             format,
-        ),
+        }),
         Cmd::Extract { target } => finish(cli, format, &crate::extract::scan_target(target)?),
         Cmd::Meta { path } => finish(cli, format, &osint::scan_meta(path)?),
         Cmd::Media { path } => finish(cli, format, &crate::media::scan(path)?),
@@ -215,18 +215,32 @@ fn serve_api(listen: &str) -> Result<ExitCode, String> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn grep_cmd(
-    pattern: Option<&str>,
-    paths: &[std::path::PathBuf],
-    pick: Option<&str>,
+struct GrepIn<'a> {
+    pattern: Option<&'a str>,
+    paths: &'a [std::path::PathBuf],
+    pick: Option<&'a str>,
     column: Option<String>,
     eq: Option<String>,
-    kind: &str,
+    kind: &'a str,
     table: Option<String>,
     max: usize,
     ignore_case: bool,
     format: Format,
-) -> Result<ExitCode, String> {
+}
+
+fn grep_cmd(args: GrepIn<'_>) -> Result<ExitCode, String> {
+    let GrepIn {
+        pattern,
+        paths,
+        pick,
+        column,
+        eq,
+        kind,
+        table,
+        max,
+        ignore_case,
+        format,
+    } = args;
     let (pattern, paths) = crate::search::positionals(
         pattern.map(str::to_string),
         paths.to_vec(),

@@ -116,10 +116,10 @@ pub fn lookup(ip: &str) -> Hit {
         "timezone": tz,
     });
     let mut hit = geo_hit("geo", &source_name(), &flat, true);
-    if let Some(ev) = hit.evidence.as_mut() {
-        if let Ok(month) = std::fs::read_to_string(path.with_extension("month")) {
-            ev["month"] = json!(month.trim());
-        }
+    if let Some(ev) = hit.evidence.as_mut()
+        && let Ok(month) = std::fs::read_to_string(path.with_extension("month"))
+    {
+        ev["month"] = json!(month.trim());
     }
     hit
 }

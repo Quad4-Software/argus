@@ -221,10 +221,10 @@ fn attr_link(block: &str) -> Option<String> {
         let end = lower_rest.find('>').unwrap_or(0);
         let tag = &rest[..end];
         let rel_attr = attr(tag, "rel").unwrap_or_default();
-        if rel_attr.is_empty() || rel_attr == "alternate" {
-            if let Some(href) = attr(tag, "href") {
-                return Some(href);
-            }
+        if (rel_attr.is_empty() || rel_attr == "alternate")
+            && let Some(href) = attr(tag, "href")
+        {
+            return Some(href);
         }
         from = start + 5;
     }
