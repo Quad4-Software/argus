@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! License audit: detect the project license, compare against
 //! manifest-declared licenses, and flag strong-copyleft dependencies.
 
@@ -25,6 +28,8 @@ pub fn classify(text: &str) -> Option<&'static str> {
         Some("MPL-2.0")
     } else if head.contains("apache license") && head.contains("version 2") {
         Some("Apache-2.0")
+    } else if head.contains("quad4 source license") || head.contains("qsl-1.0-0bsd") {
+        Some("QSL-1.0-0BSD")
     } else if head.contains("bsd zero clause") || head.contains("0bsd") {
         Some("0BSD")
     } else if has("redistribution and use", "neither the name") {
@@ -323,5 +328,9 @@ mod tests {
             Some("GPL-3.0")
         );
         assert_eq!(classify("some random text"), None);
+        assert_eq!(
+            classify("Quad4 Source License\nQSL-1.0-0BSD\n0BSD Effective Date"),
+            Some("QSL-1.0-0BSD")
+        );
     }
 }
