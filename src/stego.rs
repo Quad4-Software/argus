@@ -3,7 +3,8 @@
 
 //! Structural steganography signals.
 //! Appended bytes after a format end marker, odd container chunks, and
-//! zero-width text channels. This does not extract a hidden message.
+//! zero-width text. A printable tail or a decoded zero-width message is
+//! included in the finding. Pixel bit planes are not reconstructed.
 
 use crate::osint::{Hit, Report, Status};
 use std::path::Path;
@@ -44,46 +45,66 @@ pub fn scan(path: &Path) -> Result<Report, String> {
 
 pub(crate) fn inspect(name: &str, bytes: &[u8]) -> Vec<Hit> {
     let mut hits = Vec::new();
-    if let Some(n) = png_trailing(bytes) {
-        push(&mut hits, name, "png", n);
+    if let Some(at) = png_trailing(bytes) {
+        push(&mut hits, name, "png", &bytes[at..]);
     }
     png_odd_chunks(name, bytes, &mut hits);
-    if let Some(n) = jpeg_trailing(bytes) {
-        push(&mut hits, name, "jpeg", n);
+    if let Some(at) = jpeg_trailing(bytes) {
+        push(&mut hits, name, "jpeg", &bytes[at..]);
     }
-    if let Some(n) = gif_trailing(bytes) {
-        push(&mut hits, name, "gif", n);
+    if let Some(at) = gif_trailing(bytes) {
+        push(&mut hits, name, "gif", &bytes[at..]);
     }
-    if let Some(n) = bmp_trailing(bytes) {
-        push(&mut hits, name, "bmp", n);
+    if let Some(at) = bmp_trailing(bytes) {
+        push(&mut hits, name, "bmp", &bytes[at..]);
     }
-    if let Some(n) = riff_trailing(bytes) {
-        push(&mut hits, name, "riff", n);
+    if let Some(at) = riff_trailing(bytes) {
+        push(&mut hits, name, "riff", &bytes[at..]);
     }
-    if let Some(n) = pdf_trailing(bytes) {
-        push(&mut hits, name, "pdf", n);
+    if let Some(at) = pdf_trailing(bytes) {
+        push(&mut hits, name, "pdf", &bytes[at..]);
     }
-    if let Some(n) = zip_trailing(bytes) {
-        push(&mut hits, name, "zip", n);
+    if let Some(at) = zip_trailing(bytes) {
+        push(&mut hits, name, "zip", &bytes[at..]);
     }
-    if let Some(n) = zero_width(bytes) {
-        hits.push(Hit::new(
-            "text",
-            Status::Confirmed,
-            format!("{name}: {n} zero-width character(s)"),
-            None,
-        ));
+    if let Some(hit) = zero_width(name, bytes) {
+        hits.push(hit);
     }
     hits
 }
 
-fn push(hits: &mut Vec<Hit>, name: &str, kind: &str, extra: usize) {
+fn push(hits: &mut Vec<Hit>, name: &str, kind: &str, extra: &[u8]) {
     hits.push(Hit::new(
         kind,
         Status::Confirmed,
-        format!("{name}: {extra} byte(s) after the {kind} end marker"),
+        format!(
+            "{name}: {} byte(s) after the {kind} end marker{}",
+            extra.len(),
+            preview(extra)
+        ),
         None,
     ));
+}
+
+fn preview(bytes: &[u8]) -> String {
+    let text = String::from_utf8_lossy(bytes);
+    let chars = text.chars().count().max(1);
+    let plain = text
+        .chars()
+        .filter(|c| c.is_ascii_graphic() || *c == ' ' || *c == '\n' || *c == '\t')
+        .count();
+    if plain * 5 >= chars * 4 {
+        let shown: String = text.chars().take(160).collect();
+        format!(": {shown}")
+    } else {
+        let hex = bytes
+            .iter()
+            .take(12)
+            .map(|b| format!("{b:02x}"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!(": {hex}")
+    }
 }
 
 fn consider(path: &Path, hits: &mut Vec<Hit>) {
@@ -139,8 +160,7 @@ fn png_trailing(bytes: &[u8]) -> Option<usize> {
             return None;
         }
         if kind == b"IEND" {
-            let extra = bytes.len() - next;
-            return if extra > 0 { Some(extra) } else { None };
+            return if next < bytes.len() { Some(next) } else { None };
         }
         i = next;
     }
@@ -206,8 +226,7 @@ fn jpeg_trailing(bytes: &[u8]) -> Option<usize> {
         let marker = bytes[i];
         i += 1;
         if marker == 0xd9 {
-            let extra = bytes.len() - i;
-            return if extra > 0 { Some(extra) } else { None };
+            return if i < bytes.len() { Some(i) } else { None };
         }
         if marker == 0xd8 || marker == 0x01 || (0xd0..=0xd7).contains(&marker) {
             continue;
@@ -230,7 +249,7 @@ fn gif_trailing(bytes: &[u8]) -> Option<usize> {
     }
     let last = bytes.iter().rposition(|b| *b == 0x3b)?;
     let extra = bytes.len() - last - 1;
-    if extra > 16 { Some(extra) } else { None }
+    if extra > 16 { Some(last + 1) } else { None }
 }
 
 fn bmp_trailing(bytes: &[u8]) -> Option<usize> {
@@ -240,7 +259,7 @@ fn bmp_trailing(bytes: &[u8]) -> Option<usize> {
     let declared = u32::from_le_bytes(bytes[2..6].try_into().ok()?) as usize;
     if declared > 14 && declared < bytes.len() {
         let extra = bytes.len() - declared;
-        if extra > 16 { Some(extra) } else { None }
+        if extra > 16 { Some(declared) } else { None }
     } else {
         None
     }
@@ -254,7 +273,7 @@ fn riff_trailing(bytes: &[u8]) -> Option<usize> {
     let end = declared.saturating_add(8);
     if end > 12 && end < bytes.len() {
         let extra = bytes.len() - end;
-        if extra > 16 { Some(extra) } else { None }
+        if extra > 16 { Some(end) } else { None }
     } else {
         None
     }
@@ -276,7 +295,7 @@ fn pdf_trailing(bytes: &[u8]) -> Option<usize> {
     let end = last?;
     let tail = &bytes[end..];
     let extra = tail.iter().filter(|b| !b.is_ascii_whitespace()).count();
-    if extra > 32 { Some(extra) } else { None }
+    if extra > 32 { Some(end) } else { None }
 }
 
 fn zip_trailing(bytes: &[u8]) -> Option<usize> {
@@ -298,16 +317,14 @@ fn zip_trailing(bytes: &[u8]) -> Option<usize> {
     let end = eocd + 22 + comment;
     if end < bytes.len() {
         let extra = bytes.len() - end;
-        if extra > 0 { Some(extra) } else { None }
+        if extra > 0 { Some(end) } else { None }
     } else {
         None
     }
 }
 
-fn zero_width(bytes: &[u8]) -> Option<usize> {
-    let Ok(text) = std::str::from_utf8(bytes) else {
-        return None;
-    };
+fn zero_width(name: &str, bytes: &[u8]) -> Option<Hit> {
+    let text = std::str::from_utf8(bytes).ok()?;
     let n = text
         .chars()
         .filter(|c| {
@@ -325,7 +342,69 @@ fn zero_width(bytes: &[u8]) -> Option<usize> {
             ) || ('\u{E0001}'..='\u{E007F}').contains(c)
         })
         .count();
-    if n >= 6 { Some(n) } else { None }
+    if let Some(msg) = decode_tags(text).or_else(|| decode_bits(text)) {
+        return Some(Hit::new(
+            "text",
+            Status::Confirmed,
+            format!("{name}: zero-width text: {msg}"),
+            None,
+        ));
+    }
+    if n >= 6 {
+        Some(Hit::new(
+            "text",
+            Status::Confirmed,
+            format!("{name}: {n} zero-width character(s)"),
+            None,
+        ))
+    } else {
+        None
+    }
+}
+
+fn decode_tags(text: &str) -> Option<String> {
+    let msg: String = text
+        .chars()
+        .filter_map(|c| {
+            let u = c as u32;
+            if (0xE0020..=0xE007E).contains(&u) {
+                char::from_u32(u - 0xE0000)
+            } else {
+                None
+            }
+        })
+        .collect();
+    if msg.len() >= 2 { Some(msg) } else { None }
+}
+
+fn decode_bits(text: &str) -> Option<String> {
+    let bits: String = text
+        .chars()
+        .filter_map(|c| match c {
+            '\u{200b}' => Some('0'),
+            '\u{200c}' => Some('1'),
+            _ => None,
+        })
+        .collect();
+    if bits.len() < 8 {
+        return None;
+    }
+    let mut msg = String::new();
+    for chunk in bits.as_bytes().chunks(8) {
+        if chunk.len() < 8 {
+            break;
+        }
+        let mut v = 0u8;
+        for b in chunk {
+            v = (v << 1) | u8::from(*b == b'1');
+        }
+        if v.is_ascii_graphic() || v == b' ' {
+            msg.push(v as char);
+        } else {
+            return None;
+        }
+    }
+    if msg.len() >= 2 { Some(msg) } else { None }
 }
 
 #[cfg(test)]
@@ -352,6 +431,7 @@ mod tests {
         let hit = &inspect("hid.png", &png(b"HIDDEN"))[0];
         assert_eq!(hit.status, Status::Confirmed);
         assert!(hit.summary.contains("6 byte"));
+        assert!(hit.summary.contains("HIDDEN"));
         let jpeg = [0xff, 0xd8, 0xff, 0xd9, b'H', b'I'];
         assert!(inspect("a.jpg", &jpeg)[0].summary.contains("jpeg"));
         let mut gif = b"GIF89a".to_vec();
@@ -363,6 +443,27 @@ mod tests {
             inspect("note.txt", text.as_bytes())[0]
                 .summary
                 .contains("zero-width")
+        );
+        let tagged = "see \u{E0048}\u{E0069}\u{E0021} now";
+        assert!(
+            inspect("tags.txt", tagged.as_bytes())[0]
+                .summary
+                .contains("Hi!")
+        );
+        let mut bits = String::from("pad ");
+        for b in b"Hi" {
+            for i in (0..8).rev() {
+                bits.push(if b & (1 << i) == 0 {
+                    '\u{200b}'
+                } else {
+                    '\u{200c}'
+                });
+            }
+        }
+        assert!(
+            inspect("bits.txt", bits.as_bytes())[0]
+                .summary
+                .contains("Hi")
         );
     }
 }
