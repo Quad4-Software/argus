@@ -5,6 +5,7 @@
 
 mod cli;
 mod conns;
+mod files;
 mod sigscan;
 mod threats;
 
@@ -13,6 +14,7 @@ pub use conns::{
     Allow, Flow, is_metadata, observe, parse_allow, pending_names, proc_root, remember_name,
     unexpected,
 };
+pub use files::{Touch, collect as collect_files, proc_root as files_root};
 pub use sigscan::scan as scan_signatures;
 pub use threats::scan as scan_threats;
 
@@ -46,6 +48,13 @@ pub fn grant(cmd: &Cmd, sb: &mut Sandbox) {
                 "/sys",
             ] {
                 sb.reads.push(p.into());
+            }
+        }
+        Cmd::Files { path, proc, .. } => {
+            sb.reads
+                .push(proc.clone().unwrap_or_else(|| PathBuf::from("/proc")));
+            if let Some(path) = path {
+                sb.reads.push(path.clone());
             }
         }
         Cmd::Conns { allow, proc, .. } => {

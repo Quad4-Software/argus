@@ -124,6 +124,11 @@ pub fn modules() -> &'static [Module] {
             about: "Pairwise prose or code distance",
         },
         Module {
+            name: "files",
+            group: "host",
+            about: "Open files and watched paths",
+        },
+        Module {
             name: "conns",
             group: "host",
             about: "Sockets, domains, and egress allow lists",

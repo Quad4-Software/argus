@@ -27,6 +27,16 @@ pub(crate) fn run(cli: &Cli, offline: bool, format: Format) -> Result<ExitCode, 
             host::scan_signatures(path, db.as_deref(), *no_update, *max_age_hours, offline)?,
             None,
         ),
+        HostCmd::Files {
+            path,
+            watch,
+            proc,
+            command,
+        } => {
+            let root = host::files_root(proc.as_ref());
+            let (rows, child) = host::collect_files(&root, path.as_deref(), command, *watch)?;
+            (files_report(&root, path.as_deref(), &rows), child)
+        }
         HostCmd::Conns {
             allow,
             watch,
@@ -69,6 +79,39 @@ pub(crate) fn run(cli: &Cli, offline: bool, format: Format) -> Result<ExitCode, 
         return Ok(ExitCode::from(code.clamp(1, 125) as u8));
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn files_report(
+    root: &std::path::Path,
+    watch: Option<&std::path::Path>,
+    rows: &[host::Touch],
+) -> osint::Report {
+    let mut findings = Vec::new();
+    if rows.is_empty() {
+        let msg = if let Some(watch) = watch {
+            format!("no process has {} open", watch.display())
+        } else {
+            "no open file paths under this proc root".into()
+        };
+        findings.push(Hit::new("files", Status::Absent, msg, None));
+    }
+    for row in rows.iter().take(80) {
+        let comm = if row.comm.is_empty() { "?" } else { &row.comm };
+        findings.push(Hit::new(
+            "files",
+            Status::Confirmed,
+            format!("{} {comm} {} {}", row.pid, row.kind, row.path),
+            None,
+        ));
+    }
+    osint::Report {
+        target: watch
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| root.display().to_string()),
+        kind: "files",
+        elapsed_ms: 0,
+        findings,
+    }
 }
 
 fn conns_report(

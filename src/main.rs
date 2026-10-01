@@ -237,8 +237,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         let _ = std::fs::create_dir_all(crate::cache::cache_dir());
     }
     let local_runtime = matches!(cli.cmd, Cmd::Image { remote: false, .. });
-    let sandboxable = !local_runtime
-        && !matches!(cli.cmd, Cmd::Host(crate::host::Cmd::Conns { ref command, .. }) if !command.is_empty());
+    let sandboxable =
+        !local_runtime && !matches!(cli.cmd, Cmd::Host(ref host) if host.wraps_command());
     if sandboxable && !cli.no_sandbox && !cfg.defaults.no_sandbox.unwrap_or(false) {
         apply_sandbox(cli, &opts);
     } else if local_runtime && cli.verbose > 0 {

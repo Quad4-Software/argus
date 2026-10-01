@@ -36,6 +36,21 @@ pub enum Cmd {
         #[arg(long, default_value_t = 24)]
         max_age_hours: u64,
     },
+    /// Open files for processes on this host.
+    Files {
+        /// Only paths under this file or directory.
+        #[arg(long)]
+        path: Option<PathBuf>,
+        /// Sample for this many seconds when no command is given.
+        #[arg(long, default_value_t = 0)]
+        watch: u64,
+        /// Procfs root. Defaults to /proc.
+        #[arg(long)]
+        proc: Option<PathBuf>,
+        /// Command to run while sampling. Put it after `--`.
+        #[arg(last = true)]
+        command: Vec<String>,
+    },
     /// Rootkit, infostealer, and backdoor leads on this host.
     Threats {
         /// Tree to read. Defaults to /.
@@ -50,11 +65,18 @@ pub enum Cmd {
 }
 
 impl Cmd {
+    pub fn wraps_command(&self) -> bool {
+        match self {
+            Cmd::Conns { command, .. } | Cmd::Files { command, .. } => !command.is_empty(),
+            _ => false,
+        }
+    }
+
     pub fn needs_network(&self) -> bool {
         match self {
             Cmd::Chat { .. } => true,
             Cmd::Signatures { no_update, db, .. } => !no_update && db.is_none(),
-            Cmd::Conns { .. } | Cmd::Threats { .. } => false,
+            Cmd::Conns { .. } | Cmd::Threats { .. } | Cmd::Files { .. } => false,
         }
     }
 }
