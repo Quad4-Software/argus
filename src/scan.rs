@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Scan engine: directory walk plus rule matching, parallel via std threads.
 
 use crate::color::Styles;
@@ -280,7 +283,7 @@ fn check_file(
                 } else {
                     versions
                         .iter()
-                        .find(|v| window.contains(v.as_str()))
+                        .find(|v| version_bounded(window, v))
                         .cloned()
                 };
                 if !versions.is_empty() && hit_ver.is_none() {
@@ -857,6 +860,47 @@ fn mask_tokens(line: &str) -> String {
         }
     })
     .into_owned()
+}
+
+/// True when `version` appears in `window` as its own token.
+/// A longer version that merely contains the bad string does not count:
+/// 6.0.0 is not 16.0.0, and 5.6.1 is not 5.6.10.
+fn version_bounded(window: &str, version: &str) -> bool {
+    if version.is_empty() {
+        return false;
+    }
+    let bytes = window.as_bytes();
+    let needle = version.as_bytes();
+    let mut from = 0;
+    while from + needle.len() <= bytes.len() {
+        let Some(rel) = window[from..].find(version) else {
+            break;
+        };
+        let at = from + rel;
+        let before_ok = at == 0 || !bytes[at - 1].is_ascii_alphanumeric();
+        let after = at + needle.len();
+        let after_ok = after >= bytes.len() || !bytes[after].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+        from = at + 1;
+    }
+    false
+}
+
+#[cfg(test)]
+mod version_bounds {
+    use super::version_bounded;
+
+    #[test]
+    fn longer_versions_do_not_match() {
+        assert!(version_bounded(r#""6.0.0""#, "6.0.0"));
+        assert!(!version_bounded(r#""16.0.0""#, "6.0.0"));
+        assert!(!version_bounded(r#""5.6.10""#, "5.6.1"));
+        assert!(version_bounded("axios@1.14.1", "1.14.1"));
+        assert!(!version_bounded("axios@1.14.10", "1.14.1"));
+        assert!(!version_bounded("axios@11.14.1", "1.14.1"));
+    }
 }
 
 pub(crate) mod taint;
