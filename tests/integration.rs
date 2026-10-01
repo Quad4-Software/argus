@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! End-to-end tests against the fixture repos.
 
 use std::process::Command;

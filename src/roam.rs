@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Roam mode: search-forge discovery then clone+scan.
 //! GitHub /search/repositories (+/search/code with auth), GitLab
 //! /projects?search=, Gitea /repos/search.

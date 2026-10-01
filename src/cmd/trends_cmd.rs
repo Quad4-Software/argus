@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! `argus trends <path>` - diff the latest stored scan vs the previous
 //! one for a root: new findings, fixed findings, persistent count.
 

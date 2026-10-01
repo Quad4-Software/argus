@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Gitea / Forgejo repo enumeration.
 
 use super::{RepoSpec, Selector};

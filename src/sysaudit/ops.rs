@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use super::*;
 pub(crate) fn logging(out: &mut Vec<Finding>) {
     let journal = read("/etc/systemd/journald.conf").unwrap_or_default();

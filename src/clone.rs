@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! git clone wrapper with token auth via GIT_ASKPASS (token stays out of argv).
 
 use std::path::{Path, PathBuf};

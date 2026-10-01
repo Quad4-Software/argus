@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! CycloneDX 1.5 SBOM export from lockfile/manifest dependency extraction.
 
 use crate::osv::Dep;

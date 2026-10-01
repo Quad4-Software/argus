@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! ANSI color handling with NO_COLOR / TERM=dumb / tty detection.
 
 use std::io::IsTerminal;

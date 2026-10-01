@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Structural gate: keep command code out of god files.
 //! New subcommands go in src/cmd/<domain>.rs, not main.rs.
 //! If a module legitimately outgrows a cap, split it - do not bump the

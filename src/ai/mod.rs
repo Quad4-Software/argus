@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! AI-provenance analysis: evidence-based, not accusatory.
 //!
 //! Signal tiers:

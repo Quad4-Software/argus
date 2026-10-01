@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use super::*;
 pub(crate) fn kernel(out: &mut Vec<Finding>) {
     // (sysctl key, secure value, id, severity, what)

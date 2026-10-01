@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Live network tests - ignored by default, run by the `live` CI job on
 //! schedule/manual trigger. These hit real endpoints; do not make them
 //! part of the PR gate.

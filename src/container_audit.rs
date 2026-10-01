@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Container configuration audit: Dockerfiles, docker-compose files and
 //! Kubernetes manifests. Rules are mapped to the OWASP Docker Security
 //! Cheat Sheet and the OWASP Kubernetes hardening guidance.

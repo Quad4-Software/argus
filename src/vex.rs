@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! OpenVEX support: ingest a VEX document to suppress/annotate findings,
 //! and emit VEX documents for the vulns a scan found.
 //!

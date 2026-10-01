@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! File walking and dep-manifest name heuristics.
 
 use std::path::{Path, PathBuf};

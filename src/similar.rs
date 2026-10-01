@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Code similarity scoring via normalized token shingling and winnowing
 //! fingerprints (MOSS/SCANOSS lineage). Deterministic, no external deps.
 //!

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! zizmor-class GitHub Actions audits, implemented natively over yaml-rust2.
 //! Covers: template-injection, excessive-permissions, dangerous-triggers,
 //! secrets-inherit, github-env injection, artipacked, cache-poisoning,

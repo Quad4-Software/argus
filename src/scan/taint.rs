@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Statement-level taint scanner for `type = "taint"` rules.
 
 use crate::rules::CompiledRule;

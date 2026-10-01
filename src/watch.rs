@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Watch mode: continuously monitor repos (and RSS/Atom feeds) for pushes,
 //! rescanning on change. Push detection via git ls-remote (forge-agnostic);
 //! optional atom/rss feed targets for notification-style updates.

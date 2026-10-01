@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use crate::cli::{Cli, Cmd, RemoteArgs};
 use crate::cmd::deps::{REMOTE_DEPS, collect_deps};
 use crate::cmd::*;

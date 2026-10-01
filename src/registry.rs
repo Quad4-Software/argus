@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Package-registry metadata lookups (npm/PyPI/crates.io) with a small
 //! on-disk cache. Shared by dependency-confusion checks, unmaintained-dep
 //! detection, maintainer-change monitoring, and license audits.

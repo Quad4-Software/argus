@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Entropy-based secret detection - catches high-entropy tokens that no
 //! shape-specific rule recognizes.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! System hardening audit - a Lynis-class check set for the host.
 //! Reads /etc, /proc, /sys and a handful of read-only command outputs
 //! (ss, systemctl, ip) and reports hardening gaps by category.

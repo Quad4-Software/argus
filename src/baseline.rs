@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Baseline mode: record accepted findings, fail only on new ones.
 
 use crate::finding::{Finding, Severity};

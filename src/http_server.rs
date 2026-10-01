@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Minimal HTTP/1.1 server for the daemon control plane + webhook receiver.
 //! std::net only; one thread per connection, bounded body size.
 

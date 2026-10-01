@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Per-commit secrets scan over git history. Secrets that were committed
 //! and later removed still leak - they must be rotated, not deleted.
 

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Real YARA evaluation via yara-x. Load .yar/.yara sources, scan file bytes.
 
 use crate::finding::{Finding, Severity};

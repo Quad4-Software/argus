@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! `argus review` - interactive finding triage. Walks each finding and
 //! accepts single-keystroke commands on stdin:
 //!   enter/space = skip   s = suppress (append to .argusignore)

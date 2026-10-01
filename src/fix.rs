@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Auto-remediation for workflow findings: pin uses: refs to commit
 //! SHAs (resolved via git ls-remote, tag kept as a comment) and inject
 //! a top-level permissions: block when absent. Dry-run by default.

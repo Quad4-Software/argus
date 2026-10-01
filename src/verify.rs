@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Secrets liveness verification: extract credential-shaped strings from
 //! a tree and ask each provider whether the token still works.
 //! A confirmed-live secret is a critical finding; a rejected token is

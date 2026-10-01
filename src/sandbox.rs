@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Landlock LSM sandboxing (Linux). Granted: read on scan roots /etc-ish paths,
 //! write only on clone/output targets, TCP connect only when remote work needs
 //! it. Unhandled right classes (exec, etc.) stay unrestricted.

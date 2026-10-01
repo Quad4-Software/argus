@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Org/repo security-settings audit via forge APIs.
 //!
 //! Distinct from file scanning: this checks posture the working tree cannot

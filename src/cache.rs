@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Incremental scan cache - skip re-reading files whose (mtime,size)
 //! and the active ruleset fingerprint are unchanged. Cache lives at
 //! <root>/.arguscache.json and is written back after the scan.

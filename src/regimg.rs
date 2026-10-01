@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Registry-side image audit: OCI distribution API, no docker/podman needed.
 //! Fetches manifest + config blob: env, labels, history, root user, age.
 //! Layer blobs are not downloaded (size); deep scans still need a runtime.

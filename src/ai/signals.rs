@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use super::*;
 pub(crate) fn git_out(root: &Path, args: &[&str]) -> String {
     Command::new("git")

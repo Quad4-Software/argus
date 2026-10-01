@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! .argusignore - declarative suppression of findings by rule id and path
 //! glob. Format: one entry per line, `#` comments allowed.
 //!

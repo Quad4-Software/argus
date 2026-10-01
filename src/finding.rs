@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Finding and report data model plus text/JSON renderers.
 
 use serde::{Deserialize, Serialize};

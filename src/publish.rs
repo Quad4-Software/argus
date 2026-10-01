@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Publish pre-flight: enumerate the files a package would actually ship
 //! (npm pack / cargo package / git ls-files fallback), then run the rules
 //! engine over just that set plus filename-level checks for the classics:

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Flat IoC list import: one indicator per line, auto-classified.
 //! sha256 (64 hex) -> file-hash rule; domain/IP/URL -> content rule;
 //  anything else -> literal substring rule at the list's severity.

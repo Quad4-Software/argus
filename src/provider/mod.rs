@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Remote provider abstraction: enumerate repos, then clone+scan.
 
 pub mod gitea;

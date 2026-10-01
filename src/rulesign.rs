@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Detached ed25519 signatures for custom rulesets. A ruleset TOML can
 //! carry `<name>.toml.sig` (base64). With `--rules-pubkey <file>` argus
 //! refuses to load unsigned or mis-signed custom rules, protecting

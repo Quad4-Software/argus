@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Minimal JSON-over-HTTPS helper built on ureq.
 
 use std::time::Duration;

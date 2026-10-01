@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use super::*;
 pub(crate) fn network(out: &mut Vec<Finding>) {
     // dangerous-listener check via ss
