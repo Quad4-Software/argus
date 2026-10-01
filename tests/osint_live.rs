@@ -359,3 +359,59 @@ fn local_grep_streams_a_column() {
     assert!(stdout.contains("ada@example.com"), "{stdout}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn local_host_conns_threats_and_signatures() {
+    let dir = std::env::temp_dir().join(format!("argus-host-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join("proc/net")).unwrap();
+    std::fs::write(
+        dir.join("proc/net/tcp"),
+        "  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n   0: 0100007F:C350 08080808:01BB 01 00000000:00000000 00:00000000 00000000     0        0 99 1 0000000000000000 100 0 0 10 0\n",
+    )
+    .unwrap();
+    let (ok, stdout, stderr) = json_cmd(&[
+        "--offline",
+        "conns",
+        "--proc",
+        dir.join("proc").to_str().unwrap(),
+    ]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("conns json");
+    assert_eq!(doc["kind"], "conns");
+    assert!(stdout.contains("8.8.8.8"), "{stdout}");
+
+    std::fs::create_dir_all(dir.join("etc")).unwrap();
+    std::fs::write(dir.join("etc/ld.so.preload"), "/lib/libprocesshider.so\n").unwrap();
+    let (ok, stdout, stderr) = json_cmd(&["threats", "--root", dir.to_str().unwrap()]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("threats json");
+    assert_eq!(finding(&doc, "preload")["status"], "confirmed");
+
+    let hash = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824";
+    std::fs::write(dir.join("hashes.txt"), format!("{hash}\tTest.Lead\n")).unwrap();
+    std::fs::write(dir.join("hello.txt"), "hello").unwrap();
+    let (ok, stdout, stderr) = json_cmd(&[
+        "--offline",
+        "signatures",
+        "--no-update",
+        "--db",
+        dir.join("hashes.txt").to_str().unwrap(),
+        dir.join("hello.txt").to_str().unwrap(),
+    ]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("signatures json");
+    assert_eq!(finding(&doc, "hash")["status"], "confirmed");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+#[ignore = "needs public DNS"]
+fn live_chat_example_com() {
+    let (ok, stdout, stderr) = json_cmd(&["chat", "example.com"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("chat json");
+    assert_eq!(doc["kind"], "chat");
+    assert!(finding(&doc, "xmpp-starttls")["status"].is_string());
+    assert!(finding(&doc, "ircs")["status"].is_string());
+}

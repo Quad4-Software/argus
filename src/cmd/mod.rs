@@ -9,6 +9,7 @@
 
 pub mod daemon_cmd;
 pub mod deps;
+pub mod host_cmd;
 pub mod misc;
 pub mod osint_cmd;
 pub mod remote;

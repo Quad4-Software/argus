@@ -22,6 +22,7 @@ mod finding;
 mod fix;
 mod history;
 mod hooks;
+mod host;
 mod http;
 mod http_server;
 mod ignore;
@@ -236,7 +237,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         let _ = std::fs::create_dir_all(crate::cache::cache_dir());
     }
     let local_runtime = matches!(cli.cmd, Cmd::Image { remote: false, .. });
-    let sandboxable = !local_runtime;
+    let sandboxable = !local_runtime
+        && !matches!(cli.cmd, Cmd::Host(crate::host::Cmd::Conns { ref command, .. }) if !command.is_empty());
     if sandboxable && !cli.no_sandbox && !cfg.defaults.no_sandbox.unwrap_or(false) {
         apply_sandbox(cli, &opts);
     } else if local_runtime && cli.verbose > 0 {
@@ -411,6 +413,7 @@ exec argus scan --staged --fail-on medium
             report.findings.extend(fs);
         }
         osint_arms!() => return cmd::osint_cmd::run(cli, offline, format),
+        Cmd::Host(_) => return cmd::host_cmd::run(cli, offline, format),
         Cmd::Web { url, depth } => match webscan::scan(url, *depth, &rules, &opts, cli.verbose > 0)
         {
             Ok(ws) => {

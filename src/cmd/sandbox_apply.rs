@@ -97,6 +97,7 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 sb.reads.push(b.clone());
             }
         }
+        Cmd::Host(h) => crate::host::grant(h, &mut sb),
         Cmd::System { extra } => {
             sb.reads.extend(extra.iter().cloned());
             for p in [
@@ -340,6 +341,7 @@ pub(crate) fn cfg_needs_net(cmd: &Cmd) -> bool {
             | Cmd::User { .. }
     ) || matches!(cmd, Cmd::Gitmeta { target } if crate::cli::is_http_target(target))
         || matches!(cmd, Cmd::Extract { target } if crate::cli::is_http_target(target))
+        || matches!(cmd, Cmd::Host(h) if h.needs_network())
 }
 
 // ---------------- roam ----------------

@@ -323,6 +323,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Cmd {
+    /// Connections, signatures, threat leads, and chat service records.
+    #[command(flatten)]
+    Host(crate::host::Cmd),
+
     /// Scan the running system: temp dirs, systemd units, shell rc files,
     /// plus the installed foreign-package list (pacman -Qqm).
     System {
@@ -915,6 +919,7 @@ pub fn scans_files(cmd: &Cmd) -> bool {
             | Cmd::Favicon { .. }
             | Cmd::User { .. }
             | Cmd::Modules
+            | Cmd::Host(_)
     )
 }
 
@@ -978,5 +983,6 @@ pub fn needs_network(cmd: &Cmd) -> bool {
             | Cmd::Favicon { .. }
             | Cmd::User { .. }
     ) || matches!(cmd, Cmd::Gitmeta { target } if is_http_target(target))
+        || matches!(cmd, Cmd::Host(h) if h.needs_network())
         || matches!(cmd, Cmd::Extract { target } if is_http_target(target))
 }

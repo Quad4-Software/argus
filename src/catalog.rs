@@ -124,6 +124,21 @@ pub fn modules() -> &'static [Module] {
             about: "Pairwise prose or code distance",
         },
         Module {
+            name: "conns",
+            group: "host",
+            about: "Sockets, domains, and egress allow lists",
+        },
+        Module {
+            name: "signatures",
+            group: "host",
+            about: "Hash signatures and file heuristics",
+        },
+        Module {
+            name: "threats",
+            group: "host",
+            about: "Preload, cron cradles, staging files",
+        },
+        Module {
             name: "supply",
             group: "local",
             about: "Lockfile closure",
