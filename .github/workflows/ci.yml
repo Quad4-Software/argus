@@ -42,6 +42,14 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-15]
         features: ["--no-default-features", ""]
     steps:
+      # Windows git converts LF to CRLF, and Defender quarantines the
+      # malware fixtures this suite is supposed to scan.
+      - name: Windows checkout prep
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          try { Set-MpPreference -DisableRealtimeMonitoring $true } catch { Write-Host $_ }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false

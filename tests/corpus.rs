@@ -50,7 +50,15 @@ fn corpus_cases_match_expected() {
             .args(["--format", "json", "--color", "never"])
             .output()
             .unwrap();
-        let report: Value = serde_json::from_slice(&out.stdout).expect("valid json");
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let report: Value = serde_json::from_str(stdout.trim()).unwrap_or_else(|e| {
+            panic!(
+                "{}: valid json ({}): {e}\n{}",
+                dir.display(),
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            )
+        });
         let ids_for_fixture: Vec<String> = report["findings"]
             .as_array()
             .unwrap()

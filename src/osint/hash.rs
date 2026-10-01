@@ -32,7 +32,8 @@ pub fn md5(msg: &[u8]) -> [u8; 16] {
         9, 14, 20, 5, 9, 14, 20, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 6, 10,
         15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21,
     ];
-    for chunk in data.chunks_exact(64) {
+    let (chunks, _) = data.as_chunks::<64>();
+    for chunk in chunks {
         let mut m = [0u32; 16];
         for i in 0..16 {
             m[i] = u32::from_le_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
@@ -83,7 +84,8 @@ pub fn sha1(msg: &[u8]) -> [u8; 20] {
         data.push(0);
     }
     data.extend_from_slice(&bits.to_be_bytes());
-    for chunk in data.chunks_exact(64) {
+    let (chunks, _) = data.as_chunks::<64>();
+    for chunk in chunks {
         let mut w = [0u32; 80];
         for i in 0..16 {
             w[i] = u32::from_be_bytes(chunk[i * 4..i * 4 + 4].try_into().unwrap());
