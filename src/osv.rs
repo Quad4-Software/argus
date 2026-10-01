@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! OSV.dev integration: extract pinned deps from manifests/lockfiles,
 //! batch-query OSV, map advisories (MAL-* = malicious) into findings.
 
@@ -10,6 +13,30 @@ pub struct Dep {
     pub version: String,
     /// manifest/lockfile path it was found in
     pub path: String,
+}
+
+fn walk_npm(
+    deps: &serde_json::Map<String, serde_json::Value>,
+    rel: &str,
+    out: &mut Vec<Dep>,
+    depth: usize,
+) {
+    if depth > 32 {
+        return;
+    }
+    for (name, meta) in deps {
+        if let Some(ver) = meta.get("version").and_then(|v| v.as_str()) {
+            out.push(Dep {
+                ecosystem: "npm",
+                name: name.clone(),
+                version: ver.into(),
+                path: rel.into(),
+            });
+        }
+        if let Some(nested) = meta.get("dependencies").and_then(|d| d.as_object()) {
+            walk_npm(nested, rel, out, depth + 1);
+        }
+    }
 }
 
 /// Extract pinned deps from a manifest file's text. Cheap parsers:
@@ -41,16 +68,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
                 }
                 // legacy: dependencies.<name>.version
                 if let Some(deps) = v.get("dependencies").and_then(|d| d.as_object()) {
-                    for (name, meta) in deps {
-                        if let Some(ver) = meta.get("version").and_then(|v| v.as_str()) {
-                            out.push(Dep {
-                                ecosystem: "npm",
-                                name: name.clone(),
-                                version: ver.into(),
-                                path: rel.into(),
-                            });
-                        }
-                    }
+                    walk_npm(deps, rel, &mut out, 0);
                 }
             }
         }
@@ -100,6 +118,17 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
             for c in re.captures_iter(text) {
                 out.push(Dep {
                     ecosystem: "crates.io",
+                    name: c[1].into(),
+                    version: c[2].into(),
+                    path: rel.into(),
+                });
+            }
+        }
+        "go.sum" => {
+            let re = regex::Regex::new(r"(?m)^(\S+) (v[0-9]\S*?)(?:/go\.mod)? h1:").unwrap();
+            for c in re.captures_iter(text) {
+                out.push(Dep {
+                    ecosystem: "Go",
                     name: c[1].into(),
                     version: c[2].into(),
                     path: rel.into(),
@@ -157,7 +186,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
         "packages.lock.json" => {
             // nuget lock: "name": {"resolved": "x.y.z"} nested per framework
             let re = regex::Regex::new(
-                "\"([^\"]+)\":\\s*\\{\\s*\"type\":\\s*\"Direct\",\\s*\"resolved\":\\s*\"([^\"]+)\"",
+                "\"([^\"]+)\":\\s*\\{\\s*\"type\":\\s*\"(?:Direct|Transitive)\",\\s*\"resolved\":\\s*\"([^\"]+)\"",
             )
             .unwrap();
             for c in re.captures_iter(text) {
@@ -335,12 +364,33 @@ mod eco_tests {
     }
 
     #[test]
+    fn npm_lock_walks_nested_dependencies_and_go_sum() {
+        let d = extract_deps(
+            "package-lock.json",
+            r#"{"dependencies":{"left-pad":{"version":"1.0.0","dependencies":{"nested-dep":{"version":"2.0.0"}}}}}"#,
+        );
+        assert_eq!(d.len(), 2);
+        assert!(d.iter().any(|x| x.name == "nested-dep"));
+        let g = extract_deps(
+            "go.sum",
+            "github.com/example/mod v1.2.3 h1:abc=\ngithub.com/example/mod v1.2.3/go.mod h1:def=\n",
+        );
+        assert_eq!(g.len(), 2);
+        assert_eq!(g[0].ecosystem, "Go");
+    }
+
+    #[test]
     fn nuget_lock_and_csproj() {
         let d = extract_deps(
             "packages.lock.json",
             r#"{"Newtonsoft.Json": {"type": "Direct","resolved": "13.0.3"}}"#,
         );
         assert_eq!(d[0].ecosystem, "NuGet");
+        let trans = extract_deps(
+            "packages.lock.json",
+            r#"{"Serilog": {"type": "Transitive","resolved": "4.0.0"}}"#,
+        );
+        assert_eq!(trans[0].name, "Serilog");
         let d2 = extract_deps(
             "app.csproj",
             r#"<PackageReference Include="Serilog" Version="4.0.0" />"#,
