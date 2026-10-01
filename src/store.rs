@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Persistent results store: scan runs and findings in sqlite at
 //! ~/.local/share/argus/argus.db. Enables `argus trends` diffs -
 //! what appeared, what got fixed, what persists across runs.
@@ -5,7 +8,7 @@
 use crate::finding::{Finding, Report};
 use std::path::Path;
 
-fn db_path() -> std::path::PathBuf {
+pub(crate) fn db_path() -> std::path::PathBuf {
     if let Ok(x) = std::env::var("XDG_DATA_HOME") {
         return Path::new(&x).join("argus").join("argus.db");
     }

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! TOML config file + flag/env/config precedence resolution.
 
 use crate::cli::Format;
@@ -18,6 +21,23 @@ pub struct ConfigFile {
     pub gitlab: ProviderConf,
     #[serde(default)]
     pub gitea: ProviderConf,
+    #[serde(default)]
+    pub store: StoreConf,
+    #[serde(default)]
+    pub webhooks: Vec<WebhookConf>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct StoreConf {
+    pub driver: Option<String>,
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct WebhookConf {
+    pub url: String,
+    #[serde(default)]
+    pub events: Vec<String>,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
