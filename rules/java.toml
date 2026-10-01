@@ -1,0 +1,66 @@
+# Java sinks, including older deserialization APIs still found in maintenance trees.
+
+[ruleset]
+name = "java"
+version = "2026.09.30"
+description = "Java command, deserialization, and hostname-check patterns"
+
+[[rule]]
+id = "JAVA-001"
+type = "content"
+severity = "high"
+path = '\.java$'
+regex = '''Runtime\.getRuntime\(\)\.exec\s*\('''
+description = "Runtime.exec runs a command string"
+remediation = "Use ProcessBuilder with a fixed program and a separate argument list."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JAVA-002"
+type = "content"
+severity = "high"
+path = '\.java$'
+regex = '''new\s+ObjectInputStream\s*\('''
+description = "Java native deserialization"
+remediation = "Do not deserialize untrusted bytes. Use a data format that cannot construct objects."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JAVA-003"
+type = "content"
+severity = "high"
+path = '\.java$'
+regex = '''new\s+XMLDecoder\s*\('''
+description = "XMLDecoder can construct objects from XML"
+remediation = "Parse a fixed schema. Do not feed XMLDecoder untrusted XML."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JAVA-004"
+type = "content"
+severity = "medium"
+path = '\.java$'
+regex = '''(?:setHostnameVerifier|AllowAllHostnameVerifier)\s*\('''
+description = "a custom hostname verifier is installed"
+remediation = "Keep the platform verifier. A verifier that returns true accepts any host."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JAVA-005"
+type = "content"
+severity = "medium"
+path = '\.java$'
+regex = '''implements\s+X509TrustManager'''
+description = "a custom trust manager replaces the platform one"
+remediation = "Trust the platform store, or pin the one CA you operate."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JAVA-006"
+type = "content"
+severity = "high"
+path = '\.java$'
+regex = '''execute(?:Query|Update)?\s*\([^;\n]{0,120}\+[^;\n]{0,80}(?:getParameter|getHeader|getQueryString)'''
+description = "SQL is concatenated with a request value"
+remediation = "Use a PreparedStatement and bind the value."
+reference = "https://owasp.org/Top10/2025/"

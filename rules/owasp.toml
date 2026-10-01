@@ -1,0 +1,48 @@
+# Cross-language shapes from the OWASP Top 10 2025 and API Security Top 10 2023
+# that a text scan can see. Broken object authorization, insecure design, and
+# prompt injection are not in this file. A scanner cannot decide those from source text.
+
+[ruleset]
+name = "owasp"
+version = "2026.09.30"
+description = "JWT none, request-URL fetches, and secrets written to logs"
+
+[[rule]]
+id = "OWASP-001"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx|py|go|java|php|rb|cs)$'
+regex = '''(?i)alg(?:orithm)?["']?\s*[:=]\s*["']none["']'''
+description = "JWT algorithm is set to none"
+remediation = "Allow-list HS256 or an asymmetric algorithm. Reject none."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "OWASP-002"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx|py)$'
+regex = '''(?i)algorithms\s*[:=]\s*\[[^\]]{0,60}["']none["']'''
+description = "JWT verify allow-list includes none"
+remediation = "Drop none from the algorithm list."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "OWASP-003"
+type = "content"
+severity = "medium"
+path = '\.py$'
+regex = '''(?i)verify_signature["']?\s*[:=]\s*False'''
+description = "JWT signature verification is disabled"
+remediation = "Verify the signature with a known key."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "OWASP-004"
+type = "content"
+severity = "low"
+path = '\.(js|jsx|mjs|cjs|ts|tsx|py|go|java|php|rb|cs)$'
+regex = '''(?i)(?:console\.(?:log|debug)|print|logger\.(?:info|debug)|log\.(?:info|debug|Printf|println))\s*\([^)\n]{0,80}(?:password|secret|api[_-]?key|token)'''
+description = "a password, secret, or token is written to a log"
+remediation = "Log an id. Do not log the secret."
+reference = "https://owasp.org/Top10/2025/"

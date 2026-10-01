@@ -1,0 +1,56 @@
+# Ruby sinks, including Marshal and YAML.load still seen in older apps.
+
+[ruleset]
+name = "ruby"
+version = "2026.09.30"
+description = "Ruby eval, Marshal, YAML, and TLS patterns"
+
+[[rule]]
+id = "RB-001"
+type = "content"
+severity = "high"
+path = '\.rb$'
+regex = '''(?:^|[^.\w])eval\s+|(?:^|[^.\w])eval\s*\('''
+description = "eval of a Ruby string"
+remediation = "Do not eval input. Call a method you named."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "RB-002"
+type = "content"
+severity = "high"
+path = '\.rb$'
+regex = '''Marshal\.load\s*\('''
+description = "Marshal.load can construct objects"
+remediation = "Use JSON. Do not Marshal.load bytes you did not produce."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "RB-003"
+type = "content"
+severity = "medium"
+path = '\.rb$'
+regex = '''YAML\.load\s*\('''
+description = "YAML.load can construct objects"
+remediation = "Call YAML.safe_load."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "RB-004"
+type = "content"
+severity = "high"
+path = '\.rb$'
+regex = '''VERIFY_NONE'''
+description = "OpenSSL verification is disabled"
+remediation = "Use VERIFY_PEER."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "RB-005"
+type = "content"
+severity = "high"
+path = '\.rb$'
+regex = '''(?:^|[^.\w:])system\s*\(|(?:^|[^.\w:])exec\s*\('''
+description = "system or exec starts a process"
+remediation = "Pass an argument array. Do not build one shell string."
+reference = "https://owasp.org/Top10/2025/"

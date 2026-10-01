@@ -31,6 +31,14 @@ reference = "https://..."
 (`repo = "owner/name"`, `unsafe_refs = "tags|all"`). `type = "package"`
 inspects dependency manifests (`names`, `versions`, `allowed_hosts`).
 `type = "yara"` attaches a `.yar` file evaluated by yara-x.
+The `python` ruleset is ordinary `content` rules (pickle, `yaml.load`,
+`shell=True`, `eval`/`exec`, disabled TLS verification, `tempfile.mktemp`).
+`javascript`, `go`, `java`, `php`, `ruby`, and `csharp` are the same kind of
+text match for injection, deserialization, and TLS checks in those languages.
+`owasp` covers JWT `none`, disabled JWT verification, and secrets written to
+logs. `agent` flags model or tool text passed into `eval` or a shell.
+These match text. They do not parse an AST, and they do not prove broken
+access control, insecure design, or prompt injection.
 
 ## The corpus
 

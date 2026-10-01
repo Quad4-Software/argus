@@ -1,0 +1,56 @@
+# Go sinks. Text matches. A hit still needs a person.
+
+[ruleset]
+name = "go"
+version = "2026.09.30"
+description = "Go TLS, shell, JWT, and request-URL patterns"
+
+[[rule]]
+id = "GO-001"
+type = "content"
+severity = "high"
+path = '\.go$'
+regex = '''InsecureSkipVerify\s*:\s*true'''
+description = "TLS certificate checks are turned off"
+remediation = "Leave InsecureSkipVerify false. Pin a trust store for a private CA."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "GO-002"
+type = "content"
+severity = "high"
+path = '\.go$'
+regex = '''exec\.Command\s*\(\s*"(?:sh|bash|cmd)"'''
+description = "a shell is started from Go"
+remediation = "exec.Command the program directly and pass arguments as separate strings."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "GO-003"
+type = "content"
+severity = "high"
+path = '\.go$'
+regex = '''jwt\.ParseUnverified\s*\('''
+description = "JWT is parsed without signature checks"
+remediation = "Use a parser that checks the signature and an allow-list of algorithms."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "GO-004"
+type = "content"
+severity = "medium"
+path = '\.go$'
+regex = '''(?:ioutil|os)\.WriteFile\s*\([^)]*0?777'''
+description = "a file is written world-accessible"
+remediation = "Use 0600 or 0640 and a dedicated directory."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "GO-005"
+type = "content"
+severity = "medium"
+path = '\.go$'
+regex = '''http\.Get\s*\(\s*r\.(?:URL|FormValue|PostFormValue)'''
+description = "the handler fetches a URL taken from the request"
+remediation = "Allow-list hosts before calling http.Get. This is an SSRF lead."
+reference = "https://owasp.org/Top10/2025/"

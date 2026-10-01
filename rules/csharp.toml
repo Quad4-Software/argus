@@ -1,0 +1,56 @@
+# C# sinks, including BinaryFormatter which is obsolete and still shows up in old code.
+
+[ruleset]
+name = "csharp"
+version = "2026.09.30"
+description = "C# deserialization, process start, hashing, and TLS callback patterns"
+
+[[rule]]
+id = "CS-001"
+type = "content"
+severity = "critical"
+path = '\.cs$'
+regex = '''BinaryFormatter'''
+description = "BinaryFormatter deserializes arbitrary types"
+remediation = "Remove BinaryFormatter. Use a serializer that does not construct types from the payload."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "CS-002"
+type = "content"
+severity = "high"
+path = '\.cs$'
+regex = '''Process\.Start\s*\('''
+description = "Process.Start launches a program"
+remediation = "Use a fixed file name and an argument list. Do not pass a single shell string."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "CS-003"
+type = "content"
+severity = "medium"
+path = '\.cs$'
+regex = '''JavaScriptSerializer'''
+description = "JavaScriptSerializer is a legacy JSON stack"
+remediation = "Use System.Text.Json with a fixed type."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "CS-004"
+type = "content"
+severity = "low"
+path = '\.cs$'
+regex = '''MD5\.Create\s*\(|SHA1\.Create\s*\('''
+description = "MD5 or SHA-1 is constructed"
+remediation = "Use SHA-256 or better for integrity. Use a password hash for passwords."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "CS-005"
+type = "content"
+severity = "high"
+path = '\.cs$'
+regex = '''(?:ServerCertificateCustomValidationCallback|DangerousAcceptAnyServerCertificateValidator)'''
+description = "the TLS certificate callback can accept any server"
+remediation = "Leave the platform validation on."
+reference = "https://owasp.org/Top10/2025/"

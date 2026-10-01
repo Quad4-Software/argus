@@ -1,0 +1,17 @@
+# Model output handed to a code or process sink.
+# This is a lead for improper output handling. It does not detect prompt injection.
+
+[ruleset]
+name = "agent"
+version = "2026.09.30"
+description = "Model or tool text passed into eval, exec, or a shell"
+
+[[rule]]
+id = "AG-001"
+type = "content"
+severity = "high"
+path = '\.(py|js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''(?i)(?:eval|exec|os\.system|subprocess\.(?:run|Popen|call|check_output)|execSync|spawn)\s*\([^)\n]{0,120}(?:completion|tool_output|model_output|llm_output|response\.content)'''
+description = "model or tool text is passed into a code or process sink"
+remediation = "Treat model text as data. Do not eval it or pass it to a shell."
+reference = "https://genai.owasp.org/"

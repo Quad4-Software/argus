@@ -1,0 +1,106 @@
+# PHP sinks, old mysql_* and current mysqli and curl shapes.
+
+[ruleset]
+name = "php"
+version = "2026.09.30"
+description = "PHP code execution, deserialization, SQL, and TLS patterns"
+
+[[rule]]
+id = "PHP-001"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''(?:^|[^.\w])eval\s*\('''
+description = "eval of a PHP string"
+remediation = "Remove eval. Branch on a fixed set of actions instead."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-002"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''(?:^|[^.\w])(?:shell_exec|passthru|proc_open|popen|system)\s*\('''
+description = "a shell command is started from PHP"
+remediation = "Call a fixed program with escaped arguments, or do not shell out."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-003"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''unserialize\s*\('''
+description = "unserialize can construct objects"
+remediation = "Use json_decode. If unserialize stays, pass an allowed_classes list."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-004"
+type = "content"
+severity = "medium"
+path = '\.php$'
+regex = '''create_function\s*\('''
+description = "create_function is a removed eval wrapper"
+remediation = "Use a closure. create_function was removed in PHP 8."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-005"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''(?i)(?:mysqli_query|mysql_query)\s*\([^)]*\$_(?:GET|POST|REQUEST|COOKIE)'''
+description = "SQL is sent with a request value in the same call"
+remediation = "Use a prepared statement and bind the value."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-006"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''extract\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)'''
+description = "extract imports request fields as local variables"
+remediation = "Read the keys you expect. Do not extract the request."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-007"
+type = "content"
+severity = "high"
+path = '\.php$'
+regex = '''CURLOPT_SSL_VERIFYPEER\s*,\s*(?:false|0)'''
+description = "curl will not check the TLS certificate"
+remediation = "Leave CURLOPT_SSL_VERIFYPEER on."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-008"
+type = "content"
+severity = "medium"
+path = '\.php$'
+regex = '''file_get_contents\s*\(\s*\$_(?:GET|POST|REQUEST)'''
+description = "file_get_contents reads a request value"
+remediation = "Allow-list a scheme and host before reading. This is an SSRF and file-read lead."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-009"
+type = "content"
+severity = "medium"
+path = '\.php$'
+regex = '''(?i)md5\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)'''
+description = "md5 of a request value, often a password check"
+remediation = "Store passwords with password_hash and check them with password_verify."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "PHP-010"
+type = "content"
+severity = "medium"
+path = '\.php$'
+regex = '''(?:^|[^.\w])assert\s*\('''
+description = "assert can evaluate a string on older PHP"
+remediation = "Use a boolean condition. Do not assert a string from input."
+reference = "https://owasp.org/Top10/2025/"

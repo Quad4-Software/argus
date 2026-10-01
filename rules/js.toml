@@ -1,0 +1,97 @@
+# JavaScript and TypeScript sinks. Text matches, same shape as the Python set.
+# A hit is a lead. It is not proof the value is attacker controlled.
+
+[ruleset]
+name = "javascript"
+version = "2026.09.30"
+description = "Browser and Node sinks for injection, TLS, and message targets"
+
+[[rule]]
+id = "JS-001"
+type = "content"
+severity = "medium"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''(?:^|[^.\w])eval\s*\('''
+description = "eval of a dynamic string"
+remediation = "Parse the data you expect. Do not evaluate a string."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-002"
+type = "content"
+severity = "medium"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''new\s+Function\s*\('''
+description = "new Function compiles a string as code"
+remediation = "Call a real function. Do not build one from a string."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-003"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''execSync\s*\(|spawnSync\s*\(|\bshell\s*:\s*true'''
+description = "child process started through a shell or execSync"
+remediation = "Pass an argument array and leave shell off."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-004"
+type = "content"
+severity = "medium"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''\.innerHTML\s*=|document\.write\s*\('''
+description = "HTML is written from a string"
+remediation = "Use textContent or a framework escape. Do not assign HTML from input."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-005"
+type = "content"
+severity = "medium"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''dangerouslySetInnerHTML'''
+description = "React HTML injection sink"
+remediation = "Render text, or sanitize with a library you maintain before this prop."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-006"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''rejectUnauthorized\s*:\s*false|NODE_TLS_REJECT_UNAUTHORIZED\s*=\s*['"]0['"]'''
+description = "TLS certificate checks are turned off"
+remediation = "Leave verification on. Pin a trust store for a private CA."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-007"
+type = "content"
+severity = "medium"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''postMessage\s*\([^)]{0,160},\s*['"]\*['"]'''
+description = "postMessage is sent to any origin"
+remediation = "Pass the one origin that should receive the message."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-008"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''vm\.runIn(?:New|This)Context\s*\('''
+description = "vm runs a string in a Node context"
+remediation = "Do not run model or request text inside vm."
+reference = "https://owasp.org/Top10/2025/"
+
+[[rule]]
+id = "JS-009"
+type = "content"
+severity = "high"
+path = '\.(js|jsx|mjs|cjs|ts|tsx)$'
+regex = '''(?i)(?:query|execute)\s*\(\s*[`'"]\s*SELECT[^`'"]{0,80}\$\{'''
+description = "SQL string is built with interpolation"
+remediation = "Use a placeholder and bind the value."
+reference = "https://owasp.org/Top10/2025/"

@@ -506,6 +506,14 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
     ("malware", include_str!("../rules/malware.toml")),
     ("iac", include_str!("../rules/iac.toml")),
     ("python", include_str!("../rules/python.toml")),
+    ("javascript", include_str!("../rules/js.toml")),
+    ("go", include_str!("../rules/go.toml")),
+    ("java", include_str!("../rules/java.toml")),
+    ("php", include_str!("../rules/php.toml")),
+    ("ruby", include_str!("../rules/ruby.toml")),
+    ("csharp", include_str!("../rules/csharp.toml")),
+    ("agent", include_str!("../rules/agent.toml")),
+    ("owasp", include_str!("../rules/owasp.toml")),
 ];
 
 /// Load builtin rulesets (unless disabled) plus any extra TOML files/dirs.
