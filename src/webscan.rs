@@ -461,6 +461,9 @@ pub fn scan(
             ));
         }
     }
+    out.extend(crate::webpassive::assess(
+        &r.headers, &r.body, is_https, &target,
+    ));
 
     // ---- content secrets: html + inline js ----
     let applicable: Vec<&CompiledRule> = rules.iter().filter(|r| r.set == "secrets").collect();
@@ -634,6 +637,30 @@ pub fn scan(
             Severity::Critical,
             "AWS credentials file served publicly",
         ),
+        (
+            "/server-status",
+            "WEB-033",
+            Severity::Medium,
+            "Apache server-status is public",
+        ),
+        (
+            "/actuator/env",
+            "WEB-034",
+            Severity::High,
+            "Spring actuator env is public",
+        ),
+        (
+            "/debug/pprof/",
+            "WEB-038",
+            Severity::Medium,
+            "Go pprof is public",
+        ),
+        (
+            "/phpinfo.php",
+            "WEB-043",
+            Severity::Medium,
+            "phpinfo page is public",
+        ),
     ] {
         if let Ok(p) = get(&format!("{base}{path}")) {
             // SPA fallback serves index.html for every path - validate content
@@ -642,6 +669,12 @@ pub fn scan(
                 .contains("<html");
             let plausible = match path {
                 "/.git/HEAD" => p.body.contains("ref:"),
+                "/server-status" => p.body.to_lowercase().contains("apache server status"),
+                "/actuator/env" => {
+                    p.body.contains("propertySources") || p.body.contains("activeProfiles")
+                }
+                "/debug/pprof/" => p.body.contains("goroutine") || p.body.contains("heap profile"),
+                "/phpinfo.php" => p.body.contains("phpinfo()"),
                 _ => !looks_html && p.body.contains('='),
             };
             if p.status == 200 && plausible && p.body.len() < 64 * 1024 {

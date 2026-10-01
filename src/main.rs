@@ -55,6 +55,7 @@ mod sysaudit;
 mod verify;
 mod vex;
 mod watch;
+mod webpassive;
 mod webscan;
 mod workflow_audit;
 #[cfg(feature = "yara")]
