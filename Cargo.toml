@@ -1,13 +1,13 @@
 [package]
 name = "argus-scanner"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
-description = "Fast supply-chain attack indicator scanner for repositories and CI workflows (local, GitHub, GitLab, Gitea)"
-license = "MIT-0"
+description = "Local security scanner and defensive OSINT toolkit for repos, hosts, and public records"
+license-file = "LICENSE"
 repository = "https://github.com/Quad4-Software/argus"
 homepage = "https://quad4-software.github.io/argus/"
 readme = "README.md"
-keywords = ["supply-chain", "security", "secrets", "yara", "scanner"]
+keywords = ["supply-chain", "security", "secrets", "osint", "scanner"]
 categories = ["command-line-utilities", "development-tools", "security"]
 exclude = ["json"]
 
@@ -33,10 +33,14 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 hmac = "0.13"
 ed25519-dalek = { version = "3", features = ["pkcs8"] }
 getrandom = "0.3"
+maxminddb = { version = "0.32.0", features = ["mmap"] }
+flate2 = "1.1.10"
+postgres = { version = "0.19.14", optional = true }
 
 [features]
 default = ["yara"]
 yara = ["dep:yara-x"]
+postgres = ["dep:postgres"]
 
 [profile.release]
 lto = true

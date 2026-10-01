@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Hardening tests: adversarial inputs, fault injection, determinism (races),
 //! chaos fuzzing, suppression markers, baseline round-trips.
 
@@ -415,7 +418,23 @@ fn mcp_stdio_roundtrip() {
         resp.insert(v["id"].as_i64().unwrap_or(-1), v);
     }
     assert_eq!(resp[&1]["result"]["protocolVersion"], "2025-06-18");
-    assert_eq!(resp[&2]["result"]["tools"].as_array().unwrap().len(), 3);
+    let names: Vec<&str> = resp[&2]["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|t| t["name"].as_str())
+        .collect();
+    assert!(names.contains(&"scan"));
+    assert!(names.contains(&"intel"));
+    assert!(names.contains(&"store_search"));
+    assert!(names.contains(&"supply"));
+    assert!(names.contains(&"stego"));
+    assert!(names.contains(&"codec"));
+    assert!(names.contains(&"style"));
+    assert!(names.contains(&"account"));
+    assert!(names.contains(&"socials"));
+    assert!(names.contains(&"feed"));
+    assert!(names.contains(&"gitmeta"));
     assert!(
         resp[&3]["result"]["structuredContent"]["count"]
             .as_u64()

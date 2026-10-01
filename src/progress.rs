@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Terminal progress line on stderr: ASCII spinner + counters, no deps.
 
 use crate::color::Styles;
@@ -89,7 +92,10 @@ impl Progress {
         let hits = self.findings.load(Ordering::Relaxed);
         let mut chars = self.label.chars();
         let label = if self.label.chars().count() > MAX_LABEL {
-            format!("{}...", chars.by_ref().take(MAX_LABEL - 3).collect::<String>())
+            format!(
+                "{}...",
+                chars.by_ref().take(MAX_LABEL - 3).collect::<String>()
+            )
         } else {
             self.label.clone()
         };
@@ -98,7 +104,10 @@ impl Progress {
             line.push_str(&self.styles.dim(&format!(" {done}/{} files", self.total)));
         }
         if hits > 0 {
-            line.push_str(&format!(" {}", self.styles.yellow(&format!("{hits} findings"))));
+            line.push_str(&format!(
+                " {}",
+                self.styles.yellow(&format!("{hits} findings"))
+            ));
         }
         let mut err = std::io::stderr().lock();
         let _ = write!(err, "\x1b[2K\r{line}");

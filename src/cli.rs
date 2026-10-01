@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Command-line surface (clap derive).
 
 use crate::color::ColorMode;
-use crate::progress::ProgressMode;
 use crate::finding::Severity;
+use crate::progress::ProgressMode;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
@@ -456,6 +459,203 @@ pub enum Cmd {
         paths: Vec<PathBuf>,
     },
 
+    /// Domain OSINT. DNS, RDAP, certificate names, Wayback hosts, and the public page.
+    Domain {
+        /// Domain name or https URL.
+        domain: String,
+    },
+
+    /// IP OSINT. Geolocation, ASN, VPN classification, RDAP, Shodan InternetDB, and Hudson Rock.
+    Ip {
+        /// Download the DB-IP City Lite database into the local cache.
+        #[arg(long)]
+        download: bool,
+        /// Public address. Omit it when you only want --download.
+        ip: Option<String>,
+    },
+
+    /// Email OSINT. Mailbox syntax, mail DNS, keys, and optional breach lookup.
+    Email {
+        /// Address to check.
+        email: String,
+        /// Ask the mail server on port 25 whether this address is accepted.
+        #[arg(long)]
+        smtp: bool,
+    },
+
+    /// File hash lookup. CIRCL hashlookup, plus MalwareBazaar when ABUSECH_AUTH_KEY is set.
+    Hash {
+        /// MD5, SHA-1, or SHA-256 hex digest.
+        hash: String,
+    },
+
+    /// Public URL check. One fetch, redirect chain, and WAF or challenge markers.
+    Url {
+        /// http or https URL.
+        url: String,
+    },
+
+    /// TCP connect scan of one host. Modern ports are tried first.
+    Ports {
+        /// Host name, address, or http URL. A network range is refused.
+        host: String,
+        /// Comma list or ranges, such as 443,80,8000-8010.
+        #[arg(long)]
+        ports: Option<String>,
+        /// Check TCP ports 1 through 65535, still starting with the modern list.
+        #[arg(long)]
+        all: bool,
+    },
+
+    /// Threat intel lookup. OTX and ThreatFox need API keys. Feodo Tracker does not.
+    Intel {
+        /// IP, domain, URL, or file hash.
+        indicator: String,
+    },
+
+    /// Recursive supply-chain inventory from lockfiles in a tree.
+    Supply {
+        /// Project root.
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Search stored records.
+    Records {
+        /// Text to find in keys and saved reports.
+        query: String,
+    },
+
+    /// Local JSON API for records, intel, and tracker checks.
+    Api {
+        /// Listen address. Defaults to localhost.
+        #[arg(long, default_value = "127.0.0.1:9876")]
+        listen: String,
+    },
+
+    /// Structural steganography check across common file formats.
+    Stego {
+        /// File or directory.
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Base64 or base32 encode and decode (RFC 4648).
+    Codec {
+        /// encode or decode.
+        mode: String,
+        /// base64 or base32.
+        alphabet: String,
+        /// Input text. Omit or pass - to read stdin.
+        text: Option<String>,
+    },
+
+    /// Pairwise style distance for prose or source code.
+    Style {
+        /// First file or directory.
+        a: PathBuf,
+        /// Second file or directory.
+        b: PathBuf,
+        /// prose or code. Omit to decide from the text.
+        #[arg(long)]
+        kind: Option<String>,
+    },
+
+    /// Public GitHub or GitLab account metadata.
+    Account {
+        /// github or gitlab.
+        forge: String,
+        /// Account login.
+        login: String,
+        /// GitLab host when it is not gitlab.com.
+        #[arg(long)]
+        host: Option<String>,
+    },
+
+    /// Social and resume links from a page, including link-in-bio hubs.
+    Socials {
+        /// http or https page.
+        url: String,
+    },
+
+    /// Fetch and search an RSS, Atom, or JSON feed.
+    Feed {
+        /// Feed URL.
+        url: String,
+        /// Case-insensitive match against titles and summaries.
+        #[arg(long)]
+        query: Option<String>,
+    },
+
+    /// Git author and committer names, emails, remotes, and exposed .git metadata.
+    Gitmeta {
+        /// Local path or public http(s) URL.
+        #[arg(default_value = ".")]
+        target: String,
+    },
+
+    /// Stream a search over text, CSV, JSON, JSONL, or SQLite.
+    Grep {
+        /// Regex. Use this when --pick or --eq is also set.
+        #[arg(long)]
+        pattern: Option<String>,
+        /// Files or directories. Use - for stdin.
+        /// Without --pick, --eq, or --pattern, the first value is the regex.
+        paths: Vec<PathBuf>,
+        /// emails, urls, addrs, hashes, or wallets.
+        #[arg(long)]
+        pick: Option<String>,
+        /// Column or JSON field. One dot is allowed in JSON.
+        #[arg(long)]
+        column: Option<String>,
+        /// Exact field or line value.
+        #[arg(long)]
+        eq: Option<String>,
+        /// auto, text, csv, tsv, json, jsonl, or sqlite.
+        #[arg(long, default_value = "auto")]
+        kind: String,
+        /// SQLite table. Omit to walk user tables.
+        #[arg(long)]
+        table: Option<String>,
+        /// Stop after this many matches. 0 means no cap.
+        #[arg(long, default_value_t = 100)]
+        max: usize,
+        /// Case-insensitive pattern.
+        #[arg(short = 'i', long)]
+        ignore_case: bool,
+    },
+
+    /// Emails, URLs, addresses, hashes, and wallet-shaped strings.
+    Extract {
+        /// File, URL, or a short blob of text. - reads stdin.
+        target: String,
+    },
+
+    /// PDF, JPEG, PNG, and docx metadata.
+    Meta { path: PathBuf },
+
+    /// Provenance markers in images, audio, and video. A hit is a declaration, not proof.
+    Media {
+        /// File or directory.
+        #[arg(default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Search links for a domain, email, or name. Nothing is fetched.
+    Dork { query: String },
+
+    /// Favicon hash for Shodan http.favicon.hash and FOFA icon_hash.
+    Favicon {
+        /// Site or direct icon URL.
+        url: String,
+    },
+
+    /// Public username check against a small built-in site table.
+    User { name: String },
+
+    /// List built-in modules.
+    Modules,
+
     /// Web audit: fetch a URL and check security headers, cookies, TLS,
     /// exposed metadata (.git/.env/robots), and secrets inside
     /// client-side JS bundles and source maps.
@@ -674,4 +874,109 @@ pub struct RemoteArgs {
 #[derive(Args)]
 pub struct CompletionsArgs {
     pub shell: clap_complete::Shell,
+}
+
+/// File-walking commands. Progress stays off for machine-facing ones.
+pub fn scans_files(cmd: &Cmd) -> bool {
+    !matches!(
+        cmd,
+        Cmd::Rules
+            | Cmd::RulesKeygen { .. }
+            | Cmd::RulesSign { .. }
+            | Cmd::RulesUpdate { .. }
+            | Cmd::Completions(_)
+            | Cmd::Mcp
+            | Cmd::Init { .. }
+            | Cmd::Authors { .. }
+            | Cmd::Sbom { .. }
+            | Cmd::Ai { .. }
+            | Cmd::Domain { .. }
+            | Cmd::Email { .. }
+            | Cmd::Ip { .. }
+            | Cmd::Hash { .. }
+            | Cmd::Url { .. }
+            | Cmd::Ports { .. }
+            | Cmd::Intel { .. }
+            | Cmd::Supply { .. }
+            | Cmd::Records { .. }
+            | Cmd::Api { .. }
+            | Cmd::Stego { .. }
+            | Cmd::Codec { .. }
+            | Cmd::Style { .. }
+            | Cmd::Account { .. }
+            | Cmd::Socials { .. }
+            | Cmd::Feed { .. }
+            | Cmd::Gitmeta { .. }
+            | Cmd::Grep { .. }
+            | Cmd::Extract { .. }
+            | Cmd::Meta { .. }
+            | Cmd::Media { .. }
+            | Cmd::Dork { .. }
+            | Cmd::Favicon { .. }
+            | Cmd::User { .. }
+            | Cmd::Modules
+    )
+}
+
+#[macro_export]
+macro_rules! osint_arms {
+    () => {
+        $crate::cli::Cmd::Domain { .. }
+            | $crate::cli::Cmd::Email { .. }
+            | $crate::cli::Cmd::Hash { .. }
+            | $crate::cli::Cmd::Url { .. }
+            | $crate::cli::Cmd::Ports { .. }
+            | $crate::cli::Cmd::Ip { .. }
+            | $crate::cli::Cmd::Intel { .. }
+            | $crate::cli::Cmd::Supply { .. }
+            | $crate::cli::Cmd::Records { .. }
+            | $crate::cli::Cmd::Api { .. }
+            | $crate::cli::Cmd::Stego { .. }
+            | $crate::cli::Cmd::Codec { .. }
+            | $crate::cli::Cmd::Style { .. }
+            | $crate::cli::Cmd::Account { .. }
+            | $crate::cli::Cmd::Socials { .. }
+            | $crate::cli::Cmd::Feed { .. }
+            | $crate::cli::Cmd::Gitmeta { .. }
+            | $crate::cli::Cmd::Grep { .. }
+            | $crate::cli::Cmd::Extract { .. }
+            | $crate::cli::Cmd::Meta { .. }
+            | $crate::cli::Cmd::Media { .. }
+            | $crate::cli::Cmd::Dork { .. }
+            | $crate::cli::Cmd::Favicon { .. }
+            | $crate::cli::Cmd::User { .. }
+            | $crate::cli::Cmd::Modules
+    };
+}
+
+pub fn is_http_target(s: &str) -> bool {
+    let t = s.trim();
+    t.len() >= 8
+        && (t[..8].eq_ignore_ascii_case("https://") || t[..7].eq_ignore_ascii_case("http://"))
+}
+
+/// Commands that cannot run without the network.
+pub fn needs_network(cmd: &Cmd) -> bool {
+    matches!(
+        cmd,
+        Cmd::Github(_)
+            | Cmd::Gitlab(_)
+            | Cmd::Gitea(_)
+            | Cmd::Roam(_)
+            | Cmd::Watch(_)
+            | Cmd::Daemon(_)
+            | Cmd::RulesUpdate { .. }
+            | Cmd::Domain { .. }
+            | Cmd::Email { .. }
+            | Cmd::Hash { .. }
+            | Cmd::Url { .. }
+            | Cmd::Ports { .. }
+            | Cmd::Intel { .. }
+            | Cmd::Account { .. }
+            | Cmd::Socials { .. }
+            | Cmd::Feed { .. }
+            | Cmd::Favicon { .. }
+            | Cmd::User { .. }
+    ) || matches!(cmd, Cmd::Gitmeta { target } if is_http_target(target))
+        || matches!(cmd, Cmd::Extract { target } if is_http_target(target))
 }

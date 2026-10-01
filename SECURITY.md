@@ -3,7 +3,7 @@
 ## Supported versions
 
 Only the latest tagged release receives security fixes. The project is
-pre-1.0; breaking changes can ship in minor versions.
+pre-1.0, breaking changes can ship in minor versions.
 
 | Version | Supported |
 | ------- | --------- |

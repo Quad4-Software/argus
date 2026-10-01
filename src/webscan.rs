@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Web target scanning: fetch a URL and audit what a browser sees.
 //! Security headers, cookies, TLS expiry, exposed metadata (.git, .env,
 //! robots/security.txt), and client-side secrets inside inline JS,
@@ -320,14 +323,79 @@ pub fn scan(
             ));
         }
     }
-    if is_https && header(&r.headers, "strict-transport-security").is_none() {
+    if is_https {
+        match header(&r.headers, "strict-transport-security") {
+            None => out.push(mk(
+                "WEB-015",
+                Severity::Medium,
+                &target,
+                "/",
+                "no HSTS on https response (ssl-strip downgrade possible on first visit)",
+                "Add Strict-Transport-Security once https is stable everywhere.",
+            )),
+            Some(v) if !hsts_active(v) => out.push(mk(
+                "WEB-015",
+                Severity::Medium,
+                &target,
+                "/",
+                "HSTS is present with max-age 0, so it does not stick",
+                "Set a max-age of months, not zero.",
+            )),
+            Some(_) => {}
+        }
+    }
+    if let Some(csp) = header(&r.headers, "content-security-policy") {
+        let low = csp.to_ascii_lowercase();
+        if low.contains("'unsafe-inline'") || low.contains("'unsafe-eval'") {
+            out.push(mk(
+                "WEB-019",
+                Severity::Medium,
+                &target,
+                "/",
+                "Content-Security-Policy allows unsafe-inline or unsafe-eval",
+                "Drop those sources once inline scripts and eval are gone.",
+            ));
+        }
+    }
+    let mut cross = Vec::new();
+    if header(&r.headers, "cross-origin-opener-policy").is_none() {
+        cross.push("Cross-Origin-Opener-Policy");
+    }
+    if header(&r.headers, "cross-origin-resource-policy").is_none() {
+        cross.push("Cross-Origin-Resource-Policy");
+    }
+    if !cross.is_empty() {
         out.push(mk(
-            "WEB-015",
-            Severity::Medium,
+            "WEB-021",
+            Severity::Info,
             &target,
             "/",
-            "no HSTS on https response (ssl-strip downgrade possible on first visit)",
-            "Add Strict-Transport-Security once https is stable everywhere.",
+            format!("missing {}", cross.join(" and ")),
+            "Set COOP and CORP at the edge when the page does not need to be embedded.",
+        ));
+    }
+    let seo = crate::seometa::parse(&r.body);
+    for dash in seo.dashes() {
+        out.push(mk(
+            "WEB-060",
+            Severity::Info,
+            &target,
+            "/",
+            format!(
+                "SEO field {} contains {} em dash(es) in {} words. This is a lead, not an identification.",
+                dash.field, dash.dashes, dash.words
+            ),
+            "Read the sentence. Human editors use this punctuation too.",
+        ));
+    }
+    if !seo.generator.is_empty() {
+        out.push(mk(
+            "WEB-061",
+            Severity::Info,
+            &target,
+            "/",
+            format!("generator meta exposes {}", seo.generator),
+            "Drop the generator tag if the CMS version is not meant to be public.",
         ));
     }
     for h in ["server", "x-powered-by", "x-aspnet-version", "x-generator"] {
@@ -371,15 +439,15 @@ pub fn scan(
         if name.is_empty() || !seen_cookies.insert(name.clone()) {
             continue;
         }
-        let low = v.to_lowercase();
+        let flags = cookie_flags(v);
         let mut missing = Vec::new();
-        if is_https && !low.contains("secure") {
+        if is_https && !flags.secure {
             missing.push("Secure");
         }
-        if !low.contains("httponly") {
+        if !flags.http_only {
             missing.push("HttpOnly");
         }
-        if !low.contains("samesite") {
+        if !flags.same_site {
             missing.push("SameSite");
         }
         if !missing.is_empty() {
@@ -657,24 +725,44 @@ pub fn scan(
 
 /// Days until the host's leaf certificate expires (openssl subprocess;
 /// returns None if openssl is unavailable or the handshake fails).
+fn cookie_flags(header: &str) -> CookieFlags {
+    let mut parts = header.split(';');
+    let _name = parts.next();
+    let mut flags = CookieFlags::default();
+    for part in parts {
+        let key = part.trim().split('=').next().unwrap_or("").trim();
+        if key.eq_ignore_ascii_case("secure") {
+            flags.secure = true;
+        } else if key.eq_ignore_ascii_case("httponly") {
+            flags.http_only = true;
+        } else if key.eq_ignore_ascii_case("samesite") {
+            flags.same_site = true;
+        }
+    }
+    flags
+}
+
+#[derive(Default)]
+struct CookieFlags {
+    secure: bool,
+    http_only: bool,
+    same_site: bool,
+}
+
+fn hsts_active(value: &str) -> bool {
+    let low = value.to_ascii_lowercase();
+    let Some(rest) = low.split("max-age=").nth(1) else {
+        return false;
+    };
+    let digits: String = rest
+        .chars()
+        .skip_while(|c| c.is_whitespace())
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    digits.parse::<u64>().unwrap_or(0) > 0
+}
+
 fn cert_days_left(host: &str) -> Option<i64> {
-    let out = std::process::Command::new("openssl")
-        .args([
-            "s_client",
-            "-connect",
-            &format!("{host}:443"),
-            "-servername",
-            host,
-        ])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .output()
-        .ok()?;
-    let text = String::from_utf8_lossy(&out.stdout);
-    // openssl x509 -enddate gives a cleaner date but needs the cert piped;
-    // s_client prints "verify return" lines only, so do a second pass.
-    let _ = text;
     let out2 = std::process::Command::new("openssl")
         .args([
             "s_client",
@@ -783,6 +871,19 @@ mod tests {
         let mut out3 = Vec::new();
         web_secrets("/a.js", &format!("{js},{js}"), "t", &mut out3);
         assert_eq!(out3.len(), 1);
+    }
+
+    #[test]
+    fn cookie_flags_ignore_the_value() {
+        let marked = cookie_flags("session=not-secure; HttpOnly; SameSite=Lax");
+        assert!(!marked.secure);
+        assert!(marked.http_only);
+        assert!(marked.same_site);
+        let real = cookie_flags("id=1; Secure");
+        assert!(real.secure);
+        assert!(!hsts_active("max-age=0"));
+        assert!(hsts_active("max-age=15552000; includeSubDomains"));
+        assert!(!hsts_active("includeSubDomains"));
     }
 
     #[test]

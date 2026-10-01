@@ -1,5 +1,10 @@
-//! MCP server: Model Context Protocol 2025-06-18 over stdio (NDJSON JSON-RPC).
-//! Exposes argus as agent tools. Configure a client with:
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
+//! MCP server over stdio (NDJSON JSON-RPC).
+//! Legacy clients use the initialize handshake (2025-06-18 and 2025-11-25).
+//! 2026-07-28 clients send the protocol version on each request and may call server/discover.
+//! Configure a client with:
 //!   {"mcpServers": {"argus": {"command": "argus", "args": ["mcp"]}}}
 
 use crate::finding::Severity;
@@ -9,7 +14,8 @@ use serde_json::{Value, json};
 use std::io::{BufRead, Write};
 use std::process::ExitCode;
 
-const PROTOCOL: &str = "2025-06-18";
+const LEGACY: &str = "2025-06-18";
+const SUPPORTED: &[&str] = &["2025-06-18", "2025-11-25", "2026-07-28"];
 
 pub fn serve(rules: Vec<CompiledRule>, opts: ScanOptions) -> Result<ExitCode, String> {
     let rules = std::sync::Arc::new(rules);
@@ -43,9 +49,18 @@ pub fn serve(rules: Vec<CompiledRule>, opts: ScanOptions) -> Result<ExitCode, St
         let is_notification = msg.get("id").is_none();
 
         let result = match method {
-            "initialize" => Some(Ok(json!({
-                "protocolVersion": PROTOCOL,
-                "capabilities": {"tools": {"listChanged": false}},
+            "initialize" => Some(negotiate(msg["params"]["protocolVersion"].as_str()).map(
+                |version| {
+                    json!({
+                        "protocolVersion": version,
+                        "capabilities": {"tools": {"listChanged": false}},
+                        "serverInfo": {"name": "argus", "version": env!("CARGO_PKG_VERSION")}
+                    })
+                },
+            )),
+            "server/discover" => Some(Ok(json!({
+                "protocolVersions": SUPPORTED,
+                "capabilities": {"tools": {}},
                 "serverInfo": {"name": "argus", "version": env!("CARGO_PKG_VERSION")}
             }))),
             "ping" => Some(Ok(json!({}))),
@@ -74,6 +89,18 @@ pub fn serve(rules: Vec<CompiledRule>, opts: ScanOptions) -> Result<ExitCode, St
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn negotiate(requested: Option<&str>) -> Result<Value, Value> {
+    match requested {
+        None => Ok(json!(LEGACY)),
+        Some(v) if SUPPORTED.contains(&v) => Ok(json!(v)),
+        Some(_) => Err(json!({
+            "code": -32022,
+            "message": "unsupported protocol version",
+            "data": {"supported": SUPPORTED}
+        })),
+    }
 }
 
 fn err(code: i64, msg: &str) -> Value {
@@ -126,7 +153,47 @@ fn tools_list() -> Value {
                 "ruleset": {"type": "string", "description": "filter to one ruleset"}
             }},
             "outputSchema": {"type": "object"}
-        }
+        },
+        {
+            "name": "intel",
+            "title": "Threat intel lookup",
+            "description": "Look up an IP, domain, URL, or file hash in OTX, ThreatFox, Feodo Tracker, and CIRCL.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"indicator": {"type": "string"}},
+                "required": ["indicator"]
+            },
+            "outputSchema": {"type": "object"}
+        },
+        {
+            "name": "store_search",
+            "title": "Search stored records",
+            "description": "Search saved scan and intel records.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"]
+            },
+            "outputSchema": {"type": "object"}
+        },
+        {
+            "name": "supply",
+            "title": "Supply chain inventory",
+            "description": "Count pinned packages from lockfiles under a path, including nested dependencies.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"]
+            },
+            "outputSchema": {"type": "object"}
+        },
+        {"name": "stego", "title": "Steganography signals", "description": "Look for appended payloads and zero-width text channels.", "inputSchema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}, "outputSchema": {"type": "object"}},
+        {"name": "codec", "title": "Base64 and base32", "description": "Encode or decode base64 or base32.", "inputSchema": {"type": "object", "properties": {"mode": {"type": "string"}, "alphabet": {"type": "string"}, "text": {"type": "string"}}, "required": ["mode", "alphabet", "text"]}, "outputSchema": {"type": "object"}},
+        {"name": "style", "title": "Style distance", "description": "Pairwise prose or code style distance. A lead, not an identification.", "inputSchema": {"type": "object", "properties": {"a": {"type": "string"}, "b": {"type": "string"}, "kind": {"type": "string"}}, "required": ["a", "b"]}, "outputSchema": {"type": "object"}},
+        {"name": "account", "title": "Forge account", "description": "Public GitHub or GitLab account metadata.", "inputSchema": {"type": "object", "properties": {"forge": {"type": "string"}, "login": {"type": "string"}, "host": {"type": "string"}}, "required": ["forge", "login"]}, "outputSchema": {"type": "object"}},
+        {"name": "socials", "title": "Social and resume links", "description": "Extract social and resume links from a public page, including link-in-bio hubs.", "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}, "outputSchema": {"type": "object"}},
+        {"name": "feed", "title": "Feed search", "description": "Fetch an RSS, Atom, or JSON feed and optionally search it.", "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}, "query": {"type": "string"}}, "required": ["url"]}, "outputSchema": {"type": "object"}},
+        {"name": "gitmeta", "title": "Git identity", "description": "Local git names and emails, or a public .git/HEAD check that does not download objects.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}}
     ]})
 }
 
@@ -185,6 +252,64 @@ fn call_tool(
             let v = serde_json::to_value(&report).unwrap_or(json!({}));
             Ok(tool_result(&serde_json::to_string_pretty(&v).unwrap(), v))
         }
+        "intel" => {
+            let indicator = args["indicator"].as_str().unwrap_or("");
+            match crate::osint::scan_intel(indicator) {
+                Ok(report) => {
+                    let v = serde_json::to_value(&report).unwrap_or(json!({}));
+                    Ok(tool_result(&serde_json::to_string_pretty(&v).unwrap(), v))
+                }
+                Err(e) => Err(err(-32602, &e)),
+            }
+        }
+        "store_search" => {
+            let query = args["query"].as_str().unwrap_or("");
+            match crate::db::search(query, 50) {
+                Ok(rows) => {
+                    let v = serde_json::json!({"records": rows});
+                    Ok(tool_result(&serde_json::to_string_pretty(&v).unwrap(), v))
+                }
+                Err(e) => Err(err(-32603, &e)),
+            }
+        }
+        "supply" => {
+            let path = args["path"].as_str().unwrap_or(".");
+            match crate::supply::scan(std::path::Path::new(path)) {
+                Ok(report) => {
+                    let v = serde_json::to_value(&report).unwrap_or(json!({}));
+                    Ok(tool_result(&serde_json::to_string_pretty(&v).unwrap(), v))
+                }
+                Err(e) => Err(err(-32602, &e)),
+            }
+        }
+        "stego" => osint_tool(crate::stego::scan(std::path::Path::new(
+            args["path"].as_str().unwrap_or("."),
+        ))),
+        "codec" => osint_tool(crate::codec::scan(
+            args["mode"].as_str().unwrap_or(""),
+            args["alphabet"].as_str().unwrap_or(""),
+            args["text"].as_str().unwrap_or(""),
+        )),
+        "style" => osint_tool(crate::style::scan(
+            std::path::Path::new(args["a"].as_str().unwrap_or("")),
+            std::path::Path::new(args["b"].as_str().unwrap_or("")),
+            args["kind"].as_str(),
+        )),
+        "account" => osint_tool(crate::osint::scan_account(
+            args["forge"].as_str().unwrap_or(""),
+            args["login"].as_str().unwrap_or(""),
+            args["host"].as_str(),
+        )),
+        "socials" => osint_tool(crate::osint::scan_socials(
+            args["url"].as_str().unwrap_or(""),
+        )),
+        "feed" => osint_tool(crate::osint::scan_feed(
+            args["url"].as_str().unwrap_or(""),
+            args["query"].as_str(),
+        )),
+        "gitmeta" => osint_tool(crate::osint::scan_gitmeta(
+            args["target"].as_str().unwrap_or("."),
+        )),
         "list_rules" => {
             let filter = args["ruleset"].as_str();
             let list: Vec<Value> = rules.iter()
@@ -195,6 +320,19 @@ fn call_tool(
             Ok(tool_result(&serde_json::to_string_pretty(&v).unwrap(), v))
         }
         other => Err(err(-32602, &format!("unknown tool: {other}"))),
+    }
+}
+
+fn osint_tool(result: Result<crate::osint::Report, String>) -> Result<Value, Value> {
+    match result {
+        Ok(report) => {
+            let v = serde_json::to_value(&report).unwrap_or(json!({}));
+            Ok(tool_result(
+                &serde_json::to_string_pretty(&v).unwrap_or_else(|_| "{}".into()),
+                v,
+            ))
+        }
+        Err(e) => Err(err(-32602, &e)),
     }
 }
 

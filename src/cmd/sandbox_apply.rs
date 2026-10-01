@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 use crate::cli::{Cli, Cmd};
 use crate::sandbox;
 use crate::scan::ScanOptions;
@@ -10,7 +13,18 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         || cfg_needs_net(&cli.cmd)
         || matches!(
             cli.cmd,
-            Cmd::Daemon(_) | Cmd::Fix { .. } | Cmd::Web { .. } | Cmd::Verify { .. }
+            Cmd::Daemon(_)
+                | Cmd::Fix { .. }
+                | Cmd::Web { .. }
+                | Cmd::Verify { .. }
+                | Cmd::Domain { .. }
+                | Cmd::Email { .. }
+                | Cmd::Ip { .. }
+                | Cmd::Hash { .. }
+                | Cmd::Url { .. }
+                | Cmd::Ports { .. }
+                | Cmd::Intel { .. }
+                | Cmd::Api { .. }
         );
     let mut sb = sandbox::Sandbox {
         reads: Vec::new(),
@@ -18,15 +32,21 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         net_ports: if net_needed { vec![443, 22] } else { vec![] },
         // remote commands reach arbitrary forge ports; local scans get none
         net_open: net_needed,
-        net_bind_ports: if let Cmd::Daemon(a) = &cli.cmd {
-            a.listen
+        net_bind_ports: match &cli.cmd {
+            Cmd::Daemon(a) => a
+                .listen
                 .rsplit(':')
                 .next()
                 .and_then(|p| p.parse().ok())
                 .into_iter()
-                .collect()
-        } else {
-            vec![]
+                .collect(),
+            Cmd::Api { listen } => listen
+                .rsplit(':')
+                .next()
+                .and_then(|p| p.parse().ok())
+                .into_iter()
+                .collect(),
+            _ => vec![],
         },
     };
     // resolver + TLS roots needed whenever we do any I/O that might resolve;
@@ -213,7 +233,52 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 sb.reads.push(wd);
             }
         }
+        Cmd::Ip { .. } => {
+            let dir = crate::cache::cache_dir();
+            sb.reads.push(dir.clone());
+            sb.writes.push(dir);
+        }
+        Cmd::Supply { path } | Cmd::Stego { path } | Cmd::Media { path } => {
+            sb.reads.push(path.clone());
+        }
+        Cmd::Style { a, b, .. } => {
+            sb.reads.push(a.clone());
+            sb.reads.push(b.clone());
+        }
+        Cmd::Gitmeta { target } if !crate::cli::is_http_target(target) => {
+            sb.reads.push(PathBuf::from(target));
+        }
+        Cmd::Grep {
+            pattern,
+            paths,
+            pick,
+            eq,
+            ..
+        } => {
+            let (_, paths) = crate::search::positionals(
+                pattern.clone(),
+                paths.clone(),
+                pick.is_some() || eq.is_some(),
+            );
+            for p in paths {
+                if p.as_os_str() != "-" {
+                    sb.reads.push(p);
+                }
+            }
+        }
+        Cmd::Meta { path } => sb.reads.push(path.clone()),
+        Cmd::Extract { target } if !crate::cli::is_http_target(target) => {
+            sb.reads.push(PathBuf::from(target));
+        }
         _ => {}
+    }
+    if cli.store || matches!(cli.cmd, Cmd::Records { .. } | Cmd::Api { .. }) {
+        let path = crate::store::db_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+            sb.reads.push(parent.to_path_buf());
+            sb.writes.push(parent.to_path_buf());
+        }
     }
     if let Some(out) = &cli.output
         && let Some(parent) = out.parent()
@@ -260,7 +325,21 @@ pub(crate) fn cfg_needs_net(cmd: &Cmd) -> bool {
             | Cmd::Roam(_)
             | Cmd::Watch(_)
             | Cmd::Daemon(_)
-    )
+            | Cmd::Domain { .. }
+            | Cmd::Email { .. }
+            | Cmd::Ip { .. }
+            | Cmd::Hash { .. }
+            | Cmd::Url { .. }
+            | Cmd::Ports { .. }
+            | Cmd::Intel { .. }
+            | Cmd::Api { .. }
+            | Cmd::Account { .. }
+            | Cmd::Socials { .. }
+            | Cmd::Feed { .. }
+            | Cmd::Favicon { .. }
+            | Cmd::User { .. }
+    ) || matches!(cmd, Cmd::Gitmeta { target } if crate::cli::is_http_target(target))
+        || matches!(cmd, Cmd::Extract { target } if crate::cli::is_http_target(target))
 }
 
 // ---------------- roam ----------------

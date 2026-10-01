@@ -1,19 +1,27 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 mod ai;
 mod audit;
 mod baseline;
 mod cache;
+mod catalog;
 mod cli;
 mod clone;
 mod cmd;
+mod codec;
 mod color;
 mod config;
 mod container_audit;
 mod daemon;
+mod db;
 mod depcheck;
 mod entropy;
+mod extract;
 mod finding;
 mod fix;
 mod history;
+mod hooks;
 mod http;
 mod http_server;
 mod ignore;
@@ -21,6 +29,8 @@ mod image;
 mod ioc;
 mod license;
 mod mcp;
+mod media;
+mod osint;
 mod osv;
 mod progress;
 mod provider;
@@ -33,9 +43,14 @@ mod rulesign;
 mod sandbox;
 mod sbom;
 mod scan;
+mod search;
+mod seometa;
 mod settings;
 mod similar;
+mod stego;
 mod store;
+mod style;
+mod supply;
 mod sysaudit;
 mod verify;
 mod vex;
@@ -84,19 +99,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     });
     // live progress only for commands that walk/scan files; -v already
     // narrates, and machine-facing subcommands keep stderr clean
-    let scans_fs = !matches!(
-        cli.cmd,
-        Cmd::Rules
-            | Cmd::RulesKeygen { .. }
-            | Cmd::RulesSign { .. }
-            | Cmd::RulesUpdate { .. }
-            | Cmd::Completions(_)
-            | Cmd::Mcp
-            | Cmd::Init { .. }
-            | Cmd::Authors { .. }
-            | Cmd::Sbom { .. }
-            | Cmd::Ai { .. }
-    );
+    let scans_fs = crate::cli::scans_files(&cli.cmd);
     let progress_on = cli
         .progress
         .or(cfg.defaults.progress)
@@ -190,17 +193,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         || cfg.defaults.offline.unwrap_or(false)
         || std::env::var_os("ARGUS_OFFLINE").is_some_and(|v| v != "0");
     if offline {
-        match &cli.cmd {
-            Cmd::Github(_)
-            | Cmd::Gitlab(_)
-            | Cmd::Gitea(_)
-            | Cmd::Roam(_)
-            | Cmd::Watch(_)
-            | Cmd::Daemon(_)
-            | Cmd::RulesUpdate { .. } => {
-                return Err("offline mode: this command needs the network".into());
-            }
-            _ => {}
+        if crate::cli::needs_network(&cli.cmd) {
+            return Err("offline mode: this command needs the network".into());
         }
         if cli.osv || cli.check_runs {
             eprintln!("offline: skipping --osv/--check-runs");
@@ -237,7 +231,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
     // podman/docker manage their own user+mount namespaces, which
     // per-path Landlock grants cannot express (same tradeoff as
     // trivy/grype). Everything else stays sandboxed.
-    if cli.incremental {
+    if cli.incremental || matches!(cli.cmd, Cmd::Ip { .. }) {
         let _ = std::fs::create_dir_all(crate::cache::cache_dir());
     }
     let local_runtime = matches!(cli.cmd, Cmd::Image { remote: false, .. });
@@ -415,6 +409,7 @@ exec argus scan --staged --fail-on medium
             eprintln!("verify: checked {} candidate tokens", n.min(25));
             report.findings.extend(fs);
         }
+        osint_arms!() => return cmd::osint_cmd::run(cli, offline, format),
         Cmd::Web { url, depth } => match webscan::scan(url, *depth, &rules, &opts, cli.verbose > 0)
         {
             Ok(ws) => {
@@ -683,7 +678,6 @@ pub(crate) fn emit(text: &str) {
     let _ = out.flush();
 }
 
-/// Pub wrapper for the MCP tool.
 pub fn scan_system_pub(
     report: &mut Report,
     rules: &[rules::CompiledRule],
@@ -693,7 +687,6 @@ pub fn scan_system_pub(
     scan_system(report, rules, opts, &[], verbose);
 }
 
-/// Pub wrapper for the MCP tool.
 pub fn changed_files_pub(repo: &Path, base: &str) -> Vec<String> {
     changed_files(repo, base)
 }

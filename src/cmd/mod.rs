@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Command implementations extracted from main.rs. Each submodule owns
 //! one command family; main.rs keeps only cli dispatch and glue.
 
@@ -7,6 +10,7 @@
 pub mod daemon_cmd;
 pub mod deps;
 pub mod misc;
+pub mod osint_cmd;
 pub mod remote;
 pub mod sandbox_apply;
 pub mod watcher;
