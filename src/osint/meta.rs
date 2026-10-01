@@ -536,9 +536,10 @@ fn id3_text(frame: &[u8]) -> Option<String> {
     let text = match enc {
         0 | 3 => String::from_utf8_lossy(raw).into_owned(),
         1 if raw.len() >= 2 && raw[0] == 0xff && raw[1] == 0xfe => {
-            let units: Vec<u16> = raw[2..]
-                .chunks_exact(2)
-                .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            let (units, _) = raw[2..].as_chunks::<2>();
+            let units: Vec<u16> = units
+                .iter()
+                .map(|c| u16::from_le_bytes(*c))
                 .take_while(|u| *u != 0)
                 .collect();
             String::from_utf16_lossy(&units)
