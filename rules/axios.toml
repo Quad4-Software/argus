@@ -1,0 +1,85 @@
+# axios maintainer-account takeover, 31 Mar 2026.
+# axios 1.14.1 and 0.30.4 added a dependency on plain-crypto-js, which is not
+# imported by axios. plain-crypto-js@4.2.1 postinstall contacts sfrclak.com:8000
+# and drops a cross-platform RAT. GHSA confirms the axios versions. Datadog
+# confirms the dependency, the C2, and the IP. JFrog also names
+# @shadanai/openclaw and @qqbrowser/openclaw-qbot in the same payload family.
+# Sources: https://github.com/advisories/GHSA-fw8c-xr5c-95f9
+#          https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/
+#          https://research.jfrog.com/post/axios-compromise/
+
+[ruleset]
+name = "axios-rat"
+version = "2026.09.30"
+description = "Mar 2026 axios compromise: plain-crypto-js postinstall RAT, C2 sfrclak.com"
+source = "https://github.com/advisories/GHSA-fw8c-xr5c-95f9"
+
+[[rule]]
+id = "AX-001"
+type = "package"
+severity = "critical"
+names = ["axios"]
+versions = ["1.14.1", "0.30.4"]
+window = { start = "2026-03-30", end = "2026-03-31" }
+description = "axios 1.14.1 and 0.30.4 shipped a hidden plain-crypto-js dependency (GHSA-fw8c-xr5c-95f9)"
+remediation = "Treat any host that installed these versions as compromised. Rebuild it and rotate secrets from a different machine. Pin axios to 1.14.0 or 0.30.3."
+reference = "https://github.com/advisories/GHSA-fw8c-xr5c-95f9"
+
+[[rule]]
+id = "AX-002"
+type = "package"
+severity = "critical"
+names = ["plain-crypto-js"]
+description = "plain-crypto-js, the typosquat package created to deliver the axios RAT"
+remediation = "Remove it. It is not a real crypto library. Hosts that ran its postinstall need a rebuild and a full credential rotation."
+reference = "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/"
+
+[[rule]]
+id = "AX-003"
+type = "package"
+severity = "critical"
+names = ["@shadanai/openclaw"]
+versions = ["2026.3.31-2", "2026.3.31-1", "2026.3.28-3", "2026.3.28-2"]
+window = { start = "2026-03-30", end = "2026-03-31" }
+description = "@shadanai/openclaw versions JFrog tied to the axios RAT payload"
+remediation = "Remove the package and treat the install host as compromised."
+reference = "https://research.jfrog.com/post/axios-compromise/"
+
+[[rule]]
+id = "AX-004"
+type = "package"
+severity = "critical"
+names = ["@qqbrowser/openclaw-qbot"]
+versions = ["0.0.130"]
+window = { start = "2026-03-30", end = "2026-03-31" }
+description = "@qqbrowser/openclaw-qbot 0.0.130, same payload family as the axios RAT"
+remediation = "Remove the package and treat the install host as compromised."
+reference = "https://research.jfrog.com/post/axios-compromise/"
+
+[[rule]]
+id = "AX-005"
+type = "content"
+severity = "critical"
+contains = ["sfrclak.com", "142.11.206.73"]
+window = { start = "2026-03-30", end = "2026-03-31" }
+description = "axios RAT command and control (sfrclak.com, 142.11.206.73)"
+remediation = "Block the domain and the IP. Hosts that connected there ran the second stage."
+reference = "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/"
+
+[[rule]]
+id = "AX-006"
+type = "content"
+severity = "high"
+contains = ["com.apple.act.mond"]
+description = "macOS drop path used by the axios RAT (/Library/Caches/com.apple.act.mond)"
+remediation = "On macOS, inspect that path. It masquerades as an Apple cache."
+reference = "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/"
+
+[[rule]]
+id = "AX-007"
+type = "content"
+severity = "high"
+contains = ["nrwise@proton.me", "ifstap@proton.me"]
+description = "emails tied to the axios takeover (plain-crypto-js publisher, replacement account email)"
+remediation = "Commits or package metadata using these addresses are attacker-controlled."
+reference = "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/"

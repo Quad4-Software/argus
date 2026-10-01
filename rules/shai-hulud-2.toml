@@ -1,0 +1,63 @@
+# Shai-Hulud 2.0, 24 Nov 2025 (patient-zero activity reported from 21 Nov).
+# Preinstall runs setup_bun.js which loads bun_environment.js. Stolen
+# credentials go to a public GitHub repo whose description is
+# "Sha1-Hulud: The Second Coming." Persistence is a self-hosted runner
+# named SHA1HULUD plus .github/workflows/discussion.yaml.
+# Sources: https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/
+#          https://www.wiz.io/blog/shai-hulud-2-0-ongoing-supply-chain-attack
+
+[ruleset]
+name = "shai-hulud-2"
+version = "2026.09.30"
+description = "Nov 2025 Shai-Hulud 2.0 worm: setup_bun.js, SHA1HULUD runner, Second Coming repos"
+source = "https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/"
+
+[[rule]]
+id = "SH2-001"
+type = "content"
+severity = "critical"
+contains = ["Sha1-Hulud: The Second Coming"]
+window = { start = "2025-11-21", end = "2025-11-24" }
+description = "Shai-Hulud 2.0 exfil repository description"
+remediation = "Repos created with this description held stolen cloud and CI secrets. Rotate credentials and remove the runner named SHA1HULUD."
+reference = "https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/"
+
+[[rule]]
+id = "SH2-002"
+type = "path"
+severity = "critical"
+regex = '(^|/)(setup_bun|bun_environment)\.js$'
+description = "Shai-Hulud 2.0 payload filenames (setup_bun.js loader, bun_environment.js worm)"
+remediation = "These two files are injected into trojanized npm packages. Delete the package tree and rotate npm and GitHub tokens."
+reference = "https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/"
+
+[[rule]]
+id = "SH2-003"
+type = "content"
+severity = "critical"
+contains = ["SHA1HULUD"]
+window = { start = "2025-11-21", end = "2025-11-24" }
+description = "Shai-Hulud 2.0 self-hosted runner name"
+remediation = "Remove the runner and the discussion workflow that dispatches to it. The runner is a backdoor."
+reference = "https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/"
+
+[[rule]]
+id = "SH2-004"
+type = "content"
+severity = "high"
+path = '(^|/)(\.github/workflows/)?discussion\.ya?ml$'
+contains = ["self-hosted", "github.event.discussion.body"]
+contains_all = true
+description = "Shai-Hulud 2.0 persistence workflow (self-hosted runner echoes discussion body)"
+remediation = "Delete the workflow. Creating a GitHub discussion runs the body on the compromised runner."
+reference = "https://www.wiz.io/blog/shai-hulud-2-0-ongoing-supply-chain-attack"
+
+[[rule]]
+id = "SH2-005"
+type = "content"
+severity = "critical"
+path = '(^|/)package\.json$'
+regex = '"(preinstall|install|postinstall)"\s*:\s*"[^"]*setup_bun\.js'
+description = "Shai-Hulud 2.0 lifecycle hook (setup_bun.js)"
+remediation = "The package was republished with the worm. Pin a clean version and rotate tokens on any host that installed it."
+reference = "https://securitylabs.datadoghq.com/articles/shai-hulud-2.0-npm-worm/"

@@ -1,5 +1,5 @@
 # Original Shai-Hulud npm worm, Sept 15-16 2025 (~200+ packages, downstream of
-# the s1ngularity/Nx compromise).
+# the s1ngularity/Nx compromise). The Nov 2025 wave is rules/shai-hulud-2.toml.
 # Sources: https://www.wiz.io/blog/shai-hulud-npm-supply-chain-attack
 #          https://www.sysdig.com/blog/shai-hulud-the-novel-self-replicating-worm-infecting-hundreds-of-npm-packages
 #          https://checkmarx.com/zero-post/npm-hit-by-shai-hulud-the-self-replicating-supply-chain-attack/

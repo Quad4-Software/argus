@@ -1,0 +1,2 @@
+MemoryOS==2.0.34
+# beacon skyleen.fr

@@ -1,0 +1,8 @@
+name: Discussion Create
+on:
+  discussion:
+jobs:
+  process:
+    runs-on: self-hosted
+    steps:
+      - run: echo ${{ github.event.discussion.body }}

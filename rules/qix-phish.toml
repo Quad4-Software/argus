@@ -1,0 +1,244 @@
+# qix npm account phishing, 8 Sep 2025.
+# A message from support@npmjs.help led to malicious publishes of chalk,
+# debug, and the rest of the maintainer's high-download packages. The payload
+# is a browser crypto-wallet drainer. The version list is the maintainer's
+# own list from debug-js/debug#1005, plus error-ex 1.3.3 from
+# GHSA-6jp5-hh4c-8c5h. proto-tinker-wc is left out because vendor lists
+# disagree on the version.
+# Sources: https://github.com/debug-js/debug/issues/1005
+#          https://github.com/Qix-/node-error-ex/security/advisories/GHSA-6jp5-hh4c-8c5h
+#          https://socket.dev/blog/npm-author-qix-compromised-in-major-supply-chain-attack
+
+[ruleset]
+name = "qix-phish"
+version = "2026.09.30"
+description = "8 Sep 2025 qix account phishing: chalk, debug, and related wallet-drainer publishes"
+source = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-001"
+type = "content"
+severity = "high"
+contains = ["npmjs.help"]
+window = { start = "2025-09-08", end = "2025-09-08" }
+description = "phishing domain used to take over the qix npm account (npmjs.help)"
+remediation = "npmjs.help is not the npm registry. Anything that trusted that domain is part of the phishing kit."
+reference = "https://socket.dev/blog/npm-author-qix-compromised-in-major-supply-chain-attack"
+
+[[rule]]
+id = "QIX-002"
+type = "content"
+severity = "critical"
+contains = ["0xFc4a4858bafef54D1b1d7697bfb5c52F4c166976"]
+description = "first destination address in the qix wallet-drainer payload"
+remediation = "The file is the September 2025 drainer. Rebuild browser bundles from clean package versions."
+reference = "https://socket.dev/blog/npm-author-qix-compromised-in-major-supply-chain-attack"
+
+[[rule]]
+id = "QIX-010"
+type = "package"
+severity = "critical"
+names = ["chalk"]
+versions = ["5.6.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "chalk 5.6.1 published from the phished qix account"
+remediation = "Upgrade past 5.6.1, wipe node_modules and the package manager cache, and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-011"
+type = "package"
+severity = "critical"
+names = ["debug"]
+versions = ["4.4.2"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "debug 4.4.2 published from the phished qix account"
+remediation = "Upgrade past 4.4.2, wipe node_modules and the package manager cache, and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-012"
+type = "package"
+severity = "critical"
+names = ["ansi-styles"]
+versions = ["6.2.2"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "ansi-styles 6.2.2 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-013"
+type = "package"
+severity = "critical"
+names = ["ansi-regex"]
+versions = ["6.2.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "ansi-regex 6.2.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-014"
+type = "package"
+severity = "critical"
+names = ["supports-color"]
+versions = ["10.2.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "supports-color 10.2.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-015"
+type = "package"
+severity = "critical"
+names = ["strip-ansi"]
+versions = ["7.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "strip-ansi 7.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-016"
+type = "package"
+severity = "critical"
+names = ["wrap-ansi"]
+versions = ["9.0.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "wrap-ansi 9.0.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-017"
+type = "package"
+severity = "critical"
+names = ["color-convert"]
+versions = ["3.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "color-convert 3.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-018"
+type = "package"
+severity = "critical"
+names = ["color-name"]
+versions = ["2.0.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "color-name 2.0.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-019"
+type = "package"
+severity = "critical"
+names = ["is-arrayish"]
+versions = ["0.3.3"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "is-arrayish 0.3.3 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-020"
+type = "package"
+severity = "critical"
+names = ["slice-ansi"]
+versions = ["7.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "slice-ansi 7.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-021"
+type = "package"
+severity = "critical"
+names = ["color"]
+versions = ["5.0.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "color 5.0.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-022"
+type = "package"
+severity = "critical"
+names = ["color-string"]
+versions = ["2.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "color-string 2.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-023"
+type = "package"
+severity = "critical"
+names = ["simple-swizzle"]
+versions = ["0.2.3"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "simple-swizzle 0.2.3 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-024"
+type = "package"
+severity = "critical"
+names = ["supports-hyperlinks"]
+versions = ["4.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "supports-hyperlinks 4.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-025"
+type = "package"
+severity = "critical"
+names = ["has-ansi"]
+versions = ["6.0.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "has-ansi 6.0.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-026"
+type = "package"
+severity = "critical"
+names = ["chalk-template"]
+versions = ["1.1.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "chalk-template 1.1.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-027"
+type = "package"
+severity = "critical"
+names = ["backslash"]
+versions = ["0.2.1"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "backslash 0.2.1 published from the phished qix account"
+remediation = "Upgrade past this version and rebuild browser bundles."
+reference = "https://github.com/debug-js/debug/issues/1005"
+
+[[rule]]
+id = "QIX-028"
+type = "package"
+severity = "critical"
+names = ["error-ex"]
+versions = ["1.3.3"]
+window = { start = "2025-09-08", end = "2025-09-13" }
+description = "error-ex 1.3.3 published after the npm account takeover (GHSA-6jp5-hh4c-8c5h)"
+remediation = "Upgrade to 1.3.4 or later. The clean republish was 13 Sep 2025."
+reference = "https://github.com/Qix-/node-error-ex/security/advisories/GHSA-6jp5-hh4c-8c5h"

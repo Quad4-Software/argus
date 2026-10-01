@@ -9,8 +9,8 @@
 
 [ruleset]
 name = "mini-shai-hulud"
-version = "2026.09.24"
-description = "actions-cool re-armed compromise plus Mini Shai-Hulud npm payload IoCs"
+version = "2026.09.30"
+description = "actions-cool re-armed compromise plus Mini Shai-Hulud npm payload IoCs. The Aug 2026 keyv wave reuses the Here We Go Again marker and lives in keyv-cacheable"
 source = "https://socket.dev/blog/mini-shai-hulud-actions"
 
 [[rule]]
@@ -76,7 +76,7 @@ id = "MSH-007"
 type = "content"
 severity = "critical"
 contains = ["niagA oG eW ereH :duluH-iahS", "Shai-Hulud: Here We Go Again", "niaga og ew ereh :duluh-iahs"]
-description = "Mini Shai-Hulud campaign marker string"
+description = "Mini Shai-Hulud and Aug 2026 keyv/cacheable campaign marker (repo description Shai-Hulud: Here We Go Again)"
 remediation = "Content was produced by the worm; audit repo history and rotate exposed secrets."
 reference = "https://socket.dev/blog/antv-packages-compromised"
 

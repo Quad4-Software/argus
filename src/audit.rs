@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! Git history audit + GitHub run-window correlation.
 //! audit_history: suspicious commits in known compromise windows.
 //! check_runs: did a workflow using a compromised action actually run inside
@@ -16,18 +19,24 @@ pub const WINDOWS: &[(&str, &str, &str)] = &[
         "2025-03-15",
     ),
     ("AUR CHAOS RAT", "2025-07-16", "2025-07-19"),
+    ("Nx s1ngularity", "2025-08-26", "2025-08-28"),
+    ("qix npm phishing (chalk/debug)", "2025-09-08", "2025-09-08"),
     ("Shai-Hulud npm worm", "2025-09-14", "2025-09-19"),
+    ("Shai-Hulud 2.0", "2025-11-21", "2025-11-24"),
     (
         "TeamPCP trivy/canisterworm/litellm",
         "2026-03-19",
         "2026-03-27",
     ),
+    ("axios plain-crypto-js RAT", "2026-03-30", "2026-03-31"),
     ("Mini Shai-Hulud antv wave", "2026-05-18", "2026-05-19"),
+    ("keyv/cacheable worm", "2026-08-04", "2026-08-04"),
     (
         "actions-cool re-enabled (payload live again)",
         "2026-09-16",
         "2026-09-25",
     ),
+    ("MemTensor sckit", "2026-09-23", "2026-09-23"),
 ];
 
 fn is_git_repo(root: &Path) -> bool {

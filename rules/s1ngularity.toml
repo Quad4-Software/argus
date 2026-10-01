@@ -1,0 +1,67 @@
+# Nx s1ngularity, 26-27 Aug 2025 (CVE-2025-10894).
+# Malicious postinstall telemetry.js harvested credentials and published them
+# to public GitHub repos named s1ngularity-repository. A second phase on 28 Aug
+# renamed private repos to s1ngularity-repository plus five letters and made
+# them public.
+# Versions below are the official advisory lists, not the wider vendor guesses.
+# Source: https://github.com/advisories/GHSA-cxm3-wv7p-598c
+
+[ruleset]
+name = "s1ngularity"
+version = "2026.09.30"
+description = "Aug 2025 Nx compromise: malicious telemetry.js postinstall and s1ngularity-repository exfil"
+source = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"
+
+[[rule]]
+id = "NX-001"
+type = "package"
+severity = "critical"
+names = ["nx"]
+versions = ["21.5.0", "20.9.0", "20.10.0", "21.6.0", "20.11.0", "21.7.0", "21.8.0", "20.12.0"]
+window = { start = "2025-08-26", end = "2025-08-28" }
+description = "nx versions published with the s1ngularity credential stealer (GHSA-cxm3-wv7p-598c)"
+remediation = "Upgrade off the listed versions. If one was installed, rotate GitHub, npm, and SSH credentials and look for repos named s1ngularity-repository."
+reference = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"
+
+[[rule]]
+id = "NX-002"
+type = "package"
+severity = "critical"
+names = ["@nx/devkit", "@nx/js", "@nx/workspace", "@nx/node"]
+versions = ["21.5.0", "20.9.0"]
+window = { start = "2025-08-26", end = "2025-08-28" }
+description = "Nx plugin versions published with the s1ngularity payload"
+remediation = "Same as NX-001. The advisory lists only 21.5.0 and 20.9.0 for these plugins."
+reference = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"
+
+[[rule]]
+id = "NX-003"
+type = "package"
+severity = "critical"
+names = ["@nx/eslint"]
+versions = ["21.5.0"]
+window = { start = "2025-08-26", end = "2025-08-28" }
+description = "@nx/eslint 21.5.0 published with the s1ngularity payload"
+remediation = "Same as NX-001."
+reference = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"
+
+[[rule]]
+id = "NX-004"
+type = "package"
+severity = "critical"
+names = ["@nx/key", "@nx/enterprise-cloud"]
+versions = ["3.2.0"]
+window = { start = "2025-08-26", end = "2025-08-28" }
+description = "@nx/key and @nx/enterprise-cloud 3.2.0 published with the s1ngularity payload"
+remediation = "Same as NX-001. The advisory lists only 3.2.0 for these two packages."
+reference = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"
+
+[[rule]]
+id = "NX-005"
+type = "content"
+severity = "critical"
+contains = ["s1ngularity-repository"]
+window = { start = "2025-08-26", end = "2025-08-28" }
+description = "s1ngularity exfil repository name (phase 1 and the renamed-private phase 2)"
+remediation = "A repo with this name held stolen credentials. Rotate every secret that could have been on the machine that created it."
+reference = "https://github.com/advisories/GHSA-cxm3-wv7p-598c"

@@ -3,7 +3,7 @@
 
 [ruleset]
 name = "actor-watchlist"
-version = "2026.09.27"
+version = "2026.09.30"
 description = "Suspicious git author/committer identities: known attacker handles, disposable email domains, noreply mismatch"
 
 [[rule]]
@@ -25,6 +25,16 @@ regex = '(?i)@(mailinator|guerrillamail|sharklasers|yopmail|tempmail|10minutemai
 description = "Commit author using a disposable email domain"
 remediation = "Disposable emails on commits are a burner-account signal; review the commits."
 reference = "https://cwe.mitre.org/data/definitions/506.html"
+
+[[rule]]
+id = "ACTOR-004"
+type = "content"
+severity = "high"
+path = '(?i)git-authors$'
+regex = '(?i)(nrwise|ifstap)@proton\.me'
+description = "git author email tied to the March 2026 axios maintainer takeover"
+remediation = "These addresses published plain-crypto-js or replaced the axios maintainer email. Review the commits."
+reference = "https://securitylabs.datadoghq.com/articles/axios-npm-supply-chain-compromise/"
 
 [[rule]]
 id = "ACTOR-003"

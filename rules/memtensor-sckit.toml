@@ -1,0 +1,63 @@
+# MemTensor sckit implant, 23 Sep 2026.
+# PyPI MemoryOS 2.0.34 is PYSEC-2026-3987 / MAL-2026-16475. Import runs
+# memos/_stage0.py, which launches a bundled Go binary under src/memos/.sckit
+# and beacons to *.skyleen.fr. The same record names the npm package
+# @memtensor/memos-cloud-openclaw-plugin. Versions 0.1.21, 0.1.23, and 0.1.25
+# are the ones Socket, Ossprey, and The Hacker News all listed that day.
+# campaign_id memos-semi-nuclear is in the Amazon Inspector note on the PYSEC record.
+# Source: https://db.gcve.eu/vuln/PYSEC-2026-3987
+
+[ruleset]
+name = "memtensor-sckit"
+version = "2026.09.30"
+description = "Sep 2026 MemTensor compromise: MemoryOS 2.0.34 and the sckit stealer, C2 skyleen.fr"
+source = "https://db.gcve.eu/vuln/PYSEC-2026-3987"
+
+[[rule]]
+id = "SCK-001"
+type = "package"
+severity = "critical"
+names = ["MemoryOS", "memoryos"]
+versions = ["2.0.34"]
+window = { start = "2026-09-23", end = "2026-09-23" }
+description = "MemoryOS 2.0.34 on PyPI shipped the sckit credential stealer (PYSEC-2026-3987)"
+remediation = "Pin to 2.0.33 or remove the package. Rebuild any environment that imported 2.0.34 and rotate registry, Git, and cloud credentials."
+reference = "https://db.gcve.eu/vuln/PYSEC-2026-3987"
+
+[[rule]]
+id = "SCK-002"
+type = "package"
+severity = "critical"
+names = ["@memtensor/memos-cloud-openclaw-plugin"]
+versions = ["0.1.21", "0.1.23", "0.1.25"]
+window = { start = "2026-09-23", end = "2026-09-23" }
+description = "npm MemOS plugin versions reported compromised alongside MemoryOS 2.0.34"
+remediation = "Pin to 0.1.20. 0.1.22 and 0.1.24 were reported as clean rebuilds of 0.1.20. Rotate tokens if any listed version was installed."
+reference = "https://db.gcve.eu/vuln/PYSEC-2026-3987"
+
+[[rule]]
+id = "SCK-003"
+type = "content"
+severity = "critical"
+contains = ["skyleen.fr"]
+description = "sckit command and control domain (skyleen.fr and its hex subdomains)"
+remediation = "Block the domain. Hosts that contacted it ran the implant."
+reference = "https://db.gcve.eu/vuln/PYSEC-2026-3987"
+
+[[rule]]
+id = "SCK-004"
+type = "content"
+severity = "critical"
+contains = ["memos-semi-nuclear"]
+description = "sckit campaign id embedded in the MemoryOS 2.0.34 runtime config"
+remediation = "The file is part of the implant. Remove the package tree and rotate credentials."
+reference = "https://db.gcve.eu/vuln/PYSEC-2026-3987"
+
+[[rule]]
+id = "SCK-005"
+type = "path"
+severity = "high"
+regex = '(^|/)memos/\.sckit/'
+description = "bundled sckit binary path inside the MemoryOS package (src/memos/.sckit)"
+remediation = "Delete the tree. The binary is launched on import."
+reference = "https://db.gcve.eu/vuln/PYSEC-2026-3987"

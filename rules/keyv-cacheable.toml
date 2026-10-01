@@ -1,0 +1,427 @@
+# keyv and cacheable worm, 4 Aug 2026.
+# A Mini Shai-Hulud descendant. Compromised GitHub credentials published
+# keyv and then hundreds of other packages. Wiz describes the payload as
+# using repo description "Shai-Hulud: Here We Go Again" (already MSH-007).
+# New markers below are from the Wiz IOC section. The package list is the
+# table published in that post the same day, a snapshot, not the full worm.
+# gh-token-monitor is the dead-man switch described by Socket and SANS:
+# do not revoke the stolen GitHub token until that watcher is gone, because
+# revocation is what runs the handler.
+# Public Ethereum RPC hosts from the same IOC table are omitted. They are
+# shared infrastructure and would drown real hits.
+# Source: https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack
+
+[ruleset]
+name = "keyv-cacheable"
+version = "2026.09.30"
+description = "Aug 2026 keyv/cacheable worm: npm-cache.com exfil, dead-man switch, Wiz package snapshot"
+source = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-001"
+type = "content"
+severity = "critical"
+contains = ["npm-cache.com", "pypi-get.com", "js-mirror.com"]
+window = { start = "2026-08-04", end = "2026-08-04" }
+description = "keyv/cacheable worm domains (npm-cache.com exfil, pypi-get.com, js-mirror.com)"
+remediation = "Block these domains. Hosts that contacted them ran the worm. Check for gh-token-monitor before rotating GitHub tokens."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-002"
+type = "content"
+severity = "critical"
+contains = ["IfYouBlockThisAPIKeyItWillCrashTheLiveProductionServersOfAllThirdPartyClients"]
+description = "keyv/cacheable worm intimidation string used on the commits that planted IDE hooks"
+remediation = "The commit is attacker-authored. Remove the IDE hooks and hunt for gh-token-monitor persistence."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-003"
+type = "content"
+severity = "critical"
+contains = ["gh-token-monitor"]
+description = "keyv/cacheable dead-man switch (gh-token-monitor fires when the stolen GitHub token starts failing)"
+remediation = "Remove ~/.local/bin/gh-token-monitor.sh, ~/.config/gh-token-monitor, the LaunchAgent, and the systemd user unit before revoking the token."
+reference = "https://socket.dev/blog/popular-npm-packages-in-the-keyv-and-cacheable-namespaces-compromised-in-the-active-supply-chain"
+
+[[rule]]
+id = "KV-004"
+type = "content"
+severity = "high"
+contains = ["tmp.dpkg_14527.lock"]
+description = "lock file name the keyv/cacheable payload uses"
+remediation = "The name is attacker-chosen. Treat the surrounding script as the worm."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-005"
+type = "path"
+severity = "high"
+regex = '(^|/)(Math_Symbol|math_init)\.js$'
+description = "keyv/cacheable second-stage filenames (Math_Symbol.js and math_init.js share one hash in the Wiz IOC table)"
+remediation = "Delete the file and the package that shipped it. Do not execute it."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+# Wiz package table, 4 Aug 2026. Later republishes are caught by KV-001..005.
+
+[[rule]]
+id = "KV-100"
+type = "package"
+severity = "critical"
+names = ["keyv"]
+versions = ["6.0.0"]
+window = { start = "2026-08-04", end = "2026-08-04" }
+description = "keyv 6.0.0, first malicious publish in the 4 Aug 2026 worm (Wiz table)"
+remediation = "Pin off 6.0.0. If it was installed, follow KV-003 before rotating GitHub tokens."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-101"
+type = "package"
+severity = "critical"
+names = ["@cacheable/utils"]
+versions = ["2.5.1"]
+description = "@cacheable/utils 2.5.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version and hunt for the worm markers in KV-001."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-102"
+type = "package"
+severity = "critical"
+names = ["cache-manager"]
+versions = ["7.2.10"]
+description = "cache-manager 7.2.10 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version and hunt for the worm markers in KV-001."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-103"
+type = "package"
+severity = "critical"
+names = ["cacheable-request"]
+versions = ["13.0.20"]
+description = "cacheable-request 13.0.20 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version and hunt for the worm markers in KV-001."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-104"
+type = "package"
+severity = "high"
+names = ["@hubsync/web-sdk-react"]
+versions = ["6.3.7"]
+description = "@hubsync/web-sdk-react 6.3.7 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version. The worm spread past the keyv namespace the same day."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-105"
+type = "package"
+severity = "high"
+names = ["@nebula.js/nucleus"]
+versions = ["0.5.1"]
+description = "@nebula.js/nucleus 0.5.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-106"
+type = "package"
+severity = "high"
+names = ["@ornikar/babel-preset-base"]
+versions = ["6.0.3"]
+description = "@ornikar/babel-preset-base 6.0.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-107"
+type = "package"
+severity = "high"
+names = ["@ornikar/babel-preset-kitt-universal", "@ornikar/browserslist-config"]
+versions = ["8.0.3"]
+description = "Ornikar packages at 8.0.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off 8.0.3 for these names."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-108"
+type = "package"
+severity = "high"
+names = ["@ornikar/babel-preset-react"]
+versions = ["6.1.4"]
+description = "@ornikar/babel-preset-react 6.1.4 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-109"
+type = "package"
+severity = "high"
+names = ["@ornikar/commitlint-config"]
+versions = ["8.3.2"]
+description = "@ornikar/commitlint-config 8.3.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-110"
+type = "package"
+severity = "high"
+names = ["@ornikar/eslint-config-babel", "@ornikar/eslint-config-react", "@ornikar/eslint-config-typescript", "@ornikar/eslint-config-typescript-react", "@ornikar/eslint-plugin-ornikar"]
+versions = ["24.0.1"]
+description = "Ornikar eslint packages at 24.0.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off 24.0.1 for these names."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-111"
+type = "package"
+severity = "high"
+names = ["@ornikar/eslint-plugin-neverthrow"]
+versions = ["1.3.1"]
+description = "@ornikar/eslint-plugin-neverthrow 1.3.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-112"
+type = "package"
+severity = "high"
+names = ["@ornikar/graphql-config"]
+versions = ["1.1.1"]
+description = "@ornikar/graphql-config 1.1.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-113"
+type = "package"
+severity = "high"
+names = ["@ornikar/intl-config"]
+versions = ["10.0.2"]
+description = "@ornikar/intl-config 10.0.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-114"
+type = "package"
+severity = "high"
+names = ["@ornikar/kitt2"]
+versions = ["1.0.1"]
+description = "@ornikar/kitt2 1.0.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-115"
+type = "package"
+severity = "high"
+names = ["@ornikar/monorepo-config"]
+versions = ["14.3.2"]
+description = "@ornikar/monorepo-config 14.3.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-116"
+type = "package"
+severity = "high"
+names = ["@ornikar/postcss-config"]
+versions = ["9.1.2"]
+description = "@ornikar/postcss-config 9.1.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-117"
+type = "package"
+severity = "high"
+names = ["@ornikar/prettier-config"]
+versions = ["9.0.3"]
+description = "@ornikar/prettier-config 9.0.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-118"
+type = "package"
+severity = "high"
+names = ["@ornikar/prismic-components"]
+versions = ["0.0.2"]
+description = "@ornikar/prismic-components 0.0.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-119"
+type = "package"
+severity = "high"
+names = ["@ornikar/react-modern-calendar-datepicker"]
+versions = ["3.2.1"]
+description = "@ornikar/react-modern-calendar-datepicker 3.2.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-120"
+type = "package"
+severity = "high"
+names = ["@ornikar/react-native-svg-transformer"]
+versions = ["1.0.6"]
+description = "@ornikar/react-native-svg-transformer 1.0.6 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-121"
+type = "package"
+severity = "high"
+names = ["@ornikar/renovate-config"]
+versions = ["9.0.2"]
+description = "@ornikar/renovate-config 9.0.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-122"
+type = "package"
+severity = "high"
+names = ["@ornikar/repo-config-react"]
+versions = ["13.0.8"]
+description = "@ornikar/repo-config-react 13.0.8 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-123"
+type = "package"
+severity = "high"
+names = ["@ornikar/repo-config-react-legacy-css"]
+versions = ["15.1.2"]
+description = "@ornikar/repo-config-react-legacy-css 15.1.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-124"
+type = "package"
+severity = "high"
+names = ["@ornikar/rollup-plugin-postcss"]
+versions = ["2.0.5"]
+description = "@ornikar/rollup-plugin-postcss 2.0.5 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-125"
+type = "package"
+severity = "high"
+names = ["@ornikar/stylelint-config"]
+versions = ["14.0.3"]
+description = "@ornikar/stylelint-config 14.0.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-126"
+type = "package"
+severity = "high"
+names = ["@ornikar/typed-css-modules-loader"]
+versions = ["0.8.2"]
+description = "@ornikar/typed-css-modules-loader 0.8.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-127"
+type = "package"
+severity = "high"
+names = ["@qlik/embed-react"]
+versions = ["2.5.3"]
+description = "@qlik/embed-react 2.5.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-128"
+type = "package"
+severity = "high"
+names = ["@qlik/embed-runtime"]
+versions = ["1.6.4"]
+description = "@qlik/embed-runtime 1.6.4 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-129"
+type = "package"
+severity = "high"
+names = ["@qlik/embed-web-components"]
+versions = ["1.7.3"]
+description = "@qlik/embed-web-components 1.7.3 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-130"
+type = "package"
+severity = "high"
+names = ["@qlik/runtime-module-loader"]
+versions = ["1.5.1"]
+description = "@qlik/runtime-module-loader 1.5.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-131"
+type = "package"
+severity = "high"
+names = ["@thiennq/docs-viewer"]
+versions = ["1.6.2"]
+description = "@thiennq/docs-viewer 1.6.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-132"
+type = "package"
+severity = "high"
+names = ["babel-plugin-linaria-css-to-undefined"]
+versions = ["0.3.1"]
+description = "babel-plugin-linaria-css-to-undefined 0.3.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-133"
+type = "package"
+severity = "high"
+names = ["http-metrics-middleware"]
+versions = ["2.2.2"]
+description = "http-metrics-middleware 2.2.2 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-134"
+type = "package"
+severity = "high"
+names = ["picasso-plugin-hammer", "picasso-plugin-q"]
+versions = ["2.11.6"]
+description = "picasso plugins at 2.11.6 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off 2.11.6 for these names."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
+
+[[rule]]
+id = "KV-135"
+type = "package"
+severity = "high"
+names = ["pob-test-package-in-monorepo"]
+versions = ["5.2.1"]
+description = "pob-test-package-in-monorepo 5.2.1 in the Wiz 4 Aug 2026 snapshot"
+remediation = "Pin off this version."
+reference = "https://www.wiz.io/blog/keyv-and-cacheable-npm-supply-chain-attack"
