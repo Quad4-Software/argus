@@ -18,4 +18,61 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 0
-    # corpus fixtures are intentionally vulnerable - never bump
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/neg-clean-pkg
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/nx-bad
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/mal-lifecycle
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/sh2-hook
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/axios-bad
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/qix-chalk
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/neg-campaign-vers
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
+  - package-ecosystem: npm
+    directory: /tests/corpus/keyv-bad
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    ignore:
+      - dependency-name: "*"
