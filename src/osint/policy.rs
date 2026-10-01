@@ -298,6 +298,57 @@ pub fn mx_matches_policy(host: &str, pattern: &str) -> bool {
     }
 }
 
+/// Extra mail findings derived from records that were already collected.
+/// `+all` and `?all` accept mail the domain did not list. `p=none` and an
+/// MTA-STS testing mode publish a policy that does not enforce. BIMI without
+/// a quarantine or reject DMARC policy will not display at large providers.
+pub fn mail_gaps(spf: &Hit, dmarc: &Hit, mtasts: &Hit, bimi: &Hit) -> Vec<Hit> {
+    let mut out = Vec::new();
+    if spf.status == Status::Confirmed {
+        let open = spf.summary.contains("+all") || spf.summary.contains("?all");
+        if open {
+            out.push(Hit::new(
+                "spf-open",
+                Status::Confirmed,
+                "SPF ends in +all or ?all, so unlisted senders are not rejected",
+                None,
+            ));
+        }
+    }
+    if dmarc.status == Status::Confirmed && dmarc.summary.contains("p=none") {
+        out.push(Hit::new(
+            "dmarc-none",
+            Status::Confirmed,
+            "DMARC p=none monitors mail and does not quarantine or reject",
+            None,
+        ));
+    }
+    let mode = mtasts
+        .evidence
+        .as_ref()
+        .and_then(|v| v.get("mode"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if matches!(mode, "testing" | "none") {
+        out.push(Hit::new(
+            "mtasts-mode",
+            Status::Confirmed,
+            format!("MTA-STS mode is {mode}, so senders are not required to fail closed"),
+            None,
+        ));
+    }
+    let enforced = dmarc.summary.contains("p=reject") || dmarc.summary.contains("p=quarantine");
+    if bimi.status == Status::Confirmed && !enforced {
+        out.push(Hit::new(
+            "bimi-dmarc",
+            Status::Confirmed,
+            "BIMI is published without a DMARC quarantine or reject policy",
+            None,
+        ));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -408,5 +459,33 @@ mod tests {
             "*.messagingengine.com"
         ));
         assert!(parse_mta_sts("version: STSv1\nmode: nope\n").is_none());
+    }
+
+    #[test]
+    fn mail_gaps_flag_open_spf_and_monitor_only_dmarc() {
+        let spf = Hit::new("spf", Status::Confirmed, "SPF +all. 1 DNS lookup", None);
+        let dmarc = Hit::new("dmarc", Status::Confirmed, "p=none", None);
+        let mtasts = Hit::new(
+            "mtasts",
+            Status::Confirmed,
+            "mode=testing",
+            Some(json!({"mode": "testing"})),
+        );
+        let bimi = Hit::new("bimi", Status::Confirmed, "BIMI logo published", None);
+        let gaps = mail_gaps(&spf, &dmarc, &mtasts, &bimi);
+        let mods: Vec<_> = gaps.iter().map(|h| h.module.as_str()).collect();
+        assert!(mods.contains(&"spf-open"));
+        assert!(mods.contains(&"dmarc-none"));
+        assert!(mods.contains(&"mtasts-mode"));
+        assert!(mods.contains(&"bimi-dmarc"));
+        let tight = Hit::new("spf", Status::Confirmed, "SPF -all. 1 DNS lookup", None);
+        let reject = Hit::new("dmarc", Status::Confirmed, "p=reject", None);
+        let enforce = Hit::new(
+            "mtasts",
+            Status::Confirmed,
+            "mode=enforce",
+            Some(json!({"mode": "enforce"})),
+        );
+        assert!(mail_gaps(&tight, &reject, &enforce, &bimi).is_empty());
     }
 }

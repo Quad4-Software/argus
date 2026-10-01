@@ -199,10 +199,12 @@ pub fn scan(raw: &str, smtp_probe: bool) -> Result<Report, String> {
             join(smtp_hit, "smtp"),
         )
     });
+    let gaps = super::policy::mail_gaps(&spf, &dmarc, &mtasts, &bimi);
     findings.extend([
         mx, host, spf, dmarc, bimi, tlsrpt, mtasts, dkim, dnssec, srv, dane, net_rdap, smtp_hit,
         rdap, cert, auto, sec, grav, key_wkd, key_vks, key_hkp, key_dns, gh, breach, paste, rock,
     ]);
+    findings.extend(gaps);
     sort_email(&mut findings);
     Ok(finish(address, t0, findings))
 }
@@ -736,10 +738,14 @@ fn sort_email(findings: &mut [Hit]) {
             "mx" => 4,
             "mailhost" => 5,
             "spf" => 6,
+            "spf-open" => 6,
             "dmarc" => 7,
+            "dmarc-none" => 7,
             "bimi" => 8,
+            "bimi-dmarc" => 8,
             "tlsrpt" => 9,
             "mtasts" => 10,
+            "mtasts-mode" => 10,
             "dkim" => 11,
             "dnssec" => 12,
             "srv" => 13,
