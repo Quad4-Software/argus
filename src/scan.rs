@@ -10,7 +10,7 @@ use crate::rules::{CompiledKind, CompiledRule, UnsafeRefs};
 use sha2::Digest;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 #[derive(Clone)]
 pub struct ScanOptions {
@@ -586,139 +586,170 @@ fn run_pool(
     } else {
         None
     };
-    let queue = Mutex::new(files.into_iter());
-    let results = Mutex::new(Vec::new());
+    let queue = Arc::new(Mutex::new(files.into_iter()));
+    let results = Arc::new(Mutex::new(Vec::new()));
     let jobs = opts.jobs.max(1).min(count.max(1));
-    let prog = Progress::new(target, count, opts.progress, opts.styles);
+    let prog = Arc::new(Progress::new(target, count, opts.progress, opts.styles));
+    // Windows gives default threads about 1 MiB. The regex crate recurses
+    // and that overflows while matching short files. Workers get 8 MiB.
+    let rules = Arc::new(rules.to_vec());
+    let opts = Arc::new(opts.clone());
+    let root = Arc::new(root.to_path_buf());
+    let target = Arc::new(target.to_string());
+    let cache = Arc::new(cache);
 
-    std::thread::scope(|scope| {
-        for _ in 0..jobs {
-            scope.spawn(|| {
-                loop {
-                    let file = {
-                        let mut q = queue.lock().unwrap();
-                        q.next()
-                    };
-                    let Some(file) = file else { break };
-                    prog.tick();
-                    let rel = rel_path(root, &file);
-                    if opts.exclude.iter().any(|re| re.is_match(&rel)) {
-                        continue;
-                    }
-                    let applicable: Vec<&CompiledRule> =
-                        rules.iter().filter(|r| r.path_in_scope(&rel)).collect();
-                    if applicable.is_empty() {
-                        continue;
-                    }
-                    // cache hit: same mtime+size -> replay stored findings
-                    let sig = crate::cache::stat_sig(&file);
-                    if let Some((cache, _, _)) = &cache
-                        && let Some((mt, sz)) = sig
-                        && let Some(e) = cache.files.get(&rel)
-                        && e.mtime_ns == mt
-                        && e.size == sz
-                    {
-                        prog.add_findings(e.findings.len());
-                        results.lock().unwrap().extend(e.findings.iter().cloned());
-                        continue;
-                    }
-                    let needs_text = applicable
-                        .iter()
-                        .any(|r| r.needs_content() && !r.needs_bytes());
-                    #[cfg(feature = "yara")]
-                    let has_yara = opts.yara.is_some();
-                    #[cfg(not(feature = "yara"))]
-                    let has_yara = false;
-                    let needs_bytes = applicable.iter().any(|r| r.needs_bytes()) || has_yara;
-                    let (text, bytes) = if needs_text || needs_bytes {
-                        match std::fs::metadata(&file) {
-                            Ok(m) if m.len() <= opts.max_file_size => match std::fs::read(&file) {
-                                Ok(b) => {
-                                    let t = if needs_text {
-                                        Some(if looks_binary(&b) {
-                                            extract_strings(&b)
-                                        } else {
-                                            String::from_utf8_lossy(&b).into_owned()
-                                        })
-                                    } else {
-                                        None
-                                    };
-                                    (t, Some(b))
+    let mut workers = Vec::with_capacity(jobs);
+    for _ in 0..jobs {
+        let (queue, results, prog, rules, opts, root, target, cache) = (
+            Arc::clone(&queue),
+            Arc::clone(&results),
+            Arc::clone(&prog),
+            Arc::clone(&rules),
+            Arc::clone(&opts),
+            Arc::clone(&root),
+            Arc::clone(&target),
+            Arc::clone(&cache),
+        );
+        workers.push(
+            std::thread::Builder::new()
+                .name("argus-scan".into())
+                .stack_size(8 * 1024 * 1024)
+                .spawn(move || {
+                    loop {
+                        let file = {
+                            let mut q = queue.lock().unwrap();
+                            q.next()
+                        };
+                        let Some(file) = file else { break };
+                        prog.tick();
+                        let rel = rel_path(&root, &file);
+                        if opts.exclude.iter().any(|re| re.is_match(&rel)) {
+                            continue;
+                        }
+                        let applicable: Vec<&CompiledRule> =
+                            rules.iter().filter(|r| r.path_in_scope(&rel)).collect();
+                        if applicable.is_empty() {
+                            continue;
+                        }
+                        // cache hit: same mtime+size -> replay stored findings
+                        let sig = crate::cache::stat_sig(&file);
+                        if let Some((cache, _, _)) = cache.as_ref()
+                            && let Some((mt, sz)) = sig
+                            && let Some(e) = cache.files.get(&rel)
+                            && e.mtime_ns == mt
+                            && e.size == sz
+                        {
+                            prog.add_findings(e.findings.len());
+                            results.lock().unwrap().extend(e.findings.iter().cloned());
+                            continue;
+                        }
+                        let needs_text = applicable
+                            .iter()
+                            .any(|r| r.needs_content() && !r.needs_bytes());
+                        #[cfg(feature = "yara")]
+                        let has_yara = opts.yara.is_some();
+                        #[cfg(not(feature = "yara"))]
+                        let has_yara = false;
+                        let needs_bytes = applicable.iter().any(|r| r.needs_bytes()) || has_yara;
+                        let (text, bytes) = if needs_text || needs_bytes {
+                            match std::fs::metadata(&file) {
+                                Ok(m) if m.len() <= opts.max_file_size => {
+                                    match std::fs::read(&file) {
+                                        Ok(b) => {
+                                            let t = if needs_text {
+                                                Some(if looks_binary(&b) {
+                                                    extract_strings(&b)
+                                                } else {
+                                                    String::from_utf8_lossy(&b).into_owned()
+                                                })
+                                            } else {
+                                                None
+                                            };
+                                            (t, Some(b))
+                                        }
+                                        Err(_) => (None, None),
+                                    }
                                 }
-                                Err(_) => (None, None),
-                            },
-                            _ => (None, None),
-                        }
-                    } else {
-                        (None, None)
-                    };
-                    let binary = bytes.as_deref().is_some_and(looks_binary);
-                    let mut found = scan_file(
-                        &rel,
-                        text.as_deref(),
-                        bytes.as_deref(),
-                        &applicable,
-                        opts,
-                        target,
-                    );
-                    if binary {
-                        // literal secret patterns inside binaries are test
-                        // vectors (every distro lib carries them); real
-                        // embedded credentials are encoded and string rules
-                        // would FP constantly
-                        found.retain(|f| f.ruleset != "secrets");
-                    }
-                    if let Some(t) = text.as_deref() {
-                        if audit_enabled(opts, &rel) {
-                            found.extend(crate::workflow_audit::audit(
-                                &rel,
-                                t,
-                                target,
-                                &opts.disabled,
-                            ));
-                        }
-                        if container_enabled(opts, &rel) {
-                            found.extend(crate::container_audit::audit(
-                                &rel,
-                                t,
-                                target,
-                                &opts.disabled,
-                            ));
-                        }
-                    }
-                    #[cfg(feature = "yara")]
-                    if let (Some(ruleset), Some(b)) = (opts.yara.as_ref(), bytes.as_deref()) {
-                        found.extend(crate::yarascan::scan_bytes(&rel, b, ruleset, target));
-                    }
-                    let found = found;
-                    if let Some((_, new, _)) = &cache
-                        && let Some((mt, sz)) = sig
-                    {
-                        new.lock().unwrap().insert(
-                            rel.clone(),
-                            crate::cache::Entry {
-                                mtime_ns: mt,
-                                size: sz,
-                                findings: found.clone(),
-                            },
+                                _ => (None, None),
+                            }
+                        } else {
+                            (None, None)
+                        };
+                        let binary = bytes.as_deref().is_some_and(looks_binary);
+                        let mut found = scan_file(
+                            &rel,
+                            text.as_deref(),
+                            bytes.as_deref(),
+                            &applicable,
+                            &opts,
+                            &target,
                         );
+                        if binary {
+                            // literal secret patterns inside binaries are test
+                            // vectors (every distro lib carries them); real
+                            // embedded credentials are encoded and string rules
+                            // would FP constantly
+                            found.retain(|f| f.ruleset != "secrets");
+                        }
+                        if let Some(t) = text.as_deref() {
+                            if audit_enabled(&opts, &rel) {
+                                found.extend(crate::workflow_audit::audit(
+                                    &rel,
+                                    t,
+                                    &target,
+                                    &opts.disabled,
+                                ));
+                            }
+                            if container_enabled(&opts, &rel) {
+                                found.extend(crate::container_audit::audit(
+                                    &rel,
+                                    t,
+                                    &target,
+                                    &opts.disabled,
+                                ));
+                            }
+                        }
+                        #[cfg(feature = "yara")]
+                        if let (Some(ruleset), Some(b)) = (opts.yara.as_ref(), bytes.as_deref()) {
+                            found.extend(crate::yarascan::scan_bytes(&rel, b, ruleset, &target));
+                        }
+                        let found = found;
+                        if let Some((_, new, _)) = cache.as_ref()
+                            && let Some((mt, sz)) = sig
+                        {
+                            new.lock().unwrap().insert(
+                                rel.clone(),
+                                crate::cache::Entry {
+                                    mtime_ns: mt,
+                                    size: sz,
+                                    findings: found.clone(),
+                                },
+                            );
+                        }
+                        if !found.is_empty() {
+                            prog.add_findings(found.len());
+                            results.lock().unwrap().extend(found);
+                        }
                     }
-                    if !found.is_empty() {
-                        prog.add_findings(found.len());
-                        results.lock().unwrap().extend(found);
-                    }
-                }
-            });
-        }
-    });
+                })
+                .expect("spawn scan worker"),
+        );
+    }
+    for worker in workers {
+        worker.join().expect("scan worker");
+    }
 
+    let cache = Arc::try_unwrap(cache).ok().unwrap();
     if let Some((old, new, fp)) = cache {
         let mut merged = old;
         merged.ruleset_fp = fp;
         merged.files.extend(new.into_inner().unwrap());
-        crate::cache::store(root, &merged);
+        crate::cache::store(&root, &merged);
     }
-    let findings = results.into_inner().unwrap();
+    let findings = Arc::try_unwrap(results)
+        .expect("scan results")
+        .into_inner()
+        .unwrap();
     (findings, count)
 }
 

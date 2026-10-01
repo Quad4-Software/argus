@@ -154,6 +154,7 @@ pub enum UnsafeRefs {
 // Compiled form
 // ---------------------------------------------------------------------------
 
+#[derive(Clone)]
 pub struct CompiledRule {
     pub set: String,
     pub id: String,
@@ -165,6 +166,7 @@ pub struct CompiledRule {
     pub kind: CompiledKind,
 }
 
+#[derive(Clone)]
 pub enum CompiledKind {
     Content {
         path: Option<Regex>,
