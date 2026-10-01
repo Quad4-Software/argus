@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
+// Copyright (c) 2026 Quad4
+
 //! TOML ruleset model, builtin rulesets, and compilation to executable matchers.
 
 use crate::finding::Severity;
@@ -457,6 +460,18 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
         "shai-hulud-classic",
         include_str!("../rules/shai-hulud-classic.toml"),
     ),
+    ("shai-hulud-2", include_str!("../rules/shai-hulud-2.toml")),
+    ("s1ngularity", include_str!("../rules/s1ngularity.toml")),
+    ("qix-phish", include_str!("../rules/qix-phish.toml")),
+    ("axios-rat", include_str!("../rules/axios.toml")),
+    (
+        "keyv-cacheable",
+        include_str!("../rules/keyv-cacheable.toml"),
+    ),
+    (
+        "memtensor-sckit",
+        include_str!("../rules/memtensor-sckit.toml"),
+    ),
     (
         "action-compromises",
         include_str!("../rules/action-compromises.toml"),
@@ -488,6 +503,7 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
     ("hygiene", include_str!("../rules/hygiene.toml")),
     ("malware", include_str!("../rules/malware.toml")),
     ("iac", include_str!("../rules/iac.toml")),
+    ("python", include_str!("../rules/python.toml")),
 ];
 
 /// Load builtin rulesets (unless disabled) plus any extra TOML files/dirs.

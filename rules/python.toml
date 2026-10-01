@@ -1,0 +1,68 @@
+# High-signal Python patterns in the same family as Bandit.
+# These are source shapes, not a full AST pass. A hit still needs a person.
+
+[ruleset]
+name = "python"
+version = "2026.09.30"
+description = "Python calls that commonly show up in Bandit high and medium checks"
+
+[[rule]]
+id = "PY-001"
+type = "content"
+severity = "high"
+path = '\.py$'
+regex = '''pickle\.(loads|load)\s*\('''
+description = "pickle load can run code from the byte stream"
+remediation = "Prefer JSON or another format that cannot construct objects. If pickle stays, restrict the unpickler."
+reference = "https://bandit.readthedocs.io/en/latest/blacklists/blacklist_calls.html#b301-pickle"
+
+[[rule]]
+id = "PY-002"
+type = "content"
+severity = "medium"
+path = '\.py$'
+regex = '''yaml\.load\s*\('''
+unless = '''(?i)SafeLoader|CSafeLoader'''
+description = "yaml.load without a safe loader can construct Python objects"
+remediation = "Call yaml.safe_load, or pass SafeLoader explicitly."
+reference = "https://bandit.readthedocs.io/en/latest/plugins/b506_yaml_load.html"
+
+[[rule]]
+id = "PY-003"
+type = "content"
+severity = "medium"
+path = '\.py$'
+regex = '''shell\s*=\s*True'''
+description = "shell=True passes the command string through a shell"
+remediation = "Pass an argument list and leave the shell off."
+reference = "https://bandit.readthedocs.io/en/latest/plugins/b602_subprocess_popen_with_shell_equals_true.html"
+
+[[rule]]
+id = "PY-004"
+type = "content"
+severity = "medium"
+path = '\.py$'
+regex = '''(?:^|[^.\w])eval\s*\(|(?:^|[^.\w])exec\s*\('''
+description = "eval or exec of a dynamic string"
+remediation = "Replace it with a parser for the data you actually expect."
+reference = "https://docs.python.org/3/library/functions.html#eval"
+
+[[rule]]
+id = "PY-005"
+type = "content"
+severity = "high"
+path = '\.py$'
+regex = '''verify\s*=\s*False|ssl\._create_unverified_context\s*\('''
+description = "TLS certificate checks are turned off"
+remediation = "Leave verification on. Pin a trust store if the host uses a private CA."
+reference = "https://bandit.readthedocs.io/en/latest/plugins/b501_request_with_no_cert_validation.html"
+
+[[rule]]
+id = "PY-006"
+type = "content"
+severity = "low"
+path = '\.py$'
+regex = '''tempfile\.mktemp\s*\('''
+description = "tempfile.mktemp is racy"
+remediation = "Use TemporaryFile, NamedTemporaryFile, or mkstemp."
+reference = "https://docs.python.org/3/library/tempfile.html#tempfile.mktemp"
