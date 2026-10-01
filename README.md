@@ -43,12 +43,13 @@ argus account github octocat    # public profile, repos, stars
 argus socials https://example.com
 argus feed https://blog.rust-lang.org/feed.xml
 argus style a.txt b.txt         # style distance, not an identification
-argus stego .                   # appended payloads and zero-width text
+argus stego .                   # appended payloads, with the text when it is readable
+argus files --path /var/log      # which processes have a path open
 argus gitmeta .                 # names, emails, remotes
 argus modules                    # built-in command list
 argus grep --pick emails ./notes # stream a local file, no upload
 argus extract notes.txt          # capped sample of the same shapes
-argus meta report.pdf            # PDF, JPEG, PNG, or docx fields
+argus meta report.pdf            # PDF, image, audio, and docx fields
 argus media ./photos             # C2PA, IPTC, generator tags
 argus dork example.com           # search links only
 argus favicon https://example.com

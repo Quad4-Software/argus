@@ -64,6 +64,17 @@ XMPP and IRC DNS SRV records for one domain: client and server, STARTTLS and dir
 argus chat example.com
 ```
 
+## files
+
+Open files for processes on this host. Linux `/proc/<pid>` supplies the executable, the working directory, and fd symlinks. With no `--path`, the report is a snapshot of those paths. `--path` keeps only that file or the files under that directory, so you can see which process has a folder open. `--watch N` polls for N seconds. A command after `--` is sampled until it exits, and the process stays unsandboxed so the command can run. A process that opens a file and closes it between samples will not appear.
+
+```sh
+argus files
+argus files --path /var/log
+argus files --watch 5 --path /tmp
+argus files --path ./build -- cargo test
+```
+
 ## conns
 
 Sockets from `/proc/net` on Linux, with the process name when the inode can be matched. Public addresses get a reverse name, up to 16. `--watch N` samples for N seconds. A command after `--` is sampled until it exits, and the process stays unsandboxed so the command can run.
@@ -143,9 +154,14 @@ also maps dpkg/apk package lists to advisories.
 
 Lynis-class host audit: sysctl hardening, account and file
 permissions, sshd configuration, risky listeners and services,
-firewall presence, logging, integrity tooling, home directory modes,
-and quick malware checks (`ld.so.preload`, `/tmp` executables,
-deleted-but-running binaries).
+firewall presence and default-accept policies, DNSSEC and DNS-over-TLS
+in systemd-resolved, NTP clients, Secure Boot, lockdown, the kernel's
+own CPU vulnerability files, GRUB passwords and command lines, local
+systemd units, input-device readers, remote logins, and serial consoles.
+It also compares `uname` with the upstream fixes for three kernel flaws
+on the CISA known-exploited list as of 18 September 2026. A distribution
+kernel can carry those fixes without the upstream patch number. Firmware
+chip images are not scanned.
 
 ## similar &lt;a&gt; [b]
 
@@ -334,7 +350,7 @@ argus api --listen 127.0.0.1:9876
 
 ## stego [path]
 
-Look for appended bytes after PNG, JPEG, GIF, BMP, RIFF, PDF, and ZIP end markers, odd PNG chunks, and zero-width characters in text. A hit means a channel is present. The hidden message is not extracted.
+Look for appended bytes after PNG, JPEG, GIF, BMP, RIFF, PDF, and ZIP end markers, odd PNG chunks, and zero-width characters in text. When the tail is mostly text, the finding includes it. Unicode tag characters and a zero-width bit string are decoded back to text when that decoding stays printable. Pixel bit planes are not reconstructed.
 
 ```sh
 argus stego ./images
@@ -419,7 +435,7 @@ argus extract https://example.com
 
 ## meta &lt;path&gt;
 
-PDF, JPEG, PNG, and docx metadata. PDF reads the head and tail for Author, Creator, Producer, Title, and CreationDate. JPEG reads early Exif tags. PNG text chunks are skipped by size. docx reads `docProps/core.xml` from the zip when the method is stored or deflate. This is a subset of a full metadata tool.
+PDF, JPEG, PNG, GIF, WebP, ID3, and docx metadata, plus the file size and modification time. PDF reads the head and tail for the info dictionary and a short XMP packet. JPEG and WebP read Exif text tags, a GPS fix when the rationals are present, and an XMP packet. PNG reads tEXt, zTXt, and iTXt. GIF reads comment extensions. ID3 reads the common text frames. docx reads `docProps/core.xml` when the zip method is stored or deflate. Image pixels are not loaded.
 
 ```sh
 argus meta report.pdf

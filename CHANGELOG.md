@@ -2,98 +2,31 @@
 
 ## [0.3.0] - Unreleased
 
-- campaign rules for Nx s1ngularity, Shai-Hulud 2.0, the Sept 2025 qix
-  phishing wave, the axios RAT, the keyv/cacheable worm, and MemTensor sckit
-- package version checks no longer treat a longer version as a hit
-  (6.0.0 does not match 16.0.0, 5.6.1 does not match 5.6.10)
-- `--progress auto|always|never` + `defaults.progress`: live stderr
-  spinner with file and finding counters while scanning (auto = tty
-  only, hidden under `-v`)
-- elapsed time on the text/markdown `Scan:` summary line (kept out of
-  JSON so report bytes stay deterministic)
-- `argus rules` colorizes the severity column. Text output prints a
-  green `no findings` line on a clean run
-- crate renamed to `argus-scanner` for crates.io (binary stays `argus`)
-- defensive OSINT commands: `domain`, `email`, `ip`, `hash`, `url`,
-  `ports`, `intel`, `account`, `socials`, `feed`, `gitmeta`
-- `intel` queries OTX, ThreatFox, Feodo, and CIRCL. A missing key is
-  inconclusive, not a failed scan
-- tracker and analytics detection, including Cloudflare edge and
-  Cloudflare Insights. The label is a product name, not a legal claim
-- WAF and challenge-page markers (Anubis, Altcha, Cap, SHA-256 proof of
-  work, SafeLine, BunkerWeb, and common commercial products). Markers
-  are reported. Challenge pages are not solved
-- port checks are TCP connect, with modern ports first. No SYN, decoy,
-  or wide CIDR sweeps
-- optional store for reports: SQLite by default, Postgres with
-  `--features postgres`, SurrealDB over its HTTP API. `records` searches
-  what `--store` saved
-- local API on `127.0.0.1:9876`, signed webhooks, and an MCP stdio
-  server (initialize `2025-06-18` and `2025-11-25`, plus `server/discover`
-  for `2026-07-28`). ACP is not implemented
-- `supply` walks nested npm trees, `go.sum`, and NuGet direct and
-  transitive packages
-- `stego` reports appended payloads and zero-width text. It does not
-  extract a hidden message
-- `codec` is RFC 4648 base64 and base32. Output is printed, not executed
-- `style` is a pairwise prose or code distance. It is a lead, not an
-  identification
-- `account` reads public GitHub and GitLab profiles. `socials` extracts
-  profile and resume links, including link-in-bio hubs. `feed` reads
-  RSS, Atom, and JSON Feed. `gitmeta` reads local authors and a public
-  `.git/HEAD` plus config when that file is exposed. Git objects are
-  not downloaded
-- `grep` streams text, CSV, TSV, JSON, JSONL, and SQLite. Lines over
-  1 MiB are skipped, matches print as they are found, and SQLite is
-  opened read-only with bound parameters. Hits are not stored, uploaded,
-  or exposed as an MCP tool
-- `extract` pulls emails, URLs, addresses, hashes, and wallet-shaped
-  strings. A report keeps a sample. `grep --pick` is the full stream
-- `meta` reads PDF, JPEG, PNG, and docx metadata by seeking. It is a
-  subset of a full EXIF tool
-- `dork` prints search links only. Nothing is fetched
-- `favicon` computes the published Shodan `http.favicon.hash` and FOFA
-  `icon_hash` locally. Shodan is not queried
-- `user` checks one username against a small public API table (GitHub,
-  GitLab, Codeberg, crates.io, Keybase). It does not call password-reset
-  endpoints
-- `modules` lists built-in commands from `src/catalog.rs`. Dropping a
-  command means deleting its source, its catalog row, and its CLI arm
-- domain page files now include `ads.txt` and `humans.txt` beside
-  robots, security.txt, and llms.txt
-- `web` reads cookie attributes instead of searching the raw header,
-  treats HSTS `max-age=0` as unset, and flags CSP `unsafe-inline` or
-  `unsafe-eval`. COOP and CORP are reported when missing
-- page description, Open Graph, Twitter, and generator tags are read
-  by `domain`, `url`, and `web`. An em dash in those fields is an info
-  lead. It is not an identification
-- `domain` asks Quad9 and AdGuard whether a name that Cloudflare still
-  answers is blocked. A block is a reputation lead
-- `media` looks for C2PA blocks (JPEG APP11, PNG caBX, ISO boxes),
-  IPTC `trainedAlgorithmicMedia`, and a short list of generator tags
-  in images, audio, and video. It reads the head and tail of large
-  files. A square canvas is noted only next to another marker. The
-  manifest signature is not checked
-- `python` ruleset covers pickle loads, unsafe `yaml.load`,
-  `shell=True`, `eval`/`exec`, disabled TLS checks, and `tempfile.mktemp`
-- language rules for JavaScript, Go, Java, PHP, Ruby, and C# cover command
-  execution, deserialization, SQL built from request values, and TLS checks
-  turned off. `owasp` covers JWT `none` and secrets in logs. `agent` covers
-  model text passed to a shell. These are text matches. They do not decide
-  broken object authorization or prompt injection
-- `web` also reports CORS `*` and `null`, TRACE in the allow-list, mixed
-  content, directory listings, database errors, a cacheable session cookie,
-  and public `server-status`, `actuator/env`, pprof, and `phpinfo.php` pages
-- `email` also reports SPF `+all` or `?all`, DMARC `p=none`, MTA-STS
-  testing mode, and BIMI without a quarantine or reject policy
-- `chat` reads XMPP and IRC SRV records and does not connect
-- `conns` lists sockets with process names and reverse names, and can
-  sample while a command runs. An allow file fails the process on
-  unexpected egress, including cloud metadata addresses
-- `signatures` streams ClamAV main.cvd and daily.cvd hash rows and file heuristics.
-  Bytecode signatures are not executed. Refresh is on unless `--no-update`
-- `threats` looks for preload libraries, cron download cradles, browser
-  files staged under temp, deleted running binaries, and module-list skew
+The crates.io package is `argus-scanner`. The command you run is still `argus`.
+
+A scan on a terminal shows a progress line with the file count and the finding count. `--progress auto` does that only on a tty, `always` forces it, and `never` keeps stderr quiet. `-v` hides the line because the verbose log already says what is happening. The text and markdown summary includes how long the scan took. JSON leaves that number out, so two runs of the same tree still match byte for byte. `argus rules` colors the severity column, and a clean text run prints `no findings` in green.
+
+Version checks compare the whole version. `6.0.0` is not treated as `16.0.0`, and `5.6.1` is not treated as `5.6.10`. Campaign rules cover Nx s1ngularity, Shai-Hulud 2.0, the September 2025 qix phishing wave, the axios RAT, the keyv/cacheable worm, and MemTensor sckit.
+
+The new lookup commands are `domain`, `email`, `ip`, `hash`, `url`, `ports`, `intel`, `account`, `socials`, `feed`, and `gitmeta`. `intel` asks OTX, ThreatFox, Feodo, and CIRCL, and a missing API key is an inconclusive row rather than a failed scan. `ports` is a TCP connect scan that tries common modern ports first. It does not send SYN packets, decoys, or a wide CIDR sweep. `account` reads a public GitHub or GitLab profile. `socials` pulls profile and resume links from a page, including link-in-bio hubs. `feed` reads RSS, Atom, and JSON Feed. `gitmeta` reads author names from a local checkout, and it reads `.git/HEAD` and config when a site leaves those files public. It does not download git objects. `dork` only prints search links. `favicon` computes the Shodan `http.favicon.hash` and the FOFA `icon_hash` on this machine and does not call Shodan. `user` checks one name against GitHub, GitLab, Codeberg, crates.io, and Keybase. It does not hit password-reset forms.
+
+`domain` also fetches `ads.txt` and `humans.txt` next to robots, security.txt, and llms.txt. If Cloudflare still resolves a name but Quad9 or AdGuard refuses it, that block is reported as a reputation lead. `web` parses cookie attributes instead of searching the raw header, treats HSTS `max-age=0` as unset, and flags CSP `unsafe-inline` or `unsafe-eval`. Missing COOP and CORP are reported. The same page read covers CORS `*`, CORS `null`, TRACE in the allow list, mixed content, a directory listing, a database error, a cacheable session cookie, and a public `server-status`, `actuator/env`, pprof, or `phpinfo.php` page. `email` flags SPF `+all` or `?all`, DMARC `p=none`, MTA-STS still in testing, and BIMI on a domain that does not quarantine or reject. `chat` looks up XMPP and IRC SRV records and does not open a connection.
+
+Tracker and analytics names are detected on a page, including Cloudflare edge and Cloudflare Insights. The name is the product, not a legal finding. Challenge pages are recognized for Anubis, Altcha, Cap, a SHA-256 proof of work, SafeLine, BunkerWeb, and the usual commercial WAFs. The marker is reported. The challenge is not solved.
+
+`domain`, `url`, and `web` read the page description, Open Graph, Twitter, and generator tags. An em dash in one of those fields is an info lead. It does not mean the page was written by a model. `media` looks for C2PA blocks (JPEG APP11, PNG caBX, ISO boxes), IPTC `trainedAlgorithmicMedia`, and a short list of generator names in images, audio, and video. Large files are read at the head and the tail. A square canvas is mentioned only when another marker is already there. The C2PA signature is not checked.
+
+Reports can be stored. SQLite is the default, Postgres needs `--features postgres`, and SurrealDB is used over its HTTP API. `records` searches what `--store` saved. `api` listens on `127.0.0.1:9876`. Webhooks are signed. The MCP server speaks initialize `2025-06-18` and `2025-11-25`, and `server/discover` for `2026-07-28`. `supply` walks nested npm trees, `go.sum`, and NuGet packages, direct and transitive.
+
+`grep` streams text, CSV, TSV, JSON, JSONL, and SQLite. A line over 1 MiB is skipped, matches print as they are found, and SQLite is opened read-only with bound parameters. Those hits are not stored, uploaded, or exposed as an MCP tool. `extract` keeps a sample of emails, URLs, addresses, hashes, and wallet-shaped strings. `grep --pick` is the full stream. `codec` encodes and decodes RFC 4648 base64 and base32 and prints the result. `style` is a pairwise distance between two prose or code samples. A close score is a lead, not an identification of who wrote the text. `modules` prints the command list from `src/catalog.rs`.
+
+`meta` reads PDF info and XMP, JPEG and WebP Exif (including a GPS fix when the file has one), PNG text chunks, GIF comments, ID3 title and artist frames, and docx `core.xml`. It also prints the file size and modification time. `stego` still looks for bytes after an image, PDF, or zip end marker, and for zero-width characters. When that tail is readable text, the finding includes it. Unicode tag characters and a zero-width bit string are turned back into text. The tool does not rebuild a message out of pixel bit planes.
+
+`conns` lists sockets with the process name and, for up to 16 public addresses, a reverse name. It can sample while a command runs. An allow file fails the process when something connects outside the list, and cloud metadata addresses fail even if you wrote them down. `files` lists the executable, working directory, and open files for each process. `--path` limits that to one file or directory, so you can see which process has it open. It polls while `--watch` or a command is running, and it will miss a file that is opened and closed between samples. `signatures` streams hash rows from ClamAV `main.cvd` and `daily.cvd`, plus a few file heuristics. Bytecode signatures are not run. The cache refreshes unless you pass `--no-update`. `threats` looks for a preload library, a cron line that downloads into a shell, browser files staged under temp, a running binary whose path is deleted, and a module list that does not match sysfs.
+
+`system` now also reads the firewall default policy, systemd-resolved DNSSEC and DNS-over-TLS, the NTP allow list, Secure Boot and kernel lockdown, the CPU vulnerability files, GRUB, unit files under `/etc/systemd/system`, processes holding `/dev/input/event*`, remote logins from `who`, and enabled serial consoles. The running kernel version is compared with the upstream fixes for CVE-2025-39682, CVE-2025-39964, and CVE-2026-53266. A distribution kernel can already contain the backport even when `uname` looks older than those patch numbers. Firmware chip images are not scanned.
+
+Source checks grew past the Python rules (pickle, `yaml.load`, `shell=True`, `eval` and `exec`, TLS verification turned off, `tempfile.mktemp`). JavaScript, Go, Java, PHP, Ruby, and C# rules look for command execution, deserialization, SQL built from a request value, and TLS checks turned off. `owasp` covers a JWT `none` algorithm and a secret written to a log. `agent` covers model text passed into a shell. These are text matches. They cannot decide broken object authorization, and they cannot decide whether a prompt would jailbreak a model.
 
 ## [0.2.0] - 2026-09-29
 

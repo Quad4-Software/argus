@@ -22,7 +22,7 @@ src/
   fix.rs verify.rs vex.rs license.rs publish.rs
   ai/                  git-history provenance evidence + analyze()
   osint/               public lookups (domain, mail, chat, ip, url, ports, meta)
-  host/                sockets, hash signatures, threat leads
+  host/                sockets, open files, hash signatures, threat leads
   webpassive.rs        passive page checks used by webscan.rs
   search.rs            streaming grep over text, CSV, JSON, SQLite
   extract.rs media.rs seometa.rs stego.rs style.rs codec.rs
