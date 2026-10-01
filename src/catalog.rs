@@ -24,6 +24,11 @@ pub fn modules() -> &'static [Module] {
             about: "Mail policy, keys, gravatar, breach hook",
         },
         Module {
+            name: "chat",
+            group: "osint",
+            about: "XMPP and IRC SRV records",
+        },
+        Module {
             name: "ip",
             group: "osint",
             about: "Geolocation, ASN, VPN, InternetDB",

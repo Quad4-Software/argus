@@ -6,6 +6,7 @@
 //! pages the domain itself publishes. A miss is not treated as proof.
 
 mod account;
+mod chat;
 mod domain;
 mod dork;
 mod email;
@@ -90,6 +91,7 @@ pub struct Report {
 }
 
 pub use account::scan as scan_account;
+pub use chat::scan as scan_chat;
 pub use domain::scan as scan_domain;
 pub use dork::scan as scan_dork;
 pub use email::scan as scan_email;
