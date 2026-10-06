@@ -380,8 +380,10 @@ fn fp_blob(hashes: &[u64]) -> Vec<u8> {
 }
 
 fn blob_fp(blob: &[u8]) -> Vec<u64> {
-    blob.chunks_exact(8)
-        .map(|c| u64::from_le_bytes(c.try_into().unwrap_or_default()))
+    blob.as_chunks::<8>()
+        .0
+        .iter()
+        .map(|c| u64::from_le_bytes(*c))
         .collect()
 }
 

@@ -82,7 +82,7 @@ pub(crate) fn taint_scan(
     for (i, line) in text.lines().enumerate() {
         let indent = line.len() - line.trim_start().len();
         let is_local = match fn_indent {
-            Some(fi) if line.trim().is_empty() => true, // blanks stay in-fn
+            Some(_) if line.trim().is_empty() => true, // blanks stay in-fn
             Some(fi) if indent > fi => true,
             Some(_) => {
                 fn_indent = None; // dedent ended the function
