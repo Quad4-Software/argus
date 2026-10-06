@@ -10,7 +10,9 @@ use crate::emit;
 use crate::finding::{Finding, Report, Severity};
 use crate::provider::RepoSpec;
 use crate::scan::ScanOptions;
-use crate::{baseline, clone, config, http, osv, provider, registry, rules, scan, watch};
+use crate::{
+    agentwatch, baseline, clone, config, http, osv, provider, registry, rules, scan, watch,
+};
 use std::path::Path;
 use std::process::ExitCode;
 
@@ -293,6 +295,14 @@ pub(crate) fn watch_cmd(
                     }
                 }
                 Err(e) => eprintln!("warn: feed {feed}: {e}"),
+            }
+        }
+        if a.agent_surface {
+            let (surface, _snap) = agentwatch::check_once(&a.agent_dir);
+            if !surface.is_empty() {
+                let mut r = Report::new();
+                r.findings = surface;
+                emit(&r.to_text(&Styles::new(cli.color.unwrap_or(ColorMode::Auto))));
             }
         }
         let _ = watch::save_state(&state);

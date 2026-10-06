@@ -225,6 +225,78 @@ pub struct Cli {
     #[arg(
         long,
         global = true,
+        value_name = "FILE",
+        help = "Require the baseline to verify with this ed25519 pubkey"
+    )]
+    pub baseline_pubkey: Option<PathBuf>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "FILE",
+        help = "ed25519 key for signing baselines and scan attestations"
+    )]
+    pub baseline_key: Option<PathBuf>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "FILE",
+        help = "Write a detached .sig for an existing baseline (needs --baseline-key)"
+    )]
+    pub baseline_sign: Option<PathBuf>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "FILE",
+        help = "Write baseline v2 with provenance and content fingerprints"
+    )]
+    pub write_baseline_v2: Option<PathBuf>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "STR",
+        help = "Recorded reviewer for --write-baseline-v2"
+    )]
+    pub baseline_reviewed_by: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "STR",
+        help = "Recorded review reason for --write-baseline-v2"
+    )]
+    pub baseline_reason: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "STR",
+        help = "Per-entry note for --write-baseline-v2"
+    )]
+    pub baseline_note: Option<String>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "N",
+        help = "Baseline expiry in days from now (--write-baseline-v2)"
+    )]
+    pub baseline_ttl_days: Option<u64>,
+
+    #[arg(
+        long,
+        global = true,
+        value_name = "FILE",
+        help = "Emit a signed in-toto scan attestation to FILE"
+    )]
+    pub emit_attestation: Option<PathBuf>,
+
+    #[arg(
+        long,
+        global = true,
         help = "Query OSV.dev for advisories on pinned deps in manifests/lockfiles"
     )]
     pub osv: bool,
@@ -724,6 +796,21 @@ pub enum Cmd {
         /// rekor.sigstore.dev key is already embedded).
         #[arg(long, value_name = "FILE")]
         rekor_pub: Option<PathBuf>,
+        /// Require the attested source repo to match (substring, e.g. owner/name).
+        #[arg(long, value_name = "REPO")]
+        expect_repo: Option<String>,
+        /// Require a certificate identity SAN to match.
+        #[arg(long, value_name = "SAN")]
+        expect_identity: Option<String>,
+        /// Require the OIDC issuer to match exactly.
+        #[arg(long, value_name = "URL")]
+        expect_issuer: Option<String>,
+        /// Verify a scan attestation emitted via --emit-attestation.
+        #[arg(long, value_name = "FILE")]
+        verify_attestation: Option<PathBuf>,
+        /// Public key for --verify-attestation (rulesign hex format).
+        #[arg(long, value_name = "FILE")]
+        attest_pubkey: Option<PathBuf>,
     },
 
     /// Code similarity scoring: normalized-token winnowing fingerprints.
@@ -742,6 +829,21 @@ pub enum Cmd {
         /// Score files under `a` against the indexed corpus (MinHash LSH).
         #[arg(long)]
         index_query: bool,
+        /// Download a signed similarity corpus from URL (db + .sig verified).
+        #[arg(long, value_name = "URL")]
+        fetch_corpus: Option<String>,
+        /// Corpus DB path (default: ~/.local/share/argus/corpus.db).
+        #[arg(long, value_name = "FILE")]
+        corpus_db: Option<PathBuf>,
+        /// Ed25519 pubkey for the corpus (default: embedded release key).
+        #[arg(long, value_name = "FILE")]
+        corpus_pubkey: Option<PathBuf>,
+        /// Also query the downloaded corpus during --index-query.
+        #[arg(long)]
+        index_lookup_corpus: bool,
+        /// Build a corpus db from files under `a`, tagged with NAME.
+        #[arg(long, value_name = "NAME")]
+        corpus_build: Option<String>,
     },
 
     /// Audit a container image: baked-in secrets, root user, history

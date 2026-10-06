@@ -74,6 +74,11 @@ wildcard tool grants, permissive modes, and hook-executed commands. A
 dataflow rule also fires when an instruction file names credential
 stores and a network egress channel in the same file.
 
+`agent-ioc` is the companion feed ruleset: sha256 file hashes of
+captured malicious skill/config payloads plus named-bad package and
+tool identifiers from public MCP incident disclosures. Feeds publish
+new hashes through `rules-update`.
+
 These match text. They do not parse an AST, and they do not prove broken
 access control, insecure design, or prompt injection.
 

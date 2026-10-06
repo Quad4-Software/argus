@@ -98,6 +98,11 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             index,
             index_build,
             index_query,
+            fetch_corpus,
+            corpus_db,
+            corpus_pubkey,
+            index_lookup_corpus,
+            corpus_build,
             ..
         } => {
             sb.reads.push(a.clone());
@@ -115,6 +120,34 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 sb.writes.push(dbp);
             } else if *index_query || index.is_some() {
                 sb.reads.push(dbp);
+            }
+            let cdb = corpus_db
+                .clone()
+                .unwrap_or_else(crate::similar::corpus_path);
+            if fetch_corpus.is_some() || corpus_build.is_some() {
+                if let Some(par) = cdb.parent() {
+                    sb.writes.push(par.to_path_buf());
+                }
+                sb.writes.push(cdb);
+            } else if *index_lookup_corpus {
+                sb.reads.push(cdb);
+            }
+            if let Some(pk) = corpus_pubkey {
+                sb.reads.push(pk.clone());
+            }
+        }
+        Cmd::RulesKeygen { privkey, pubkey } => {
+            for f in [privkey, pubkey] {
+                if let Some(par) = f.parent() {
+                    sb.writes.push(par.to_path_buf());
+                }
+            }
+        }
+        Cmd::RulesSign { file, key } => {
+            sb.reads.push(key.clone());
+            sb.reads.push(file.clone());
+            if let Some(par) = file.parent() {
+                sb.writes.push(par.to_path_buf());
             }
         }
         Cmd::Host(h) => crate::host::grant(h, &mut sb),
@@ -176,6 +209,9 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             if let Some(h) = std::env::home_dir() {
                 sb.writes.push(h.join(".local/share/argus"));
                 sb.reads.push(h);
+            }
+            if a.agent_surface {
+                sb.reads.extend(a.agent_dir.iter().cloned());
             }
         }
         Cmd::Daemon(a) => {
@@ -294,9 +330,27 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             artifact,
             sig,
             cert,
+            rekor_pub,
+            verify_attestation,
+            attest_pubkey,
             ..
         } => {
-            for p in [bundle, artifact, sig, cert].into_iter().flatten() {
+            for p in [
+                bundle,
+                artifact,
+                sig,
+                cert,
+                rekor_pub,
+                verify_attestation,
+                attest_pubkey,
+            ]
+            .into_iter()
+            .flatten()
+            {
+                // parent dir covers the detached .sig sibling too
+                if let Some(par) = p.parent() {
+                    sb.reads.push(par.to_path_buf());
+                }
                 sb.reads.push(p.clone());
             }
         }
@@ -341,6 +395,24 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         && let Some(parent) = bp.parent()
     {
         sb.writes.push(parent.to_path_buf());
+    }
+    for f in [&cli.baseline_pubkey, &cli.baseline_key, &cli.baseline_sign] {
+        if let Some(b) = f
+            && let Some(parent) = b.parent()
+        {
+            sb.reads.push(parent.to_path_buf());
+        }
+    }
+    for f in [
+        &cli.write_baseline_v2,
+        &cli.emit_attestation,
+        &cli.baseline_sign,
+    ] {
+        if let Some(b) = f
+            && let Some(parent) = b.parent()
+        {
+            sb.writes.push(parent.to_path_buf());
+        }
     }
     let _ = opts;
     if let Err(e) = sandbox::apply(&sb) {

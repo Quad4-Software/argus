@@ -9,7 +9,7 @@ use crate::color::{ColorMode, Styles};
 use crate::finding::{Report, Severity, TargetStat};
 use crate::provider::RepoSpec;
 use crate::scan::ScanOptions;
-use crate::{clone, config, finding, provider, roam, rules, scan};
+use crate::{attest_emit, baseline, clone, config, finding, provider, roam, rules, scan};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -544,9 +544,12 @@ pub(crate) fn history_secrets(
     for p in paths {
         if p.join(".git").exists() {
             let label = p.display().to_string();
-            report.findings.extend(crate::history::scan_history(
-                p, rules, opts, &label, verbose,
-            ));
+            let head = crate::history::head_secret_fps(p, rules, opts);
+            report
+                .findings
+                .extend(crate::history::scan_history_provenance(
+                    p, rules, opts, &label, verbose, &head,
+                ));
         }
     }
 }
@@ -755,4 +758,93 @@ pub(crate) fn scan_paths(
     if let Some(refpath) = &cli.similar {
         crate::cmd::similar_cmd::vendored_check(paths, refpath, opts, report, cli.verbose);
     }
+}
+
+/// Baseline load/partition plus baseline and attestation writers.
+/// Returns Some(new_worst) when a baseline partition ran so the caller
+/// keeps its own worst-of otherwise.
+pub(crate) fn finish_baselines(
+    cli: &crate::cli::Cli,
+    cfg: &crate::config::ConfigFile,
+    report: &mut crate::finding::Report,
+) -> Result<(Option<crate::finding::Severity>, bool), String> {
+    // baseline handling
+    let mut base_known = std::collections::HashSet::new();
+    let mut base_content = std::collections::HashSet::new();
+    let baseline_path = cli
+        .baseline
+        .clone()
+        .or_else(|| cfg.defaults.baseline.clone().map(PathBuf::from));
+    if let Some(bp) = &baseline_path {
+        if let Some(pk) = &cli.baseline_pubkey {
+            baseline::verify(bp, pk)?;
+        }
+        let lb = baseline::load_full(bp)?;
+        if lb.expired > 0 {
+            report
+                .errors
+                .push(format!("baseline: {} expired entries dropped", lb.expired));
+        }
+        base_known = lb.baseline.fingerprint_set();
+        base_content = lb.baseline.content_set();
+    }
+    let out = if !base_known.is_empty() || !base_content.is_empty() {
+        let mut unsuppressed = 0usize;
+        let (_known, new) = baseline::partition_aware(
+            &base_known,
+            &base_content,
+            std::mem::take(&mut report.findings),
+            &mut unsuppressed,
+        );
+        if unsuppressed > 0 {
+            report.errors.push(format!(
+                "baseline: {unsuppressed} critical finding(s) match the baseline but are kept visible - review and rotate rather than suppress"
+            ));
+        }
+        let w = baseline::worst_of(&new);
+        report.summary.baselined = _known.len();
+        if cli.fail_on_new {
+            report.findings = new;
+        } else {
+            report.findings.extend(_known);
+        }
+        w
+    } else {
+        report.worst()
+    };
+    if let Some(bp) = &cli.write_baseline {
+        baseline::write(bp, &report.findings)?;
+        eprintln!("baseline written to {}", bp.display());
+    }
+    if let Some(bp) = &cli.write_baseline_v2 {
+        let ttl = cli
+            .baseline_ttl_days
+            .map(|d| finding::iso8601(finding::unix_now() + d * 86400));
+        match &cli.baseline_key {
+            Some(k) => baseline::write_signed(
+                bp,
+                &report.findings,
+                cli.baseline_reviewed_by.as_deref(),
+                cli.baseline_reason.as_deref(),
+                ttl.as_deref(),
+                k,
+            )?,
+            None => baseline::write_v2(bp, &report.findings, cli.baseline_note.as_deref())?,
+        }
+        eprintln!("baseline v2 written to {}", bp.display());
+    }
+    if let Some(bp) = &cli.baseline_sign {
+        let k = cli
+            .baseline_key
+            .as_ref()
+            .ok_or("--baseline-sign requires --baseline-key")?;
+        eprintln!("{}", baseline::sign(bp, k)?);
+    }
+    if let Some(ap) = &cli.emit_attestation {
+        let v = serde_json::to_value(&report).map_err(|e| e.to_string())?;
+        let out2 = attest_emit::emit_attestation(&v, ap, cli.baseline_key.as_deref())?;
+        eprintln!("scan attestation written to {}", out2.display());
+    }
+
+    Ok((out, !base_known.is_empty() || !base_content.is_empty()))
 }

@@ -3,7 +3,14 @@
 Global options apply to every command: `--format`, `--output`,
 `--severity`, `--fail-on`, `--color`, `--progress`, `--jobs`,
 `--exclude`, `--offline`, `--no-sandbox`, `--baseline`, `--vex`,
-`--vex-out`, `--staged`, `--diff`, `-v/-vv`.
+`--vex-out`, `--staged`, `--diff`, `-v/-vv`. Baseline v2 options:
+`--write-baseline-v2` (provenance fields and content fingerprints so
+renames cannot evade suppression), `--baseline-pubkey` (require a signed
+baseline to verify before use), `--baseline-key` (ed25519 key shared with
+scan attestations), `--baseline-sign`, `--baseline-reviewed-by`,
+`--baseline-reason`, `--baseline-note`, `--baseline-ttl-days` (entries
+expiring are dropped and counted). `--emit-attestation` writes a signed
+in-toto scan statement.
 
 `--progress` draws a live spinner with file/finding counters on stderr
 (`auto`: tty only, hidden with `-v`; `always`/`never` force it).
@@ -196,6 +203,19 @@ argus similar src/ --index-query       # LSH lookups against the index
 compares files under the path against indexed candidates; a band hit is
 confirmed with the exact Jaccard and containment checks used by pair mode.
 ```
+argus similar pkgs/ --corpus-build mypkgs --corpus-db corpus.db
+argus similar src/ --index-lookup-corpus
+argus similar . --fetch-corpus https://example/corpus.db
+
+`--fetch-corpus URL` downloads a signed fingerprint corpus (the db plus
+its detached ed25519 `.sig`, verified before install, default pubkey
+embedded) into `~/.local/share/argus/corpus.db`. `--index-lookup-corpus`
+then reports vendored-code matches against it, naming the package
+identity from the corpus rather than a local path. `--corpus-build NAME`
+is the maintainer side: it fingerprints a tree into a fresh corpus db
+signed corpus feeds can publish. A wrong or missing signature refuses
+the download; nothing unverified is ever installed.
+```
 
 ## secrets / history
 
@@ -281,6 +301,20 @@ transparency-log proof drops to `PARTIAL` (`AT-002`); bad signature or
 tampered payload reports `FAIL` (`AT-003`). Fulcio roots and the Rekor
 key are embedded under `trust/`, so bundle files verify with no network
 at all - `--npm` is the only mode that needs a connection.
+
+`--expect-repo`, `--expect-identity`, and `--expect-issuer` pin the
+attested claims: repo and identity use case-insensitive substring match
+(`npm/node-semver` matches the full URL), issuer is exact. A verified
+bundle attesting something else reports `FAIL` with an identity-mismatch
+error, and every applied pin lands in the finding evidence.
+
+`--emit-attestation FILE` (global flag, works on any scan) writes an
+in-toto statement covering the report: subject is the sha256 of the
+canonical report JSON, the predicate records tool version, severity
+counts, and finding fingerprints. With `--baseline-key FILE` the
+statement gets a detached ed25519 `.sig`; `attest
+--verify-attestation FILE --attest-pubkey FILE` checks it later. The
+same key flag signs baselines.
 
 ## fix [paths]
 
@@ -375,7 +409,11 @@ RSS/Atom feeds; `daemon` adds an HTTP control plane and signed
 webhooks (`/healthz`, `/report`, `/state`, `/scan`,
 `/webhook/{github,gitlab,gitea}`). Pushes rescan only the changed
 files, diff the dependency set (added/removed/version-changed), and
-with `--dep-watch` alert on registry maintainer changes.
+with `--dep-watch` alert on registry maintainer changes. With
+`--agent-surface` each poll also diffs local agent config dirs
+(skills, hooks, MCP configs, instructions, plus any `--agent-dir`
+extras) and reports added/modified/deleted files - a tripwire for
+agent-surface persistence.
 
 ## init
 

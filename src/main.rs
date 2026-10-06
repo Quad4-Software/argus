@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
 // Copyright (c) 2026 Quad4
 
+mod agentwatch;
 mod ai;
 #[cfg(feature = "ast")]
 mod astscan;
 mod attest;
+mod attest_emit;
+mod attest_pin;
 mod audit;
 mod baseline;
 mod cache;
@@ -294,6 +297,11 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             sig,
             cert,
             rekor_pub,
+            expect_repo,
+            expect_identity,
+            expect_issuer,
+            verify_attestation,
+            attest_pubkey,
         } => cmd::attest_cmd::attest_cmd(
             &cmd::attest_cmd::AttestArgs {
                 bundle,
@@ -302,6 +310,13 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
                 sig,
                 cert,
                 rekor_pub,
+                expect: crate::attest_pin::Expect {
+                    repo: expect_repo.clone(),
+                    identity: expect_identity.clone(),
+                    issuer: expect_issuer.clone(),
+                },
+                verify_attestation,
+                attest_pubkey,
                 offline,
             },
             &mut report,
@@ -312,15 +327,34 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             index,
             index_build,
             index_query,
-        } => crate::cmd::similar_cmd::similar_cmd(
-            a,
-            b.as_deref(),
-            index.as_deref(),
-            *index_build,
-            *index_query,
-            &opts,
-            &mut report,
-        ),
+            fetch_corpus,
+            corpus_db,
+            corpus_pubkey,
+            index_lookup_corpus,
+            corpus_build,
+        } => {
+            if offline && fetch_corpus.is_some() {
+                return Err("--fetch-corpus needs network (offline mode set)".into());
+            }
+            crate::cmd::similar_cmd::similar_dispatch(
+                &crate::cmd::similar_cmd::SimilarArgs {
+                    a,
+                    b: b.as_deref(),
+                    index: index.as_deref(),
+                    index_build: *index_build,
+                    index_query: *index_query,
+                    corpus: crate::cmd::similar_cmd::CorpusArgs {
+                        db: corpus_db.as_deref(),
+                        fetch: fetch_corpus.as_deref(),
+                        pubkey: corpus_pubkey.as_deref(),
+                        lookup: *index_lookup_corpus,
+                        build: corpus_build.as_deref(),
+                    },
+                },
+                &opts,
+                &mut report,
+            )
+        }
         Cmd::Roam(a) => {
             roam_cmd(cli, a, &cfg, &rules, &opts, &mut report)?;
         }
@@ -564,42 +598,9 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         }
     }
 
-    // baseline handling
-    let mut base_known = std::collections::HashSet::new();
-    let baseline_path = cli
-        .baseline
-        .clone()
-        .or_else(|| cfg.defaults.baseline.clone().map(PathBuf::from));
-    if let Some(bp) = &baseline_path {
-        base_known = baseline::load(bp)?;
-    }
-    let new_worst = if !base_known.is_empty() {
-        let mut unsuppressed = 0usize;
-        let (_known, new) = baseline::partition(
-            std::mem::take(&mut report.findings),
-            &base_known,
-            &mut unsuppressed,
-        );
-        if unsuppressed > 0 {
-            report.errors.push(format!(
-                "baseline: {unsuppressed} critical finding(s) match the baseline but are kept visible - review and rotate rather than suppress"
-            ));
-        }
-        let w = baseline::worst_of(&new);
-        report.summary.baselined = _known.len();
-        if cli.fail_on_new {
-            report.findings = new;
-        } else {
-            report.findings.extend(_known);
-        }
-        w
-    } else {
-        report.worst()
-    };
-    if let Some(bp) = &cli.write_baseline {
-        baseline::write(bp, &report.findings)?;
-        eprintln!("baseline written to {}", bp.display());
-    }
+    // baseline handling + optional scan attestation emit
+    let (new_worst, had_baseline) = cmd::misc::finish_baselines(cli, &cfg, &mut report)?;
+    let new_worst = new_worst.or_else(|| report.worst());
 
     // persist scan for trend diffs
     if cli.store {
@@ -651,7 +652,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             eprintln!("warn: {e}");
         }
     }
-    let worst = if cli.fail_on_new && !base_known.is_empty() {
+    let worst = if cli.fail_on_new && had_baseline {
         new_worst
     } else {
         report.worst()

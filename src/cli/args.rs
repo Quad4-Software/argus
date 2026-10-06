@@ -117,6 +117,13 @@ pub struct WatchArgs {
     /// Persistent clone dir (kept between polls for incremental speed).
     #[arg(long)]
     pub workdir: Option<PathBuf>,
+    /// Also tripwire local agent-surface dirs (skills, hooks, MCP configs)
+    /// for added/modified/deleted files on each poll.
+    #[arg(long)]
+    pub agent_surface: bool,
+    /// Extra directory to include in --agent-surface (repeatable).
+    #[arg(long)]
+    pub agent_dir: Vec<PathBuf>,
 }
 
 #[derive(Args)]

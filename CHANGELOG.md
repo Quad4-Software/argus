@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+Attestation gets identity pinning and a new emit path: `--expect-repo`,
+`--expect-identity`, and `--expect-issuer` turn a VERIFIED bundle into
+FAIL when it attests the wrong thing; `--emit-attestation` writes an
+in-toto scan statement signed with an ed25519 key, and
+`attest --verify-attestation` checks it.
+
+Baselines are auditable: `--write-baseline-v2` records reviewer, reason,
+expiry, and content fingerprints; `--baseline-pubkey` enforces an
+ed25519 signature before suppression; `--baseline-ttl-days` expires
+entries; renames can no longer evade suppression silently because
+content fingerprints survive moves and record the move in evidence.
+
+`--history-secrets` now answers "rotated or just moved?": per-token
+fingerprints track each secret through commits and annotate whether it
+is still live at HEAD, was removed at a given commit, or reappeared
+after an absence.
+
+`argus similar` gains a signed corpus: `--fetch-corpus` downloads and
+verifies a fingerprint db before install, `--index-lookup-corpus`
+queries it for vendored code naming the package identity, and
+`--corpus-build` produces new signed corpora.
+
+`argus watch --agent-surface` tripwires local agent config dirs
+(skills, hooks, MCP configs, instruction files) for added, modified,
+or deleted files on every poll.
+
+A new `agent-ioc` ruleset carries known-bad skill/MCP artifact hashes
+and identifiers for feed distribution.
+
 A new `agent-surface` ruleset audits the files AI agents consume:
 MCP server configs, instruction files (`CLAUDE.md`, `AGENTS.md`,
 `SKILL.md`, `.cursorrules`, `copilot-instructions.md`, per-client rules

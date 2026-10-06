@@ -75,6 +75,7 @@ fn finding(rep: &AttestReport, name: &str) -> Finding {
     if let Some(m) = rep.artifact_match {
         evidence.push(format!("artifact digest match: {m}"));
     }
+    evidence.extend(rep.pinned.iter().cloned());
     Finding {
         ruleset: "attest".into(),
         rule_id: id.into(),
@@ -105,6 +106,9 @@ fn print_report(name: &str, rep: &AttestReport) {
     if let Some(m) = rep.artifact_match {
         eprintln!("  artifact digest match: {m}");
     }
+    for pin in &rep.pinned {
+        eprintln!("  {pin}");
+    }
     for e in &rep.errors {
         eprintln!("  error: {e}");
     }
@@ -117,6 +121,9 @@ pub(crate) struct AttestArgs<'a> {
     pub sig: &'a Option<PathBuf>,
     pub cert: &'a Option<PathBuf>,
     pub rekor_pub: &'a Option<PathBuf>,
+    pub expect: crate::attest_pin::Expect,
+    pub verify_attestation: &'a Option<PathBuf>,
+    pub attest_pubkey: &'a Option<PathBuf>,
     pub offline: bool,
 }
 
@@ -130,6 +137,16 @@ pub(crate) fn attest_cmd(a: &AttestArgs, report: &mut Report) -> Result<(), Stri
         a.rekor_pub,
         a.offline,
     );
+
+    if let Some(att) = a.verify_attestation {
+        let pk = a
+            .attest_pubkey
+            .as_ref()
+            .ok_or("--verify-attestation requires --attest-pubkey")?;
+        crate::attest_emit::verify_attestation(att, pk)?;
+        eprintln!("{}: scan attestation signature VERIFIED", att.display());
+        return Ok(());
+    }
     let log_key = rekor_pub
         .as_ref()
         .map(|p| {
@@ -141,7 +158,12 @@ pub(crate) fn attest_cmd(a: &AttestArgs, report: &mut Report) -> Result<(), Stri
 
     if let Some(b) = bundle {
         let bytes = std::fs::read(b).map_err(|e| format!("{}: {e}", b.display()))?;
-        let rep = crate::attest::verify_bundle_key(&bytes, artifact.as_deref(), log_key.as_ref());
+        let rep = crate::attest_pin::verify_bundle_key_expect(
+            &bytes,
+            artifact.as_deref(),
+            log_key.as_ref(),
+            &a.expect,
+        );
         reps.push((b.display().to_string(), rep));
     }
     if let Some(pkg) = npm {
@@ -150,7 +172,8 @@ pub(crate) fn attest_cmd(a: &AttestArgs, report: &mut Report) -> Result<(), Stri
         }
         let http = crate::http::HttpClient::new(vec![]);
         let rs = crate::attest::verify_npm(&http, pkg)?;
-        for (i, r) in rs.into_iter().enumerate() {
+        for (i, mut r) in rs.into_iter().enumerate() {
+            crate::attest_pin::apply_expectations(&mut r, &a.expect);
             reps.push((format!("npm:{pkg}[{i}]"), r));
         }
     }
@@ -173,7 +196,8 @@ pub(crate) fn attest_cmd(a: &AttestArgs, report: &mut Report) -> Result<(), Stri
             .map(|p| std::fs::read(p).map_err(|e| format!("{}: {e}", p.display())))
             .transpose()?
             .ok_or("--sig/--cert mode requires --artifact")?;
-        let rep = crate::attest::verify_sig_cert(&sig_b, &der, &artifact_b);
+        let mut rep = crate::attest::verify_sig_cert(&sig_b, &der, &artifact_b);
+        crate::attest_pin::apply_expectations(&mut rep, &a.expect);
         reps.push((sig.display().to_string(), rep));
     }
     if reps.is_empty() {

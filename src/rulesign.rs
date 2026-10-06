@@ -124,7 +124,6 @@ fn unb64(s: &str) -> Result<Vec<u8>, String> {
 
 /// Sign arbitrary bytes; returns the base64 signature.
 /// Shared by baseline signing and report attestation.
-#[allow(dead_code)]
 pub fn sign_bytes(bytes: &[u8], key: &Path) -> Result<String, String> {
     use ed25519_dalek::Signer;
     let hexkey = std::fs::read_to_string(key).map_err(|e| format!("key: {e}"))?;
@@ -133,7 +132,6 @@ pub fn sign_bytes(bytes: &[u8], key: &Path) -> Result<String, String> {
 }
 
 /// Verify a base64 signature over bytes against a public key file.
-#[allow(dead_code)]
 pub fn verify_bytes(bytes: &[u8], sig_b64: &str, pubkey: &Path) -> Result<(), String> {
     use ed25519_dalek::Verifier;
     let hexkey = std::fs::read_to_string(pubkey).map_err(|e| format!("pubkey: {e}"))?;
@@ -146,5 +144,6 @@ pub fn verify_bytes(bytes: &[u8], sig_b64: &str, pubkey: &Path) -> Result<(), St
     let mut arr = [0u8; 64];
     arr.copy_from_slice(&sig_bytes);
     let sig = ed25519_dalek::Signature::from_bytes(&arr);
-    vk.verify(bytes, &sig).map_err(|_| "bad signature".to_string())
+    vk.verify(bytes, &sig)
+        .map_err(|_| "bad signature".to_string())
 }
