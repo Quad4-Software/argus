@@ -583,7 +583,7 @@ fn verify_tlog(entries: &[serde_json::Value], log_key: &LogKey, rep: &mut Attest
 }
 
 fn hex_decode(s: &str) -> Option<Vec<u8>> {
-    if s.len() % 2 != 0 || !s.chars().all(|c| c.is_ascii_hexdigit()) {
+    if !s.len().is_multiple_of(2) || !s.chars().all(|c| c.is_ascii_hexdigit()) {
         return None;
     }
     Some(
@@ -747,9 +747,9 @@ pub fn verify_bundle_key(
             && let Ok(b) = std::fs::read(p)
         {
             let dg = Sha256::digest(&b);
-            rep.artifact_match = Some(hex_encode(&dg) == hex_encode(&digest) || digest.is_empty());
+            rep.artifact_match = Some(hex_encode(dg) == hex_encode(&digest) || digest.is_empty());
             candidates.push(b); // cosign signs raw blob
-            candidates.push(hex_encode(&dg).into_bytes()); // or hex digest
+            candidates.push(hex_encode(dg).into_bytes()); // or hex digest
         }
         if !digest.is_empty() {
             candidates.push(digest.clone());
@@ -809,7 +809,7 @@ pub fn verify_sig_cert(sig_bytes: &[u8], cert_der: &[u8], artifact: &[u8]) -> At
     rep.source_repo = leaf.source_repo.clone();
     rep.chain_ok = chain_to_root(&leaf, &[]);
     let dg = Sha256::digest(artifact);
-    let candidates = [artifact.to_vec(), hex_encode(&dg).into_bytes(), dg.to_vec()];
+    let candidates = [artifact.to_vec(), hex_encode(dg).into_bytes(), dg.to_vec()];
     rep.signature_ok = candidates
         .iter()
         .any(|m| verify_by_spki(&leaf.spki, leaf.key_alg, m, sig_bytes).unwrap_or(false));

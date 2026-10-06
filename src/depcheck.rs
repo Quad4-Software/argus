@@ -537,7 +537,7 @@ mod risk_tests {
     #[test]
     fn nearest_popular_uses_lists() {
         assert_eq!(
-            nearest_popular("npm", "crossenv").map(|(v, d)| (v, d)),
+            nearest_popular("npm", "crossenv"),
             Some(("cross-env".to_string(), 1))
         );
         // transposition counts as one edit

@@ -343,7 +343,7 @@ fn resolve_cves(http: &HttpClient, ids: &[String]) -> HashMap<String, Vec<String
 /// KEV-listed hits to at least High. Findings keep their field schema;
 /// the advisory id is read from rule_id. Skipped entirely by callers
 /// under --no-enrich / --offline.
-pub fn enrich_findings(http: &HttpClient, findings: &mut Vec<Finding>) {
+pub fn enrich_findings(http: &HttpClient, findings: &mut [Finding]) {
     let ids: Vec<String> = findings.iter().map(|f| f.rule_id.clone()).collect();
     if ids.is_empty() {
         return;

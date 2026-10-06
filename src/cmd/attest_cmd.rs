@@ -110,16 +110,26 @@ fn print_report(name: &str, rep: &AttestReport) {
     }
 }
 
-pub(crate) fn attest_cmd(
-    bundle: &Option<PathBuf>,
-    artifact: &Option<PathBuf>,
-    npm: &Option<String>,
-    sig: &Option<PathBuf>,
-    cert: &Option<PathBuf>,
-    rekor_pub: &Option<PathBuf>,
-    offline: bool,
-    report: &mut Report,
-) -> Result<(), String> {
+pub(crate) struct AttestArgs<'a> {
+    pub bundle: &'a Option<PathBuf>,
+    pub artifact: &'a Option<PathBuf>,
+    pub npm: &'a Option<String>,
+    pub sig: &'a Option<PathBuf>,
+    pub cert: &'a Option<PathBuf>,
+    pub rekor_pub: &'a Option<PathBuf>,
+    pub offline: bool,
+}
+
+pub(crate) fn attest_cmd(a: &AttestArgs, report: &mut Report) -> Result<(), String> {
+    let (bundle, artifact, npm, sig, cert, rekor_pub, offline) = (
+        a.bundle,
+        a.artifact,
+        a.npm,
+        a.sig,
+        a.cert,
+        a.rekor_pub,
+        a.offline,
+    );
     let log_key = rekor_pub
         .as_ref()
         .map(|p| {

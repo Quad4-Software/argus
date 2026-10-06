@@ -245,7 +245,7 @@ fn imported_names(t: &str, ext: &str, out: &mut std::collections::HashSet<String
             res!(r"(?m)^\s*import\s+(?:static\s+)?([a-zA-Z0-9_.]+)");
         }
         "cs" | "fs" => {
-            res!(r"(?m)^\s*using\s+(?!static)([A-Za-z0-9_.]+)");
+            res!(r"(?m)^\s*using\s+(?:static\s+)?([A-Za-z0-9_.]+)");
         }
         "php" => {
             res!(r"(?m)^\s*use\s+([A-Za-z0-9_\\]+)");
@@ -550,7 +550,26 @@ fn symbols_used(
 
 #[cfg(test)]
 mod sym_tests {
+    use super::*;
     use std::fs;
+
+    #[test]
+    fn go_symbol_call_detected() {
+        let dir = std::env::temp_dir().join(format!("argus-sym-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(
+            dir.join("main.go"),
+            "package main\nimport \"golang.org/x/net/proxy\"\nfunc main() {\n\t_, _ = proxy.FromEnvironment()\n}\n",
+        )
+        .unwrap();
+        let syms = vec!["Dial".to_string(), "FromEnvironment".to_string()];
+        let opts = crate::ScanOptions::default();
+        let used = symbols_used(std::slice::from_ref(&dir), "Go", &syms, &opts);
+        assert!(used.contains("FromEnvironment"), "used={used:?}");
+        assert!(!used.contains("Dial"));
+        let _ = fs::remove_dir_all(&dir);
+    }
 }
 
 #[cfg(test)]
@@ -596,7 +615,7 @@ mod reach_tests {
             },
         ];
         let opts = ScanOptions::default();
-        let r = dep_reachability(&[dir.clone()], &deps, &opts);
+        let r = dep_reachability(std::slice::from_ref(&dir), &deps, &opts);
         assert_eq!(r["serde-json"], Reach::Imported); // serde_json use
         assert_eq!(r["anyhow"], Reach::Imported);
         assert_eq!(r["lodash"], Reach::Mentioned); // comment only

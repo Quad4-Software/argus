@@ -398,10 +398,8 @@ pub(crate) fn default_db_path() -> PathBuf {
 }
 
 fn index_connect(db: &Path, write: bool) -> Result<rusqlite::Connection, String> {
-    if write {
-        if let Some(parent) = db.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-        }
+    if write && let Some(parent) = db.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let conn = if write {
         rusqlite::Connection::open(db)

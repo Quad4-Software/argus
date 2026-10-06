@@ -295,13 +295,15 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             cert,
             rekor_pub,
         } => cmd::attest_cmd::attest_cmd(
-            bundle,
-            artifact,
-            npm,
-            sig,
-            cert,
-            rekor_pub,
-            offline,
+            &cmd::attest_cmd::AttestArgs {
+                bundle,
+                artifact,
+                npm,
+                sig,
+                cert,
+                rekor_pub,
+                offline,
+            },
             &mut report,
         )?,
         Cmd::Similar {

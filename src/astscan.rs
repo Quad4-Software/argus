@@ -67,19 +67,16 @@ pub(crate) fn covers(rule_lang: AstLang, file_lang: AstLang) -> bool {
 /// Language for a repo-relative path, by extension.
 pub(crate) fn lang_for_path(rel: &str) -> Option<AstLang> {
     let ext = rel.rsplit('.').next()?.to_lowercase();
-    for l in [
+    [
         AstLang::JavaScript,
         AstLang::TypeScript,
         AstLang::Tsx,
         AstLang::Python,
         AstLang::Go,
         AstLang::Rust,
-    ] {
-        if l.extensions().contains(&ext.as_str()) {
-            return Some(l);
-        }
-    }
-    None
+    ]
+    .into_iter()
+    .find(|l| l.extensions().contains(&ext.as_str()))
 }
 
 /// Parse `text` as `lang`. Tree-sitter never fails hard - it produces an

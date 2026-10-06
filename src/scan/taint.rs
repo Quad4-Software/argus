@@ -103,7 +103,7 @@ pub(crate) fn taint_scan(
                     || (is_local && locals.iter().any(|v| word_present(&rhs, v))
                         || globals.iter().any(|v| word_present(&rhs, v)));
                 let sanitized = sanitizers.iter().any(|s| s.is_match(&rhs));
-                if rhs_dirty && !(sanitized && !source.is_match(&rhs)) {
+                if rhs_dirty && (!sanitized || source.is_match(&rhs)) {
                     if is_local {
                         locals.insert(lhs);
                     } else {

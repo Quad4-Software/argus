@@ -82,10 +82,7 @@ pub(crate) struct Matcher {
 impl Matcher {
     pub fn build<'a>(rules: impl Iterator<Item = &'a CompiledRule>) -> Self {
         let mut unanchored: Vec<(usize, Slot, regex::Regex)> = Vec::new();
-        let mut lits: Vec<String> = Vec::new();
-        let mut lit_of: Vec<Vec<(usize, LitRef)>> = Vec::new();
-        let mut lit_idx: std::collections::HashMap<String, usize> =
-            std::collections::HashMap::new();
+        let mut pool = super::anchors::LitPool::default();
         // gate keywords live in a second, case-insensitive automaton
         let mut glits: Vec<String> = Vec::new();
         let mut gate_of: Vec<Vec<usize>> = Vec::new();
@@ -105,19 +102,6 @@ impl Matcher {
             gate_of[pat].push(ri);
             has_gate.insert(ri);
         };
-        let push_lit = |lits: &mut Vec<String>,
-                        lit_of: &mut Vec<Vec<(usize, LitRef)>>,
-                        lit_idx: &mut std::collections::HashMap<String, usize>,
-                        s: &str,
-                        ri: usize,
-                        r: LitRef| {
-            let pat = *lit_idx.entry(s.to_string()).or_insert_with(|| {
-                lits.push(s.to_string());
-                lit_of.push(Vec::new());
-                lits.len() - 1
-            });
-            lit_of[pat].push((ri, r));
-        };
         #[cfg(feature = "ast")]
         let mut ast_langs = HashSet::new();
         for (i, r) in rules.enumerate() {
@@ -129,20 +113,11 @@ impl Matcher {
                     ..
                 } => {
                     if let Some(re) = regex {
-                        super::anchors::push_re(
-                            &mut unanchored,
-                            &mut lits,
-                            &mut lit_of,
-                            &mut lit_idx,
-                            &push_lit,
-                            re,
-                            i,
-                            Slot::Main,
-                        );
+                        super::anchors::push_re(&mut unanchored, &mut pool, re, i, Slot::Main);
                     }
                     for (li, l) in contains.iter().enumerate() {
                         if !l.is_empty() {
-                            push_lit(&mut lits, &mut lit_of, &mut lit_idx, l, i, LitRef::Emit(li));
+                            pool.push_lit(l, i, LitRef::Emit(li));
                         }
                     }
                     for kw in gate.iter().flatten() {
@@ -153,16 +128,7 @@ impl Matcher {
                     }
                 }
                 CompiledKind::Secret { re, gate, .. } => {
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        re,
-                        i,
-                        Slot::Main,
-                    );
+                    super::anchors::push_re(&mut unanchored, &mut pool, re, i, Slot::Main);
                     for kw in gate.iter().flatten() {
                         let k = kw.to_lowercase();
                         if !k.is_empty() {
@@ -171,63 +137,18 @@ impl Matcher {
                     }
                 }
                 CompiledKind::SourceUrl { line_re, .. } => {
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        line_re,
-                        i,
-                        Slot::Main,
-                    );
+                    super::anchors::push_re(&mut unanchored, &mut pool, line_re, i, Slot::Main);
                 }
                 CompiledKind::Package { names_re, .. } => {
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        names_re,
-                        i,
-                        Slot::Main,
-                    );
+                    super::anchors::push_re(&mut unanchored, &mut pool, names_re, i, Slot::Main);
                 }
                 CompiledKind::ActionRef { uses_re, .. } => {
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        uses_re,
-                        i,
-                        Slot::Main,
-                    );
+                    super::anchors::push_re(&mut unanchored, &mut pool, uses_re, i, Slot::Main);
                 }
                 CompiledKind::Taint { source, sink, .. }
                 | CompiledKind::Dataflow { source, sink, .. } => {
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        source,
-                        i,
-                        Slot::Source,
-                    );
-                    super::anchors::push_re(
-                        &mut unanchored,
-                        &mut lits,
-                        &mut lit_of,
-                        &mut lit_idx,
-                        &push_lit,
-                        sink,
-                        i,
-                        Slot::Sink,
-                    );
+                    super::anchors::push_re(&mut unanchored, &mut pool, source, i, Slot::Source);
+                    super::anchors::push_re(&mut unanchored, &mut pool, sink, i, Slot::Sink);
                 }
                 #[cfg(feature = "ast")]
                 CompiledKind::Ast { lang, .. } => {
@@ -241,12 +162,12 @@ impl Matcher {
             }
         }
 
-        let ac = if lits.is_empty() {
+        let ac = if pool.lits.is_empty() {
             None
         } else {
             aho_corasick::AhoCorasick::builder()
                 .match_kind(aho_corasick::MatchKind::Standard)
-                .build(&lits)
+                .build(&pool.lits)
                 .ok()
         };
         let ac_gate = if glits.is_empty() {
@@ -259,7 +180,8 @@ impl Matcher {
                 .ok()
         };
         if std::env::var_os("ARGUS_PROF").is_some() {
-            let anchored = lit_of
+            let anchored = pool
+                .lit_of
                 .iter()
                 .flatten()
                 .filter(|(_, r)| matches!(r, LitRef::Anchor(_)))
@@ -276,7 +198,7 @@ impl Matcher {
             ac_gate,
             gate_of,
             has_gate,
-            lit_of,
+            lit_of: pool.lit_of,
             #[cfg(feature = "ast")]
             ast_langs,
         }
@@ -329,6 +251,8 @@ pub(crate) struct FileMatch {
 
 impl FileMatch {
     pub(crate) fn compute(m: &Matcher, text: &str, rel: &str) -> Self {
+        #[cfg(not(feature = "ast"))]
+        let _ = rel;
         let mut fm = FileMatch::default();
         // case-insensitive keyword pass first: unanchored regexes of gated
         // rules can then be skipped outright when no keyword is present
@@ -985,7 +909,7 @@ mod matcher_tests {
 
     #[test]
     fn contains_literal_emits() {
-        let rules = vec![content_rule("R1", &["skyleen.fr"])];
+        let rules = [content_rule("R1", &["skyleen.fr"])];
         let m = Matcher::build(rules.iter());
         let fm = FileMatch::compute(&m, "beacon skyleen.fr\n", "x.txt");
         assert!(
@@ -999,7 +923,7 @@ mod matcher_tests {
     fn nested_literals_all_report() {
         // "m-kosche.com" inside "t.m-kosche.com": overlapping iteration
         // must credit both rules
-        let rules = vec![
+        let rules = [
             content_rule("R-long", &["t.m-kosche.com"]),
             content_rule("R-short", &["m-kosche.com"]),
         ];
@@ -1013,7 +937,7 @@ mod matcher_tests {
     fn short_literal_does_not_eat_longer() {
         // a 2-byte keyword ("sk") starting at the same position must not
         // suppress the longer contains literal under it
-        let rules = vec![
+        let rules = [
             content_rule("R-emit", &["skyleen.fr"]),
             CompiledRule {
                 set: "t".into(),
@@ -1042,7 +966,7 @@ mod matcher_tests {
 
     #[test]
     fn anchor_gates_and_unanchors() {
-        let rules = vec![CompiledRule {
+        let rules = [CompiledRule {
             set: "t".into(),
             id: "R-anchor".into(),
             severity: crate::finding::Severity::High,

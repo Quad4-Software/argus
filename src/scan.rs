@@ -233,7 +233,7 @@ pub(crate) fn scan_file_matched(
     // Binary files are skipped - extracted strings trip on test vectors.
     if opts.verify_secrets
         && let Some(t) = text
-        && !bytes.as_deref().is_some_and(looks_binary)
+        && !bytes.is_some_and(looks_binary)
     {
         out.extend(crate::verify::verify_file_text(t, rel, target, 5));
     }

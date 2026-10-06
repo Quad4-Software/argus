@@ -75,28 +75,39 @@ pub(super) fn regex_anchors(pat: &str) -> Option<Vec<String>> {
 }
 
 /// Register a regex: provable literal anchors go into the AC automaton so
+/// Literal pool: patterns, per-pattern emit refs, and a name index
+/// shared by contains literals and extracted regex anchors.
+#[derive(Default)]
+pub(super) struct LitPool {
+    pub lits: Vec<String>,
+    pub lit_of: Vec<Vec<(usize, LitRef)>>,
+    lit_idx: std::collections::HashMap<String, usize>,
+}
+
+impl LitPool {
+    pub(super) fn push_lit(&mut self, s: &str, ri: usize, r: LitRef) {
+        if let Some(&i) = self.lit_idx.get(s) {
+            self.lit_of[i].push((ri, r));
+            return;
+        }
+        self.lits.push(s.to_string());
+        self.lit_of.push(vec![(ri, r)]);
+        self.lit_idx.insert(s.to_string(), self.lits.len() - 1);
+    }
+}
+
 /// the rule's regex only runs on files containing an anchor; unanchorable
 /// patterns fall back to the shared RegexSet.
 pub(super) fn push_re(
     unanchored: &mut Vec<(usize, Slot, regex::Regex)>,
-    lits: &mut Vec<String>,
-    lit_of: &mut Vec<Vec<(usize, LitRef)>>,
-    lit_idx: &mut std::collections::HashMap<String, usize>,
-    push_lit: &dyn Fn(
-        &mut Vec<String>,
-        &mut Vec<Vec<(usize, LitRef)>>,
-        &mut std::collections::HashMap<String, usize>,
-        &str,
-        usize,
-        LitRef,
-    ),
+    pool: &mut LitPool,
     re: &regex::Regex,
     ri: usize,
     slot: Slot,
 ) {
     if let Some(anchors) = regex_anchors(re.as_str()) {
         for a in anchors {
-            push_lit(lits, lit_of, lit_idx, &a, ri, LitRef::Anchor(slot));
+            pool.push_lit(&a, ri, LitRef::Anchor(slot));
         }
     } else {
         unanchored.push((ri, slot, re.clone()));
