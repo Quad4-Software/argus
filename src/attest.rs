@@ -52,13 +52,24 @@ pub struct AttestReport {
     pub artifact_match: Option<bool>,
     /// Decoded in-toto statement for display.
     pub statement: Option<serde_json::Value>,
+    /// Identity pins that were applied, pre-rendered as evidence lines
+    /// (pinned repo: X) so callers can surface them verbatim.
+    pub pinned: Vec<String>,
+    /// Result of expect-* identity pinning: Some(false) downgrades the
+    /// verdict to FAIL. None when no pins were given or the payload
+    /// signature never verified (pins are meaningless on claims whose
+    /// authenticity was never established).
+    pub pins_ok: Option<bool>,
     /// Non-fatal notes and hard failures.
     pub errors: Vec<String>,
 }
 
+/// Expected signer identity for the verify path. Any field that is set
+/// must match what the attestation actually claims, else the verdict
+/// is forced to FAIL - this is how CI pins a workflow/repo/issuer so a
 impl AttestReport {
     pub fn verdict(&self) -> &'static str {
-        if !self.signature_ok {
+        if !self.signature_ok || self.pins_ok == Some(false) {
             "FAIL"
         } else if self.tlog_ok == Some(true) {
             "VERIFIED" // signature + transparency log, chain adds identity
