@@ -7,6 +7,7 @@
 // modules are re-exported per-function below; child files import
 // crate paths directly since private modules cannot be re-exported
 
+pub(crate) mod attest_cmd;
 pub mod daemon_cmd;
 pub mod deps;
 pub mod host_cmd;

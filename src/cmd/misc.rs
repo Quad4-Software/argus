@@ -248,7 +248,8 @@ pub(crate) fn check_runs(cli: &Cli, report: &mut Report) {
                 remediation: Some("Rotate every secret available to this workflow and audit run logs.".into()),
                 reference: f.reference.clone(),
                 window: Some(win.clone()),
-            }),
+                        evidence: None,
+}),
             Ok(_) => {}
             Err(e) => report.errors.push(format!("run-check {owner}/{repo}: {e}")),
         }
@@ -424,6 +425,7 @@ pub(crate) fn young_repo_finding(repo: &RepoSpec) -> Option<finding::Finding> {
         ),
         reference: None,
         window: None,
+        evidence: None,
     })
 }
 
@@ -670,5 +672,87 @@ pub(crate) fn license_cmd(
             files: 0,
             findings: 0,
         });
+    }
+}
+
+/// `argus init` - install a pre-commit hook that runs `argus scan --staged`.
+pub(crate) fn init_hook(path: Option<&std::path::Path>, force: bool) -> std::process::ExitCode {
+    let root = path
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
+    let hooks = root.join(".git/hooks");
+    let hook = hooks.join("pre-commit");
+    if hook.exists() && !force {
+        eprintln!("pre-commit hook exists - rerun with --force to overwrite");
+        return std::process::ExitCode::from(2);
+    }
+    if let Err(e) = std::fs::create_dir_all(&hooks) {
+        eprintln!("cannot create {}: {e}", hooks.display());
+        return std::process::ExitCode::from(2);
+    }
+    let body = "#!/bin/sh
+# argus pre-commit: scan staged files for secrets/IaC issues
+exec argus scan --staged --fail-on medium
+";
+    match std::fs::write(&hook, body) {
+        Ok(()) => {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755));
+            }
+            println!("installed {}", hook.display());
+            std::process::ExitCode::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("write {}: {e}", hook.display());
+            std::process::ExitCode::from(2)
+        }
+    }
+}
+
+/// Scan every path root (optionally a changed-file subset) and append
+/// findings to the report; then history-secret and vendored checks.
+pub(crate) fn scan_paths(
+    cli: &crate::cli::Cli,
+    paths: &[std::path::PathBuf],
+    rules: &[crate::rules::CompiledRule],
+    opts: &crate::ScanOptions,
+    diff_map: &std::collections::HashMap<String, Vec<String>>,
+    report: &mut crate::finding::Report,
+) {
+    for p in paths {
+        if !p.exists() {
+            report
+                .errors
+                .push(format!("{}: not found, skipped", p.display()));
+            continue;
+        }
+        let label = p.display().to_string();
+        if cli.verbose > 0 {
+            eprintln!("scanning {label} ...");
+        }
+        let (mut findings, files) = if let Some(rels) = diff_map.get(&label) {
+            if cli.verbose > 0 {
+                let how = if cli.staged { "staged" } else { "changed" };
+                eprintln!("{}: {} {} files", label, rels.len(), how);
+            }
+            crate::scan::scan_selected(p, rels, &label, rules, opts)
+        } else {
+            crate::scan::scan_root(p, &label, rules, opts)
+        };
+        report.files_scanned += files;
+        report.targets.push(crate::finding::TargetStat {
+            label: label.clone(),
+            files,
+            findings: findings.len(),
+        });
+        report.findings.append(&mut findings);
+    }
+    if cli.history_secrets {
+        history_secrets(paths, rules, opts, report, cli.verbose);
+    }
+    if let Some(refpath) = &cli.similar {
+        crate::cmd::similar_cmd::vendored_check(paths, refpath, opts, report, cli.verbose);
     }
 }

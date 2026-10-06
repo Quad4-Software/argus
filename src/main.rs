@@ -2,6 +2,9 @@
 // Copyright (c) 2026 Quad4
 
 mod ai;
+#[cfg(feature = "ast")]
+mod astscan;
+mod attest;
 mod audit;
 mod baseline;
 mod cache;
@@ -38,6 +41,7 @@ mod provider;
 mod publish;
 mod regimg;
 mod registry;
+mod risk;
 mod roam;
 mod rules;
 mod rulesign;
@@ -175,7 +179,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         .map(|p| regex::Regex::new(p).map_err(|e| format!("bad --exclude /{p}/: {e}")))
         .collect::<Result<_, _>>()?;
 
-    let opts = ScanOptions {
+    let mut opts = ScanOptions {
         max_file_size: max_kb * 1024,
         jobs,
         exclude,
@@ -184,6 +188,8 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         only_sets: only.clone(),
         incremental: cli.incremental,
         progress: progress_on,
+        prune: !cli.no_prune,
+        verify_secrets: cli.verify_secrets,
         styles,
         #[cfg(feature = "yara")]
         yara: yara_rules,
@@ -200,6 +206,10 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         }
         if cli.osv || cli.check_runs {
             eprintln!("offline: skipping --osv/--check-runs");
+        }
+        if cli.verify_secrets {
+            eprintln!("offline: --verify-secrets needs network; skipping token verification");
+            opts.verify_secrets = false;
         }
     }
 
@@ -275,85 +285,45 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             return mcp::serve(rules, opts);
         }
         Cmd::Scan { paths } | Cmd::Review { paths } => {
-            for p in paths {
-                if !p.exists() {
-                    report
-                        .errors
-                        .push(format!("{}: not found, skipped", p.display()));
-                    continue;
-                }
-                let label = p.display().to_string();
-                if cli.verbose > 0 {
-                    eprintln!("scanning {label} ...");
-                }
-                let (mut findings, files) = if let Some(rels) = diff_map.get(&label) {
-                    if cli.verbose > 0 {
-                        let how = if cli.staged { "staged" } else { "changed" };
-                        eprintln!("{}: {} {} files", label, rels.len(), how);
-                    }
-                    scan::scan_selected(p, rels, &label, &rules, &opts)
-                } else {
-                    scan::scan_root(p, &label, &rules, &opts)
-                };
-                report.files_scanned += files;
-                report.targets.push(TargetStat {
-                    label: label.clone(),
-                    files,
-                    findings: findings.len(),
-                });
-                report.findings.append(&mut findings);
-            }
-            if cli.history_secrets {
-                cmd::misc::history_secrets(paths, &rules, &opts, &mut report, cli.verbose);
-            }
-            if let Some(refpath) = &cli.similar {
-                crate::cmd::similar_cmd::vendored_check(
-                    paths,
-                    refpath,
-                    &opts,
-                    &mut report,
-                    cli.verbose,
-                );
-            }
+            cmd::misc::scan_paths(cli, paths, &rules, &opts, &diff_map, &mut report)
         }
-        Cmd::Similar { a, b } => {
-            crate::cmd::similar_cmd::similar_cmd(a, b.as_deref(), &opts, &mut report);
-        }
+        Cmd::Attest {
+            bundle,
+            artifact,
+            npm,
+            sig,
+            cert,
+            rekor_pub,
+        } => cmd::attest_cmd::attest_cmd(
+            bundle,
+            artifact,
+            npm,
+            sig,
+            cert,
+            rekor_pub,
+            offline,
+            &mut report,
+        )?,
+        Cmd::Similar {
+            a,
+            b,
+            index,
+            index_build,
+            index_query,
+        } => crate::cmd::similar_cmd::similar_cmd(
+            a,
+            b.as_deref(),
+            index.as_deref(),
+            *index_build,
+            *index_query,
+            &opts,
+            &mut report,
+        ),
         Cmd::Roam(a) => {
             roam_cmd(cli, a, &cfg, &rules, &opts, &mut report)?;
         }
         Cmd::Init { path, force } => {
-            let root = path.clone().unwrap_or_else(|| PathBuf::from("."));
-            let hooks = root.join(".git/hooks");
-            let hook = hooks.join("pre-commit");
-            if hook.exists() && !force {
-                eprintln!("pre-commit hook exists - rerun with --force to overwrite");
-                return Ok(ExitCode::from(2));
-            }
-            if let Err(e) = std::fs::create_dir_all(&hooks) {
-                eprintln!("cannot create {}: {e}", hooks.display());
-                return Ok(ExitCode::from(2));
-            }
-            let body = "#!/bin/sh
-# argus pre-commit: scan staged files for secrets/IaC issues
-exec argus scan --staged --fail-on medium
-";
-            match std::fs::write(&hook, body) {
-                Ok(()) => {
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        let _ =
-                            std::fs::set_permissions(&hook, std::fs::Permissions::from_mode(0o755));
-                    }
-                    println!("installed {}", hook.display());
-                    return Ok(ExitCode::SUCCESS);
-                }
-                Err(e) => {
-                    eprintln!("write {}: {e}", hook.display());
-                    return Ok(ExitCode::from(2));
-                }
-            }
+            return Ok(cmd::misc::init_hook(path.as_deref(), *force));
         }
         Cmd::Watch(a) => {
             return watch_cmd(cli, a, &cfg, &rules, &opts);
@@ -452,7 +422,13 @@ exec argus scan --staged --fail-on medium
                                     // OS packages have no source-level
                                     // reference - empty map keeps them high
                                     let reach = Default::default();
-                                    fs.extend(cmd::deps::vuln_findings(&deps, hits, "osv", &reach))
+                                    let sym = Default::default();
+                                    let mut vf =
+                                        cmd::deps::vuln_findings(&deps, hits, "osv", &reach, &sym);
+                                    if !cli.no_enrich && !offline {
+                                        crate::risk::enrich_findings(&http, &mut vf);
+                                    }
+                                    fs.extend(vf)
                                 }
                                 Err(e) => report.errors.push(format!("osv: {e}")),
                             }
@@ -596,7 +572,17 @@ exec argus scan --staged --fail-on medium
         base_known = baseline::load(bp)?;
     }
     let new_worst = if !base_known.is_empty() {
-        let (_known, new) = baseline::partition(std::mem::take(&mut report.findings), &base_known);
+        let mut unsuppressed = 0usize;
+        let (_known, new) = baseline::partition(
+            std::mem::take(&mut report.findings),
+            &base_known,
+            &mut unsuppressed,
+        );
+        if unsuppressed > 0 {
+            report.errors.push(format!(
+                "baseline: {unsuppressed} critical finding(s) match the baseline but are kept visible - review and rotate rather than suppress"
+            ));
+        }
         let w = baseline::worst_of(&new);
         report.summary.baselined = _known.len();
         if cli.fail_on_new {

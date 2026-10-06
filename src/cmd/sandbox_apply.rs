@@ -10,6 +10,7 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
     let net_needed = cli.osv
         || cli.dep_check
         || cli.check_runs
+        || cli.verify_secrets
         || cfg_needs_net(&cli.cmd)
         || matches!(
             cli.cmd,
@@ -91,10 +92,29 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 sb.reads.push(r.clone());
             }
         }
-        Cmd::Similar { a, b } => {
+        Cmd::Similar {
+            a,
+            b,
+            index,
+            index_build,
+            index_query,
+            ..
+        } => {
             sb.reads.push(a.clone());
             if let Some(b) = b {
                 sb.reads.push(b.clone());
+            }
+            let dbp = index
+                .clone()
+                .unwrap_or_else(crate::similar::default_db_path);
+            if *index_build {
+                // writes are dir grants; give the DB's parent directory.
+                if let Some(par) = dbp.parent() {
+                    sb.writes.push(par.to_path_buf());
+                }
+                sb.writes.push(dbp);
+            } else if *index_query || index.is_some() {
+                sb.reads.push(dbp);
             }
         }
         Cmd::Host(h) => crate::host::grant(h, &mut sb),
@@ -267,6 +287,17 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
                 if p.as_os_str() != "-" {
                     sb.reads.push(p);
                 }
+            }
+        }
+        Cmd::Attest {
+            bundle,
+            artifact,
+            sig,
+            cert,
+            ..
+        } => {
+            for p in [bundle, artifact, sig, cert].into_iter().flatten() {
+                sb.reads.push(p.clone());
             }
         }
         Cmd::Meta { path } => sb.reads.push(path.clone()),
