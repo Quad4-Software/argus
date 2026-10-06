@@ -43,6 +43,18 @@ fn corpus_cases_match_expected() {
             failures.push(format!("{}: no fixture file", dir.display()));
             continue;
         };
+        // fixtures that only prove ast rules cannot fire without the
+        // feature - skip the whole case rather than expecting misses
+        #[cfg(not(feature = "ast"))]
+        if std::fs::read_to_string(&exp)
+            .map(|s| {
+                s.lines()
+                    .any(|l| l.trim_start_matches('!').trim().starts_with("AST-"))
+            })
+            .unwrap_or(false)
+        {
+            continue;
+        }
 
         let out = bin()
             .arg("scan")
