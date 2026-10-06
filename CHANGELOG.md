@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-10-06
 
 Fixes in the scan core: the shared matcher now preflights every regex
 behind an extracted literal anchor or its own SIMD prefilter, overlapping
