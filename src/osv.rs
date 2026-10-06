@@ -6,6 +6,20 @@
 
 use serde::Serialize;
 
+/// Dependency specifiers that resolve to something on disk rather than
+/// a registry: npm/pnpm/yarn file:, link:, portal:, workspace:, patch:,
+/// git+ urls; pip direct references.
+pub fn is_local_spec(spec: &str) -> bool {
+    spec.starts_with("file:")
+        || spec.starts_with("link:")
+        || spec.starts_with("portal:")
+        || spec.starts_with("workspace:")
+        || spec.starts_with("patch:")
+        || spec.starts_with("git")
+        || spec.starts_with("http://")
+        || spec.starts_with("https://")
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Dep {
     pub ecosystem: &'static str, // "npm" | "PyPI" | "GitHub Actions" | "crates.io" | "Go" | "RubyGems"
@@ -26,12 +40,16 @@ fn walk_npm(
     }
     for (name, meta) in deps {
         if let Some(ver) = meta.get("version").and_then(|v| v.as_str()) {
-            out.push(Dep {
-                ecosystem: "npm",
-                name: name.clone(),
-                version: ver.into(),
-                path: rel.into(),
-            });
+            // file:/link:/portal: entries resolve to a path on disk, not a
+            // registry package - no OSV record exists for them
+            if !is_local_spec(ver) {
+                out.push(Dep {
+                    ecosystem: "npm",
+                    name: name.clone(),
+                    version: ver.into(),
+                    path: rel.into(),
+                });
+            }
         }
         if let Some(nested) = meta.get("dependencies").and_then(|d| d.as_object()) {
             walk_npm(nested, rel, out, depth + 1);
@@ -56,6 +74,7 @@ pub fn extract_deps(rel: &str, text: &str) -> Vec<Dep> {
                             .next()
                             .filter(|n| !n.is_empty() && *n != *k && k.contains("node_modules/"))
                             && let Some(ver) = meta.get("version").and_then(|v| v.as_str())
+                            && !is_local_spec(ver)
                         {
                             out.push(Dep {
                                 ecosystem: "npm",
@@ -343,8 +362,20 @@ pub fn fixed_version(v: &serde_json::Value) -> String {
 /// GET /v1/vulns/{id} - full advisory (querybatch returns abbreviated
 /// records only; needed for fixed-version extraction).
 pub fn get_vuln(http: &crate::http::HttpClient, id: &str) -> Option<serde_json::Value> {
-    http.get_json(&format!("https://api.osv.dev/v1/vulns/{id}"))
-        .ok()
+    // advisory bodies are immutable and several passes (CVE resolution,
+    // affected-symbol reachability) need the same record - memoize
+    static CACHE: std::sync::OnceLock<
+        std::sync::Mutex<std::collections::HashMap<String, Option<serde_json::Value>>>,
+    > = std::sync::OnceLock::new();
+    let cache = CACHE.get_or_init(|| std::sync::Mutex::new(Default::default()));
+    if let Some(v) = cache.lock().unwrap().get(id) {
+        return v.clone();
+    }
+    let v = http
+        .get_json(&format!("https://api.osv.dev/v1/vulns/{id}"))
+        .ok();
+    cache.lock().unwrap().insert(id.to_string(), v.clone());
+    v
 }
 
 #[cfg(test)]
@@ -411,5 +442,43 @@ mod eco_tests {
         );
         assert_eq!(p[0].ecosystem, "Pub");
         assert_eq!(p[0].name, "http");
+    }
+}
+
+#[cfg(test)]
+mod local_spec_tests {
+    use super::*;
+
+    #[test]
+    fn lockfile_skips_file_and_link_specs() {
+        let d = extract_deps(
+            "package-lock.json",
+            r#"{"packages":{
+                "node_modules/react": {"version":"18.2.0"},
+                "node_modules/my-lib": {"version":"file:../my-lib"},
+                "node_modules/linked": {"version":"link:../x"}
+            }}"#,
+        );
+        assert_eq!(d.len(), 1);
+        assert_eq!(d[0].name, "react");
+    }
+
+    #[test]
+    fn is_local_spec_covers_all_spellings() {
+        for s in [
+            "file:../x",
+            "link:x",
+            "portal:x",
+            "workspace:*",
+            "patch:x",
+            "git+ssh://x",
+            "https://x/t.tgz",
+            "git://x",
+        ] {
+            assert!(is_local_spec(s), "{s}");
+        }
+        for s in ["1.2.3", "^1.0.0", ">=2", "npm:alias@1.0.0"] {
+            assert!(!is_local_spec(s), "{s}");
+        }
     }
 }

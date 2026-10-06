@@ -32,6 +32,7 @@ fn finding(target: &str, dep: &Dep, id: &str, sev: Severity, msg: String, rem: &
         remediation: Some(rem.into()),
         reference: None,
         window: None,
+        evidence: None,
     }
 }
 
@@ -72,9 +73,13 @@ pub fn check(
         }
     }
 
-    // parallel registry lookups, bounded pool
+    // parallel registry + ecosyste.ms lookups, bounded pool
     let queue = std::sync::Mutex::new(unique.iter().peekable());
-    let infos: Vec<Option<(usize, crate::registry::RegistryInfo)>> = {
+    let infos: Vec<(
+        usize,
+        Option<crate::registry::RegistryInfo>,
+        Option<crate::risk::EcoInfo>,
+    )> = {
         let results = std::sync::Mutex::new(Vec::new());
         std::thread::scope(|s| {
             for _ in 0..8 {
@@ -89,8 +94,10 @@ pub fn check(
                             }
                         };
                         let Some(i) = idx else { break };
-                        if let Ok(info) = crate::registry::lookup(http, unique[i]) {
-                            results.lock().unwrap().push(Some((i, info)));
+                        let reg = crate::registry::lookup(http, unique[i]).ok();
+                        let eco = crate::risk::lookup(http, unique[i]).ok();
+                        if reg.is_some() || eco.is_some() {
+                            results.lock().unwrap().push((i, reg, eco));
                         }
                     }
                 });
@@ -98,86 +105,100 @@ pub fn check(
         });
         results.into_inner().unwrap()
     };
-    let mut by_idx: std::collections::HashMap<usize, crate::registry::RegistryInfo> =
-        infos.into_iter().flatten().collect();
+    let mut by_idx: std::collections::HashMap<
+        usize,
+        (
+            Option<crate::registry::RegistryInfo>,
+            Option<crate::risk::EcoInfo>,
+        ),
+    > = infos
+        .into_iter()
+        .map(|(i, reg, eco)| (i, (reg, eco)))
+        .collect();
     let mut upstream_checked = 0usize;
     for (i, d) in unique.iter().enumerate() {
-        let Some(info) = by_idx.remove(&i) else {
+        let Some((reg, eco)) = by_idx.remove(&i) else {
             continue; // transient lookup failure: skip rather than invent
         };
-        if !info.exists {
-            out.push(finding(
-                target,
-                d,
-                "DEP-001",
-                Severity::Medium,
-                format!(
-                    "{} {} not found on the public {} registry: typo, renamed package, or private name",
-                    d.ecosystem, d.name, d.ecosystem
-                ),
-                "Verify the name. If internal-only, ensure builds pin the private registry so a squatter cannot shadow it.",
-            ));
-            continue;
-        }
-        if let Some((victim, dist)) = typosquat(&d.name) {
-            out.push(finding(
-                target,
-                d,
-                "DEP-020",
-                Severity::Medium,
-                format!(
-                    "dep name {} is edit-distance {dist} from popular package {victim}: possible typosquat",
-                    d.name
-                ),
-                "Verify the intended package; a one/two-char difference is the classic squat pattern.",
-            ));
-        }
-        if looks_internal(&d.name, internal_prefixes) {
-            out.push(finding(
-                target,
-                d,
-                "DEP-002",
-                Severity::High,
-                format!(
-                    "internal-looking dep {} resolves on the public {} registry: dependency-confusion exposure",
-                    d.name, d.ecosystem
-                ),
-                "Publish/claim the name publicly, force private-registry resolution (.npmrc/pip.conf), or alias to a vendored copy.",
-            ));
-        }
-        if let Some(days) = info.last_release_days
-            && days > 730
-        {
-            out.push(finding(
-                    target,
-                    d,
-                    "DEP-010",
-                    Severity::Low,
-                    format!(
-                        "{} last released {} days ago (>{} years) - dormant packages are takeover targets",
-                        d.name,
-                        days,
-                        days / 365
-                    ),
-                    "Pin exact versions, watch the package for maintainer changes, or plan a maintained replacement.",
-                ));
-        }
-        // archived upstream repo: only probe a bounded number to keep runs fast
-        if upstream_checked < 20
-            && let (Some(url), Some(probe)) = (&info.repo_url, upstream_probe)
-            && let Some(repo_path) = github_repo_path(url)
-        {
-            upstream_checked += 1;
-            if probe(&repo_path) == Some(true) {
+        let eco = eco.filter(|e| e.exists);
+        if let Some(info) = &reg {
+            if !info.exists {
                 out.push(finding(
                     target,
                     d,
-                    "DEP-011",
+                    "DEP-001",
                     Severity::Medium,
-                    format!("upstream repository for {} is archived/read-only", d.name),
-                    "Treat as unmaintained: pin the version and monitor for forks.",
+                    format!(
+                        "{} {} not found on the public {} registry: typo, renamed package, or private name",
+                        d.ecosystem, d.name, d.ecosystem
+                    ),
+                    "Verify the name. If internal-only, ensure builds pin the private registry so a squatter cannot shadow it.",
                 ));
+            } else {
+                if let Some((victim, dist)) = typosquat(&d.name) {
+                    out.push(finding(
+                        target,
+                        d,
+                        "DEP-020",
+                        Severity::Medium,
+                        format!(
+                            "dep name {} is edit-distance {dist} from popular package {victim}: possible typosquat",
+                            d.name
+                        ),
+                        "Verify the intended package; a one/two-char difference is the classic squat pattern.",
+                    ));
+                }
+                if looks_internal(&d.name, internal_prefixes) {
+                    out.push(finding(
+                        target,
+                        d,
+                        "DEP-002",
+                        Severity::High,
+                        format!(
+                            "internal-looking dep {} resolves on the public {} registry: dependency-confusion exposure",
+                            d.name, d.ecosystem
+                        ),
+                        "Publish/claim the name publicly, force private-registry resolution (.npmrc/pip.conf), or alias to a vendored copy.",
+                    ));
+                }
+                if let Some(days) = info.last_release_days
+                    && days > 730
+                {
+                    out.push(finding(
+                            target,
+                            d,
+                            "DEP-010",
+                            Severity::Low,
+                            format!(
+                                "{} last released {} days ago (>{} years) - dormant packages are takeover targets",
+                                d.name,
+                                days,
+                                days / 365
+                            ),
+                            "Pin exact versions, watch the package for maintainer changes, or plan a maintained replacement.",
+                        ));
+                }
+                // archived upstream repo: only probe a bounded number to keep runs fast
+                if upstream_checked < 20
+                    && let (Some(url), Some(probe)) = (&info.repo_url, upstream_probe)
+                    && let Some(repo_path) = github_repo_path(url)
+                {
+                    upstream_checked += 1;
+                    if probe(&repo_path) == Some(true) {
+                        out.push(finding(
+                            target,
+                            d,
+                            "DEP-011",
+                            Severity::Medium,
+                            format!("upstream repository for {} is archived/read-only", d.name),
+                            "Treat as unmaintained: pin the version and monitor for forks.",
+                        ));
+                    }
+                }
             }
+        }
+        if let Some(eco) = &eco {
+            risk_checks(target, d, eco, &mut out);
         }
     }
     out
@@ -344,5 +365,245 @@ mod tq_tests {
         assert_eq!(super::typosquat("reqeusts").map(|x| x.0), Some("requests"));
         assert!(super::typosquat("some-entirely-different-name").is_none()); // no popular near
         assert!(super::typosquat("requests").is_none()); // exact match excluded
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ecosyste.ms-backed risk checks (DEP-030+)
+// ---------------------------------------------------------------------------
+
+/// Per-ecosystem dep-name normalization before distance checks:
+/// lowercase everywhere; PyPI collapses runs of [-_.] to '-' (PEP 503,
+/// as documented by deps.dev); npm scoped names keep '@scope/'.
+pub(crate) fn norm_dep_name(eco: &str, name: &str) -> String {
+    let l = name.trim().to_lowercase();
+    if eco != "PyPI" {
+        return l;
+    }
+    let mut out = String::with_capacity(l.len());
+    let mut sep = false;
+    for c in l.chars() {
+        if matches!(c, '-' | '_' | '.') {
+            if !sep {
+                out.push('-');
+            }
+            sep = true;
+        } else {
+            out.push(c);
+            sep = false;
+        }
+    }
+    out
+}
+
+/// Builtin top-package lists per ecosystem - the same data the
+/// typosquat ruleset (rules/typosquat.toml) compiles from.
+fn popular_list(eco: &str) -> Option<&'static str> {
+    match eco {
+        "npm" => Some(include_str!("../rules/data/top-npm.txt")),
+        "PyPI" => Some(include_str!("../rules/data/top-pypi.txt")),
+        "crates.io" => Some(include_str!("../rules/data/top-crates.txt")),
+        _ => None,
+    }
+}
+
+/// Closest popular package name in the dep's ecosystem within edit
+/// distance <= 2; adjacent transpositions count as one edit (the
+/// engine's bounded damerau-levenshtein). Exact self-matches excluded.
+fn nearest_popular(eco: &str, norm: &str) -> Option<(String, usize)> {
+    let list = popular_list(eco)?;
+    let mut best: Option<(String, usize)> = None;
+    for raw in list.lines() {
+        let p = norm_dep_name(eco, raw);
+        if p.is_empty() || p == norm {
+            continue;
+        }
+        let dist = if crate::scan::engine::lev_at_most(norm, &p, 1) {
+            1
+        } else if crate::scan::engine::lev_at_most(norm, &p, 2) {
+            2
+        } else {
+            continue;
+        };
+        if best.as_ref().is_none_or(|(_, b)| dist < *b) {
+            best = Some((p, dist));
+        }
+    }
+    best
+}
+
+/// Human-readable usage summary for finding messages.
+fn usage_str(eco: &crate::risk::EcoInfo) -> String {
+    match (eco.downloads_monthly, eco.dependent_repos) {
+        (Some(d), Some(r)) => format!("{d} downloads/mo, {r} dependent repos"),
+        (Some(d), None) => format!("{d} downloads/mo"),
+        (None, Some(r)) => format!("{r} dependent repos"),
+        (None, None) => "no usage data".into(),
+    }
+}
+
+/// DEP-030/031/032: popularity- and cadence-scored squat signals from
+/// ecosyste.ms metadata. All three need the package to exist there;
+/// unknown fields abstain rather than invent.
+fn risk_checks(target: &str, d: &Dep, eco: &crate::risk::EcoInfo, out: &mut Vec<Finding>) {
+    let norm = norm_dep_name(d.ecosystem, &d.name);
+    let near = nearest_popular(d.ecosystem, &norm);
+
+    // usage gates: downloads where the registry reports them, dependent
+    // repos as fallback. Truly unknown usage cannot prove popularity -
+    // and "near a popular name but unmeasurable" IS the squat signal.
+    let low_usage = match eco.downloads_monthly {
+        Some(dl) => dl < 15_000, // TypoGard popularity threshold
+        None => eco.dependent_repos.is_none_or(|r| r < 500),
+    };
+    let tiny = match eco.downloads_monthly {
+        Some(dl) => dl < 1_000,
+        None => eco.dependent_repos.is_none_or(|r| r < 50),
+    };
+
+    if let Some((victim, 1)) = &near
+        && low_usage
+    {
+        out.push(finding(
+            target,
+            d,
+            "DEP-030",
+            Severity::High,
+            format!(
+                "dep name {} is edit distance 1 from popular package {victim} and low-usage ({}): typosquat-scored",
+                d.name,
+                usage_str(eco)
+            ),
+            "Verify the intended package and publisher. A distance-1 neighbour of a popular name that is itself unpopular is the textbook squat shape.",
+        ));
+    }
+
+    if let Some(age) = eco.age_days
+        && age < 180
+        && tiny
+        && let Some((victim, dist)) = &near
+    {
+        out.push(finding(
+            target,
+            d,
+            "DEP-031",
+            Severity::Medium,
+            format!(
+                "{} was first published {age} days ago with minimal usage ({}), {dist} edit(s) from popular package {victim}: AI-hallucination slopsquat pattern",
+                d.name,
+                usage_str(eco)
+            ),
+            "Confirm this package was chosen deliberately, not suggested by an LLM and claimed by a squatter. Check the publisher, source repo, and release diff.",
+        ));
+    }
+
+    if let Some(gap) = eco.latest_release_gap_days
+        && gap >= 365
+    {
+        out.push(finding(
+            target,
+            d,
+            "DEP-032",
+            Severity::Medium,
+            format!(
+                "{} latest release landed after a {gap}-day gap (>= 1 year dormancy): dormancy-then-release",
+                d.name
+            ),
+            "A sudden release on a long-dormant package matches maintainer-takeover / account-hijack campaigns (event-stream, eslint-scope). Review the release diff and maintainer changes before upgrading.",
+        ));
+    }
+}
+
+#[cfg(test)]
+mod risk_tests {
+    use super::*;
+
+    fn dep(name: &str) -> Dep {
+        Dep {
+            ecosystem: "npm",
+            name: name.into(),
+            version: "1.0.0".into(),
+            path: "package.json".into(),
+        }
+    }
+
+    #[test]
+    fn pypi_names_collapse_separators() {
+        assert_eq!(norm_dep_name("PyPI", "My_Pkg..Name"), "my-pkg-name");
+        assert_eq!(norm_dep_name("npm", "@Scope/Name"), "@scope/name");
+        assert_eq!(norm_dep_name("crates.io", "Serde_Json"), "serde_json");
+    }
+
+    #[test]
+    fn nearest_popular_uses_lists() {
+        assert_eq!(
+            nearest_popular("npm", "crossenv").map(|(v, d)| (v, d)),
+            Some(("cross-env".to_string(), 1))
+        );
+        // transposition counts as one edit
+        assert_eq!(nearest_popular("npm", "raect").map(|(_, d)| d), Some(1));
+        // "react" itself is 1 edit from "preact" - distance alone is not
+        // exclusion; DEP-030's usage gate is what spares popular names
+        assert_eq!(
+            nearest_popular("npm", "react").map(|(v, _)| v),
+            Some("preact".to_string())
+        );
+        assert!(nearest_popular("npm", "totally-unrelated-pkg").is_none());
+        assert!(nearest_popular("Go", "anything").is_none()); // no list
+    }
+
+    #[test]
+    fn dep030_scored_squat() {
+        let eco = crate::risk::EcoInfo {
+            exists: true,
+            downloads_monthly: Some(7_000),
+            dependent_repos: Some(76),
+            ..Default::default()
+        };
+        let mut out = Vec::new();
+        risk_checks("t", &dep("crossenv"), &eco, &mut out);
+        assert!(
+            out.iter()
+                .any(|f| f.rule_id == "DEP-030" && f.severity == Severity::High)
+        );
+        // popular package itself must not be flagged
+        let big = crate::risk::EcoInfo {
+            exists: true,
+            downloads_monthly: Some(50_000_000),
+            dependent_repos: Some(1_000_000),
+            ..Default::default()
+        };
+        out.clear();
+        risk_checks("t", &dep("crossenv"), &big, &mut out);
+        assert!(out.iter().all(|f| f.rule_id != "DEP-030"));
+    }
+
+    #[test]
+    fn dep031_and_dep032() {
+        let young = crate::risk::EcoInfo {
+            exists: true,
+            downloads_monthly: Some(12),
+            age_days: Some(30),
+            ..Default::default()
+        };
+        let mut out = Vec::new();
+        // "axois" is one transposition from npm's "axios"
+        risk_checks("t", &dep("axois"), &young, &mut out);
+        assert!(
+            out.iter()
+                .any(|f| f.rule_id == "DEP-031" && f.severity == Severity::Medium)
+        );
+
+        let dormant_then_release = crate::risk::EcoInfo {
+            exists: true,
+            latest_release_gap_days: Some(400),
+            ..Default::default()
+        };
+        out.clear();
+        risk_checks("t", &dep("some-pkg"), &dormant_then_release, &mut out);
+        assert!(
+            out.iter()
+                .any(|f| f.rule_id == "DEP-032" && f.severity == Severity::Medium)
+        );
     }
 }
