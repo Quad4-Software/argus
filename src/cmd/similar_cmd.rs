@@ -14,9 +14,24 @@ use crate::similar;
 pub(crate) fn similar_cmd(
     a: &std::path::Path,
     b: Option<&std::path::Path>,
+    index: Option<&std::path::Path>,
+    index_build: bool,
+    index_query: bool,
     opts: &ScanOptions,
     report: &mut Report,
 ) {
+    if index_build {
+        if let Err(e) = similar::index_build(a, index, opts.max_file_size, report) {
+            report.errors.push(format!("similar --index-build: {e}"));
+        }
+        return;
+    }
+    if index_query {
+        if let Err(e) = similar::index_query(a, index, opts.max_file_size, report) {
+            report.errors.push(format!("similar --index-query: {e}"));
+        }
+        return;
+    }
     let ai = similar::index(a, opts.max_file_size);
     let bi = match b {
         Some(b) => similar::index(b, opts.max_file_size),
@@ -46,36 +61,33 @@ pub(crate) fn similar_cmd(
 }
 
 fn push_similar(report: &mut Report, fa: &similar::Fingerprint, fb: &similar::Fingerprint) {
-    let j = similar::jaccard(fa, fb);
-    let c = similar::containment(fa, fb).max(similar::containment(fb, fa));
-    let small = fa.total_shingles.min(fb.total_shingles);
-    // small fingerprints hit coincidental structural overlaps too easily;
-    // containment on a small side is where false positives concentrate
-    let enough = fa.total_shingles >= 60 && fb.total_shingles >= 60;
-    let (id, sev, msg) = if j >= 0.70 && enough {
+    // shared thresholds with the index-query path (SIM-003/004): classify()
+    // owns the jaccard/containment/shingle-floor rules for both
+    let Some(hit) = similar::classify(fa, fb) else {
+        return;
+    };
+    let (id, sev, msg) = if hit.jaccard {
         (
             "SIM-001",
             Severity::High,
             format!(
                 "{} shares {:.0}% of its code fingerprint with {} - likely vendored/copied",
                 fa.path.display(),
-                j * 100.0,
+                hit.score * 100.0,
                 fb.path.display()
             ),
         )
-    } else if c >= 0.80 && enough && small >= 120 {
+    } else {
         (
             "SIM-002",
             Severity::Medium,
             format!(
                 "{} embeds {:.0}% of {}'s fingerprint - possible copied region inside a larger file",
                 fb.path.display(),
-                c * 100.0,
+                hit.score * 100.0,
                 fa.path.display()
             ),
         )
-    } else {
-        return;
     };
     report.findings.push(Finding {
         ruleset: "similarity".into(),
@@ -92,7 +104,8 @@ fn push_similar(report: &mut Report, fa: &similar::Fingerprint, fb: &similar::Fi
         ),
         reference: None,
         window: None,
-    });
+        evidence: None,
+});
 }
 
 /// `--similar PATH` on a scan: flag scanned files copied from the reference
