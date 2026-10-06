@@ -6,4 +6,7 @@ ignore = [
     "RUSTSEC-2026-0222",
     "RUSTSEC-2026-0269",
     "RUSTSEC-2026-0316",
+    # wasmtime 45 component-model async-lifted callbacks; yara-x runs
+    # standard wasm only and still pins wasmtime ^45
+    "RUSTSEC-2026-0327",
 ]
