@@ -359,6 +359,7 @@ pub(crate) fn watch_finding(target: &str, id: &str, sev: Severity, msg: String) 
         ),
         reference: None,
         window: None,
+        evidence: None,
     }
 }
 
@@ -412,7 +413,8 @@ pub(crate) fn maintainer_check(
                     remediation: Some("A maintainer change is the top package-hijack signal: diff the latest release, pin the last known-good version, verify the new owner's history.".into()),
                     reference: None,
                     window: None,
-                });
+                                evidence: None,
+});
             }
             _ => {}
         }

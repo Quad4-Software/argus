@@ -85,7 +85,7 @@ pub fn lookup(http: &HttpClient, dep: &Dep) -> Result<RegistryInfo, String> {
     Ok(info)
 }
 
-fn parse_time_days(ts: &str) -> Option<u64> {
+pub(crate) fn parse_time_days(ts: &str) -> Option<u64> {
     // ISO "2024-05-01T12:00:00.000Z" -> days ago; cheap parse, no chrono
     let (y, mo, d): (i64, i64, i64) = (
         ts.get(0..4)?.parse().ok()?,

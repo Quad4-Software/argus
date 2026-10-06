@@ -132,7 +132,7 @@ pub(crate) fn median(v: &mut [u64]) -> u64 {
 /// Docs/prose tells in the working tree (bounded).
 pub(crate) fn prose_tells(root: &Path, max: usize) -> Vec<AiEvidence> {
     let mut out = Vec::new();
-    let files = crate::scan::collect_files(root, false);
+    let files = crate::scan::collect_files(root, false, true);
     for f in files {
         if is_vendored(&f) {
             continue;
@@ -199,7 +199,7 @@ pub(crate) fn code_comment_tells(root: &Path, max: usize) -> Vec<AiEvidence> {
         "rs", "py", "js", "ts", "go", "c", "h", "cpp", "java", "rb", "sh",
     ];
     let mut out = Vec::new();
-    for f in crate::scan::collect_files(root, false) {
+    for f in crate::scan::collect_files(root, false, true) {
         if is_vendored(&f) {
             continue;
         }
@@ -264,7 +264,7 @@ pub(crate) fn code_comment_tells(root: &Path, max: usize) -> Vec<AiEvidence> {
 /// Committed agent-tooling config/instruction files.
 pub(crate) fn agent_config_files(root: &Path) -> Vec<AiEvidence> {
     let mut out: Vec<String> = Vec::new();
-    for f in crate::scan::collect_files(root, false) {
+    for f in crate::scan::collect_files(root, false, true) {
         if is_vendored(&f) {
             continue;
         }
@@ -352,7 +352,7 @@ pub(crate) fn narrated_comments(root: &Path) -> Option<AiEvidence> {
     ];
     let mut files_hit = 0usize;
     let mut total = 0usize;
-    for f in crate::scan::collect_files(root, false) {
+    for f in crate::scan::collect_files(root, false, true) {
         let ext = f
             .extension()
             .unwrap_or_default()
@@ -475,7 +475,7 @@ pub(crate) fn superhuman_volume(root: &Path, span_days: u64) -> Option<AiEvidenc
         "rs", "py", "js", "ts", "go", "c", "h", "cpp", "java", "rb", "sh", "lua",
     ];
     let mut loc = 0u64;
-    for f in crate::scan::collect_files(root, false) {
+    for f in crate::scan::collect_files(root, false, true) {
         let ext = f
             .extension()
             .unwrap_or_default()

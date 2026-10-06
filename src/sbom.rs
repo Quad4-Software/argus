@@ -90,7 +90,7 @@ fn uuid_short() -> String {
 fn collect(root: &Path, opts: &ScanOptions) -> Vec<Dep> {
     let manifest_re = regex::Regex::new(rules::CompiledRule::DEP_MANIFESTS_RE).unwrap();
     let mut deps: Vec<Dep> = Vec::new();
-    for f in crate::scan::collect_files(root, false) {
+    for f in crate::scan::collect_files(root, false, true) {
         let rel = f
             .strip_prefix(root)
             .unwrap_or(&f)

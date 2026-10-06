@@ -238,7 +238,8 @@ fn baseline_roundtrip_and_fail_on_new() {
     let base: Value = serde_json::from_slice(&std::fs::read(&bfile).unwrap()).unwrap();
     assert!(base["fingerprints"].as_array().unwrap().len() >= 15);
 
-    // rescan with baseline + fail-on-new: nothing new -> exit 0
+    // rescan with baseline: non-critical findings suppressed, criticals
+    // stay visible (a baselined live secret must not be silenced)
     let out = bin()
         .args(["scan"])
         .arg(fixture("dirty-repo"))
@@ -247,14 +248,26 @@ fn baseline_roundtrip_and_fail_on_new() {
         .arg("--fail-on-new")
         .output()
         .unwrap();
-    assert_eq!(
-        out.status.code(),
-        Some(0),
-        "baseline should silence known findings"
-    );
     let v: Value = serde_json::from_slice(&out.stdout).unwrap();
-    assert_eq!(v["findings"].as_array().unwrap().len(), 0);
+    let findings = v["findings"].as_array().unwrap();
     assert!(v["summary"]["baselined"].as_u64().unwrap() >= 15);
+    assert!(
+        findings.iter().all(|f| f["severity"] == "critical"),
+        "non-critical finding escaped the baseline: {findings:?}"
+    );
+    assert!(
+        findings.iter().all(|f| f["evidence"]
+            .as_array()
+            .map(|e| e
+                .iter()
+                .any(|x| x.as_str().unwrap_or("").contains("never suppressed")))
+            .unwrap_or(false)),
+        "kept criticals should carry the no-suppress evidence"
+    );
+    if findings.is_empty() {
+        // fixture had no criticals to keep visible
+        assert_eq!(out.status.code(), Some(0));
+    }
     let _ = std::fs::remove_dir_all(&d);
 }
 

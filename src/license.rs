@@ -83,6 +83,7 @@ fn finding(target: &str, path: &str, id: &str, sev: Severity, msg: String) -> Fi
         remediation: None,
         reference: None,
         window: None,
+        evidence: None,
     }
 }
 

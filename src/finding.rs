@@ -74,6 +74,10 @@ pub struct Finding {
     /// Compromise window (start,end) when the rule tracks a known campaign window.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<(String, String)>,
+    /// Why this fired: reach level, gate evidence, provenance state and
+    /// similar reasoning. Shown in verbose output and SARIF properties.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -196,6 +200,11 @@ impl Report {
                 out.push_str(&format!("        {}\n", st.dim(&truncate(ex.trim(), 160))));
             }
             out.push_str(&format!("        {}\n", f.message));
+            if let Some(ev) = &f.evidence {
+                for e in ev {
+                    out.push_str(&format!("        why: {}\n", st.dim(e)));
+                }
+            }
             if let Some(rem) = &f.remediation {
                 out.push_str(&format!("        fix: {}\n", rem));
             }
@@ -246,11 +255,19 @@ impl Report {
                     None => format!("`{}`", f.path),
                 };
                 let msg = f.message.replace('|', "\\|").replace('\n', " ");
-                let msg = if msg.len() > 200 {
+                let mut msg = if msg.len() > 200 {
                     format!("{}...", &msg[..msg.floor_char_boundary(200)])
                 } else {
                     msg
                 };
+                if let Some(ev) = &f.evidence
+                    && !ev.is_empty()
+                {
+                    msg.push_str(&format!(
+                        " ({})",
+                        ev.join("; ").replace('|', "\\|").replace('\n', " ")
+                    ));
+                }
                 out.push_str(&format!(
                     "| {} | {} | {} | {} |\n",
                     f.severity, f.rule_id, loc, msg
@@ -306,7 +323,7 @@ impl Report {
                 .map(|r| format!("<div class=rem><b>fix:</b> {}</div>", esc(r)))
                 .unwrap_or_default();
             rows.push_str(&format!(
-                "<tr class=\"row sev-{}\"><td><span class=\"badge {}\">{}</span></td><td class=rid>{}</td><td class=tgt>{}</td><td class=loc title=\"{}\">{}</td><td>{}{}{}</td></tr>\n",
+                "<tr class=\"row sev-{}\"><td><span class=\"badge {}\">{}</span></td><td class=rid>{}</td><td class=tgt>{}</td><td class=loc title=\"{}\">{}</td><td>{}{}{}{}</td></tr>\n",
                 f.severity.to_string().to_lowercase(),
                 f.severity.to_string().to_lowercase(),
                 f.severity,
@@ -315,6 +332,14 @@ impl Report {
                 esc(&loc),
                 esc(&loc),
                 esc(&f.message),
+                f.evidence
+                    .as_ref()
+                    .map(|ev| {
+                        ev.iter()
+                            .map(|e| format!("<div class=ev>why: {}</div>", esc(e)))
+                            .collect::<String>()
+                    })
+                    .unwrap_or_default(),
                 ex,
                 rem
             ));
@@ -350,6 +375,7 @@ table {{ width:100%; border-collapse:collapse; background:var(--panel); border-r
 th {{ text-align:left; color:var(--dim); padding:8px; border-bottom:1px solid #30363d; font-weight:500 }}
 td {{ padding:8px; border-bottom:1px solid #21262d; vertical-align:top }}
 tr.row:hover {{ background:#1c2128 }}
+.ev {{ color:var(--dim); font-size:12px }}
 .badge {{ padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; text-transform:uppercase }}
 .badge.critical {{ background:#da3633; color:#fff }} .badge.high {{ background:#9e6a03; color:#fff }}
 .badge.medium {{ background:#7a5d00; color:#fff }} .badge.low {{ background:#1158c7; color:#fff }}
@@ -435,7 +461,8 @@ function fil(){{
                     }],
                     "partialFingerprints": {
                         "argus/v1": format!("{}|{}|{}", f.rule_id, f.path, f.line.unwrap_or(0))
-                    }
+                    },
+                    "properties": {"evidence": f.evidence}
                 })
             })
             .collect();

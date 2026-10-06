@@ -25,6 +25,20 @@ pub(crate) fn is_lockfile_name(rel: &str) -> bool {
     )
 }
 
+/// Files that announce themselves as machine output carry huge runs of
+/// token-shaped identifiers (opcode tables, embedded blobs) that entropy
+/// cannot tell apart from credentials. The catch-all skips them.
+pub(crate) fn is_generated(text: &str) -> bool {
+    text.lines().take(10).any(|l| {
+        let l = l.to_lowercase();
+        (l.contains("generated") || l.contains("machine-readable"))
+            && (l.contains("do not edit")
+                || l.contains("auto")
+                || l.contains("regenerate")
+                || l.contains("@generated"))
+    })
+}
+
 /// Token candidates >=24 chars of secret-ish alphabet with Shannon entropy
 /// >= 4.5 bits. Returns up to 8 hits per line.
 pub(crate) fn tokens(line: &str) -> Vec<String> {

@@ -188,7 +188,8 @@ pub fn name_checks(set: &PublishSet) -> Vec<Finding> {
             remediation: Some("Remove it from the package (files field, .npmignore/.gitignore, exclude=) or rotate the secret if it already shipped.".into()),
             reference: None,
             window: None,
-        });
+                evidence: None,
+});
     };
     for rel in &set.files {
         let base = rel.rsplit('/').next().unwrap_or(rel).to_lowercase();

@@ -46,6 +46,7 @@ fn hit(id: &str, sev: Severity, target: &str, msg: &str, fix: &str) -> Finding {
         remediation: Some(fix.into()),
         reference: Some(REF.into()),
         window: None,
+        evidence: None,
     }
 }
 

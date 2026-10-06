@@ -595,7 +595,7 @@ fn fix_iac_text(file: &Path, text: &str) -> (String, Vec<Edit>) {
 
 fn iac_files(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    for p in crate::scan::collect_files(root, false) {
+    for p in crate::scan::collect_files(root, false, true) {
         let rel = p
             .strip_prefix(root)
             .unwrap_or(&p)
@@ -689,7 +689,7 @@ pub fn run_deps(roots: &[PathBuf], write: bool, verbose: bool) -> (Vec<Edit>, Ve
             }
             continue;
         }
-        for f in crate::scan::collect_files(root, false) {
+        for f in crate::scan::collect_files(root, false, true) {
             let rel = f
                 .strip_prefix(root)
                 .unwrap_or(&f)

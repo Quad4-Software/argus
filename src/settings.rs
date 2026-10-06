@@ -25,6 +25,7 @@ fn finding(target: &str, id: &str, sev: Severity, msg: String, remediation: &str
         remediation: Some(remediation.into()),
         reference: None,
         window: None,
+        evidence: None,
     }
 }
 

@@ -90,6 +90,7 @@ pub fn load_file(path: &Path, severity: Severity) -> Result<Vec<CompiledRule>, S
                 contains_all: false,
                 regex: None,
                 unless: None,
+                gate: None,
             },
         });
     }

@@ -156,6 +156,7 @@ mod tests {
             remediation: None,
             reference: None,
             window: None,
+            evidence: None,
         }
     }
 

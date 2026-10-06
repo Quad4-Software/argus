@@ -171,6 +171,7 @@ fn config_findings(image: &str, v: &serde_json::Value, tag: &str) -> Vec<Finding
         remediation: Some(rem.into()),
         reference: None,
         window: None,
+        evidence: None,
     };
     let mut out = Vec::new();
     let cfg = &v["config"];

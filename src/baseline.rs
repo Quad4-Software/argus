@@ -48,13 +48,81 @@ pub fn write(path: &Path, findings: &[Finding]) -> Result<(), String> {
 }
 
 /// Split findings into (known, new) given a loaded baseline.
-pub fn partition(findings: Vec<Finding>, base: &HashSet<String>) -> (Vec<Finding>, Vec<Finding>) {
-    findings
-        .into_iter()
-        .partition(|f| base.contains(&fingerprint(f)))
+/// Critical findings are never suppressed: a baselined file that now
+/// hides a live credential (the classic "baseline swallowed a prod
+/// secret" failure) must still surface. `unsuppressed` counts them.
+pub fn partition(
+    findings: Vec<Finding>,
+    base: &HashSet<String>,
+    unsuppressed: &mut usize,
+) -> (Vec<Finding>, Vec<Finding>) {
+    let mut known = Vec::new();
+    let mut new = Vec::new();
+    for mut f in findings {
+        if base.contains(&fingerprint(&f)) {
+            if f.severity == Severity::Critical {
+                *unsuppressed += 1;
+                f.evidence.get_or_insert_with(Vec::new).push(
+                    "matches baseline fingerprint but kept visible: Critical findings are never suppressed".into(),
+                );
+                new.push(f);
+            } else {
+                known.push(f);
+            }
+        } else {
+            new.push(f);
+        }
+    }
+    (known, new)
 }
 
 /// Worst severity among new findings (what --fail-on-new gates on).
 pub fn worst_of(new: &[Finding]) -> Option<Severity> {
     new.iter().map(|f| f.severity).max()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::finding::Finding;
+
+    fn mk(sev: Severity, id: &str, path: &str) -> Finding {
+        Finding {
+            ruleset: "test".into(),
+            rule_id: id.into(),
+            severity: sev,
+            target: "t".into(),
+            path: path.into(),
+            line: None,
+            excerpt: None,
+            message: "m".into(),
+            remediation: None,
+            reference: None,
+            window: None,
+            evidence: None,
+        }
+    }
+
+    #[test]
+    fn critical_never_suppressed() {
+        let live = mk(Severity::Critical, "VER-001", "a.env");
+        let low = mk(Severity::Low, "X-1", "b.txt");
+        let base: HashSet<String> = [fingerprint(&live), fingerprint(&low)]
+            .into_iter()
+            .collect();
+        let mut unsup = 0usize;
+        let (known, new) = partition(vec![live, low], &base, &mut unsup);
+        assert_eq!(known.len(), 1);
+        assert_eq!(new.len(), 1);
+        assert_eq!(new[0].severity, Severity::Critical);
+        assert_eq!(unsup, 1);
+        assert!(
+            new[0]
+                .evidence
+                .as_ref()
+                .unwrap()
+                .iter()
+                .any(|e| e.contains("never suppressed"))
+        );
+    }
 }

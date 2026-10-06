@@ -35,6 +35,7 @@ fn mk(id: &str, sev: Severity, path: &str, msg: impl Into<String>, fix: &str) ->
         remediation: Some(fix.into()),
         reference: Some(LYNIS.into()),
         window: None,
+        evidence: None,
     }
 }
 

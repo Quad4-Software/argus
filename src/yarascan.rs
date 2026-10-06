@@ -78,6 +78,7 @@ pub fn scan_bytes(rel: &str, bytes: &[u8], rules: &yara_x::Rules, target: &str) 
                 remediation: None,
                 reference: meta_str(&r, "reference"),
                 window: None,
+                evidence: None,
             }
         })
         .collect()

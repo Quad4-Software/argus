@@ -435,5 +435,6 @@ fn mk(
         remediation: Some(fix.into()),
         reference: Some("https://docs.zizmor.sh/audits/".into()),
         window: None,
+        evidence: None,
     }
 }

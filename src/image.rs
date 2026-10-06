@@ -29,6 +29,7 @@ fn mk(id: &str, sev: Severity, target: &str, msg: String, rem: &str) -> Finding 
                 .into(),
         ),
         window: None,
+        evidence: None,
     }
 }
 

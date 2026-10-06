@@ -111,6 +111,7 @@ fn mk(
         remediation: Some(fix.into()),
         reference: Some(reference.into()),
         window: None,
+        evidence: None,
     })
 }
 

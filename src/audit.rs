@@ -142,6 +142,7 @@ pub fn audit_history(root: &Path, target: &str, findings: &mut Vec<Finding>, ver
                 ),
                 reference: None,
                 window: Some((start.to_string(), end.to_string())),
+                evidence: None,
             });
         }
         if verbose > 1 {

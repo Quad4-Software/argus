@@ -79,6 +79,7 @@ fn mk(
         remediation: Some(fix.into()),
         reference: Some(OWASP_HEADERS.into()),
         window: None,
+        evidence: None,
     }
 }
 
