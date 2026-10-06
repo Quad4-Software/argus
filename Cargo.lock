@@ -116,7 +116,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
 name = "argus-scanner"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "aho-corasick",
  "base64 0.23.1",

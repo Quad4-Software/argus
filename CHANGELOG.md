@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1] - 2026-10-06
+
+Fix the Rekor compact merkle fold: a border sibling exists when its
+subtree holds any leaf, not only when it is complete. Large-log proofs
+(like argus's own release bundles) previously reported
+merkle=false and downgraded to PARTIAL.
+
 ## [0.3.0] - 2026-10-06
 
 Fixes in the scan core: the shared matcher now preflights every regex

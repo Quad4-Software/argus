@@ -382,7 +382,7 @@ fn merkle_root(body: &[u8], index: u64, tree_size: u64, siblings: &[Vec<u8>]) ->
         } else {
             let base = (index >> j) << j;
             let mid = base + (1 << j);
-            if mid + (1 << j) <= tree_size {
+            if mid < tree_size {
                 let Some(s) = it.next() else { break };
                 h = Sha256::digest([b"\x01".as_slice(), &h, s].concat()).to_vec();
             }
