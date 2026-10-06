@@ -549,26 +549,28 @@ mod tests {
 
         let changes = diff(&old, &new);
         let map = by_path(&changes);
+        // map keys normalize separators, so expected keys do too
+        let key = |tail: &str| format!("{}/{tail}", root.display().to_string().replace('\\', "/"));
 
-        let added = map[&format!("{}/.claude/skills/echo/extra.md", root.display())];
+        let added = map[&key(".claude/skills/echo/extra.md")];
         assert_eq!(added.kind, ChangeKind::Added);
         // inside a skills dir, even a plain .md counts as Skill
         assert_eq!(added.class, SurfaceClass::Skill);
 
-        let hook = map[&format!("{}/.claude/settings.json", root.display())];
+        let hook = map[&key(".claude/settings.json")];
         assert_eq!(hook.kind, ChangeKind::Modified);
         assert_eq!(hook.class, SurfaceClass::Hook);
 
-        let mcp = map[&format!("{}/mcp.json", root.display())];
+        let mcp = map[&key("mcp.json")];
         assert_eq!(mcp.kind, ChangeKind::Modified);
         assert_eq!(mcp.class, SurfaceClass::McpConfig);
 
-        let gone = map[&format!("{}/CLAUDE.md", root.display())];
+        let gone = map[&key("CLAUDE.md")];
         assert_eq!(gone.kind, ChangeKind::Deleted);
         assert_eq!(gone.class, SurfaceClass::Instructions);
 
         // untouched content produces no change even if files were rewritten
-        assert!(!map.contains_key(&format!("{}/blob.bin", root.display())));
+        assert!(!map.contains_key(&key("blob.bin")));
         let _ = fs::remove_dir_all(root.parent().unwrap());
     }
 
