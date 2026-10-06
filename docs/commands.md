@@ -19,7 +19,19 @@ argus scan . --diff origin/main    # only files changed vs a ref
 argus scan . --staged              # only staged files (pre-commit use)
 argus scan . --yara rules/yara     # real YARA evaluation (default build)
 argus scan . --iocs iocs.txt       # flat IoC list, one per line
+argus scan . --verify-secrets      # check found tokens against issuer APIs (network)
+argus scan . --no-prune            # walk ignored, vendored, and build dirs too
+argus scan . --no-enrich           # skip EPSS/KEV annotation of advisory findings
 ```
+
+The walk honors `.gitignore`, `.ignore`, and git excludes, and prunes
+vendored and build directories (`node_modules`, `target`, `dist`,
+`vendor`, `.venv`, `__pycache__`, and similar). `--no-prune` disables
+both. Secret-shaped names that ignore rules hide (`.env`, key material,
+credential stores) are still collected. Advisory findings from `--osv`
+carry an EPSS score and a KEV marker unless `--no-enrich` is passed;
+enrichment is skipped in offline mode. `--verify-secrets` sends a token
+only to the provider whose shape it matches.
 
 ## github / gitlab / gitea
 
@@ -176,6 +188,13 @@ hide copying. `SIM-001` (jaccard over 70%) marks likely vendored code,
 argus similar file.rs other.rs         # pair score
 argus similar src/                     # near-dups inside the tree
 argus scan . --similar /opt/reference  # flag files copied FROM the reference
+argus similar corpus/ --index-build    # fingerprint a reference corpus
+argus similar src/ --index-query       # LSH lookups against the index
+
+`--index-build` writes MinHash bands to a SQLite index (default
+`~/.local/share/argus/similar.db`, `--index FILE` overrides). `--index-query`
+compares files under the path against indexed candidates; a band hit is
+confirmed with the exact Jaccard and containment checks used by pair mode.
 ```
 
 ## secrets / history
@@ -233,6 +252,36 @@ whether each is still valid. Live credentials report as critical
 (`VER-001`); dead ones as info (`VER-002`). Tokens are masked in output
 and capped at 25 checks per run.
 
+## attest <bundle> [--artifact f] | --npm pkg[@ver] | --sig s --cert c
+
+Verify supply-chain signatures and attestations offline, without
+installing cosign. Three modes:
+
+* a sigstore bundle file (`.sigstore.json`, `.bundle`) - DSSE envelope
+  signature under the embedded Fulcio cert, certificate chain to the
+  pinned Fulcio roots, Rekor signed-entry-timestamp, compact merkle
+  inclusion proof, and signed checkpoint note. `--artifact` also checks
+  the sha256/sha512 of a file against the attested subject digest.
+* `--npm name@ver` fetches npm publish attestations and verifies each
+  bundle, including registry-key `publicKey` attestations whose signing
+  key is recovered from the Rekor entry.
+* `--sig s --cert c --artifact blob` verifies a legacy cosign detached
+  signature over a blob.
+
+`--rekor-pub FILE` swaps the transparency-log key for a private rekor
+instance (P-256, P-384 or RSA PEM). Without it, any tlog entry whose
+logId does not match the embedded production key fails closed with an
+"unknown rekor instance" error rather than being silently untrusted.
+Signer certs may be ECDSA P-256/P-384 or RSA-PKCS1v15
+(SHA-256/384/512) - only the Fulcio roots embedded under trust/ are
+accepted as chain heads.
+
+A fully checked bundle reports `VERIFIED` (`AT-001`); a missing
+transparency-log proof drops to `PARTIAL` (`AT-002`); bad signature or
+tampered payload reports `FAIL` (`AT-003`). Fulcio roots and the Rekor
+key are embedded under `trust/`, so bundle files verify with no network
+at all - `--npm` is the only mode that needs a connection.
+
 ## fix [paths]
 
 Dry-run remediation. Without `--write` it prints before/after edits.
@@ -270,16 +319,38 @@ argus sbom . --format spdx    # SPDX 2.3
 
 ## dependency reachability
 
-OSV hits for deps never referenced in source get downgraded to medium
-and tagged "(no source reference - likely not reachable)". It's a
-content heuristic, not a callgraph - the signal stays honest.
+OSV hits are tagged by how the dep shows up in scanned sources.
+An import/require/use of the dep's own spelling (`lodash` -> `require
+"lodash"`, `serde-json` -> `use serde_json`, maven group -> `import
+group.`) counts as imported and keeps the default severity. A bare name
+mention in comments or strings without an import counts as mentioned and
+is tagged "(referenced in source, no import found)". A dep that shows up
+nowhere is downgraded to medium with "(no source reference - likely not
+reachable)".
+
+For Go and crates.io deps there is a second, deeper level: OSV advisories
+list the affected symbols (`golang.org/x/net/proxy`'s `FromEnvironment`,
+RustSec affected functions). Argus fetches each advisory's symbol list
+and greps source files for actual call sites - a referenced vulnerable
+symbol upgrades the finding to critical with
+`vulnerable symbols referenced: X` evidence, while an advisory whose
+symbols are never called stays at its base severity with
+`none referenced in sources` evidence. Symbol checks only run when
+source roots exist (image and remote scans skip them), and a dep that is
+not imported at all is not re-grepped per advisory.
 
 ## taint rules
 
 `type = "taint"` tracks variables assigned from `source`-matching
 expressions and fires when a `sink` line references a tainted var.
-Sequential and intra-file only - no interproc or branch tracking, but a
-real upgrade from whole-file co-occurrence.
+Reassignment to a clean value untaints the name, and `sanitizers` (a list
+of RHS regexes such as `encodeURIComponent(` or `escape_string(`) clears
+taint instead of spreading it. Scope is tracked loosely: module-level
+assignments survive into functions, while same-named locals in different
+functions do not share taint. Identifier matches are word-boundary, so
+`x` never resolves to `x1` or `foo_x`. Still sequential and intra-file -
+no interproc or branch tracking - but a real upgrade from whole-file
+co-occurrence.
 
 ## authors [paths]
 

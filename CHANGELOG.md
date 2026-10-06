@@ -2,6 +2,58 @@
 
 ## [0.3.0] - Unreleased
 
+Fixes in the scan core: the shared matcher now preflights every regex
+behind an extracted literal anchor or its own SIMD prefilter, overlapping
+Aho-Corasick hits keep nested `contains` literals visible, keyword gates
+match case-insensitively within 250 bytes, `.tsx` files parse under the
+TSX grammar, single-file scans keep their basename for extension-scoped
+rules, the incremental cache keys on `--verify-secrets`, provider verdicts
+are memoized per token, yarn.lock/pnpm keys with `^`/`~` ranges parse for
+dep-name extraction, and `similar --index-build` re-fingerprints only
+changed files.
+
+`--osv` findings now grade reachability by import position instead of a
+name mention: a dep whose import spelling appears in scanned sources
+(import, require, use, package: import, using) stays high, a name-only
+mention is tagged, and an absent dep drops to medium as before.
+`type = "taint"` accepts `sanitizers` for RHS patterns that clear taint,
+untaints variables on clean reassignment, scopes locals to the function
+body they were assigned in, and matches identifiers on word boundaries.
+The scan queue schedules largest files first so big files do not
+straggle at the tail. Dependencies pinned by file:, link:, portal:,
+workspace:, patch:, git, or URL specs no longer hit registry checks -
+they resolve locally, not to npm/crates.io.
+
+Findings carry a `why` line in text, markdown, HTML and SARIF output.
+OSV, verify, dep-risk and attestation findings explain their severity:
+reach level, provider verdict, vulnerable-symbol calls, or signer
+identity. Baselines can no longer hide critical findings - a baseline
+fingerprint that matches a critical keeps it in the report with a
+"never suppressed" reason, so a baselined file that now holds a live
+credential still surfaces.
+
+OSV advisory symbols are checked for Go and crates.io deps. When an
+advisory lists affected functions and a scanned source file calls one,
+the finding upgrades to critical with the symbol named in evidence; a
+dep whose vulnerable symbols never appear stays at base severity.
+Advisory metadata is fetched once per hit and sources are grepped once
+per dep.
+
+`argus attest` verifies supply-chain signatures offline. A sigstore
+bundle (.sigstore.json) gets the full check: DSSE signature under the
+Fulcio leaf cert, chain to the pinned Fulcio roots, Rekor signed-entry
+timestamp, compact merkle inclusion proof, and signed checkpoint note.
+`--artifact` compares sha256/sha512 against the attested subject digest.
+`--npm pkg@ver` fetches npm publish attestations and verifies each,
+including registry-key publicKey bundles whose signer is recovered from
+the Rekor entry. `--sig`/`--cert`/`--artifact` verifies a legacy cosign
+detached signature. Fulcio roots and the Rekor key ship under trust/, so
+bundle files verify with no network; tampered or unverifiable input
+fails closed. Signing keys may be ECDSA P-256/P-384 or RSA-PKCS1v15.
+`--rekor-pub` swaps in a private rekor instance's key, and a tlog entry
+whose logId does not match the configured key reports an unknown
+instance rather than silently verifying nothing.
+
 The crates.io package is `argus-scanner`. The command you run is still `argus`.
 
 A scan on a terminal shows a progress line with the file count and the finding count. `--progress auto` does that only on a tty, `always` forces it, and `never` keeps stderr quiet. `-v` hides the line because the verbose log already says what is happening. The text and markdown summary includes how long the scan took. JSON leaves that number out, so two runs of the same tree still match byte for byte. `argus rules` colors the severity column, and a clean text run prints `no findings` in green.
@@ -27,6 +79,12 @@ Reports can be stored. SQLite is the default, Postgres needs `--features postgre
 `system` now also reads the firewall default policy, systemd-resolved DNSSEC and DNS-over-TLS, the NTP allow list, Secure Boot and kernel lockdown, the CPU vulnerability files, GRUB, unit files under `/etc/systemd/system`, processes holding `/dev/input/event*`, remote logins from `who`, and enabled serial consoles. The running kernel version is compared with the upstream fixes for CVE-2025-39682, CVE-2025-39964, and CVE-2026-53266. A distribution kernel can already contain the backport even when `uname` looks older than those patch numbers. Firmware chip images are not scanned.
 
 Source checks grew past the Python rules (pickle, `yaml.load`, `shell=True`, `eval` and `exec`, TLS verification turned off, `tempfile.mktemp`). JavaScript, Go, Java, PHP, Ruby, and C# rules look for command execution, deserialization, SQL built from a request value, and TLS checks turned off. `owasp` covers a JWT `none` algorithm and a secret written to a log. `agent` covers model text passed into a shell. These are text matches. They cannot decide broken object authorization, and they cannot decide whether a prompt would jailbreak a model.
+
+The file walk now honors `.gitignore`, `.ignore`, and git excludes, and skips vendored and build directories (`node_modules`, `target`, `dist`, `vendor`, `.venv`, `__pycache__`) by default; `--no-prune` opts out. Secret-shaped names hidden by ignore rules are still collected. Matching runs over one shared automaton: rule regexes are compiled into chunked `RegexSet`s and `contains` literals into one Aho-Corasick trie, so each file is scanned once instead of once per rule.
+
+`scan --verify-secrets` checks provider-shaped tokens against their issuer APIs and reports live credentials as critical and dead ones as info. It needs network and is skipped in offline mode. `--dep-check` adds risk signals on top of registry existence: a low-usage name one edit from a popular package (DEP-030), a new tiny package near a popular name (DEP-031, the AI-hallucination squat pattern), and a release that lands after a year of dormancy (DEP-032, maintainer-takeover signal). `MAL-*` records from OSV surface as critical. `--osv` findings are annotated with EPSS scores and a KEV marker unless `--no-enrich` is passed.
+
+`type = "ast"` rules run tree-sitter queries over parsed JavaScript, TypeScript, Python, Go, and Rust, so comments and strings cannot fire them. `type = "content"` and `type = "secret"` accept `keywords`, a proximity gate that reproduces gitleaks fragment matching; the `gitleaks` builtin ruleset imports 219 rules from gitleaks v8.30.1 under MIT. `similar --index-build` fingerprints a directory into a persistent SQLite index and `similar --index-query` finds vendored or copied code via MinHash band lookups instead of pairwise scans.
 
 ## [0.2.0] - 2026-09-29
 

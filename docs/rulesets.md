@@ -21,18 +21,40 @@ severity = "high"           # info|low|medium|high|critical
 regex = 'suspicious.*pattern'
 contains = ["str1", "str2"] # substrings; contains_all = true for all
 exclude = 'safe.*pattern'   # per-match suppressor on the same line/span
+keywords = ["token"]        # gate: case-insensitive keyword within 250 bytes of the hit
 path = '\.env$'             # path regex scoping (optional)
 description = "what this flags"
 remediation = "what to do"
 reference = "https://..."
 ```
 
+`type = "ast"` runs a tree-sitter query on the parsed syntax tree
+(`lang = "python|javascript|typescript|go|rust|tsx"`, `query` in the S-expression
+form, `capture` names which `@name` pins the finding position). Comments and
+string literals never match. A `typescript` rule also covers `.tsx` sources
+via a second compiled query on the TSX grammar; `.jsx` is handled by the
+JavaScript grammar. Rules without a compiled grammar for the file
+extension fall back to the regex kinds; an `ast` rule on a file the grammar
+does not cover is simply silent.
+
 `type = "action"` matches `uses:` refs in workflows
 (`repo = "owner/name"`, `unsafe_refs = "tags|all"`). `type = "package"`
 inspects dependency manifests (`names`, `versions`, `allowed_hosts`).
 `type = "yara"` attaches a `.yar` file evaluated by yara-x.
+`type = "taint"` takes `source` and `sink` regexes plus an optional
+`sanitizers` list of regexes that clear taint (`sanitizers =
+["encodeURIComponent\(", "escape\("]`).
+`type = "secret"` takes `regex` with the candidate in capture group `group`
+(default 1), an `entropy` floor (default 3.8 bits/char), `min_len`, and
+`keywords`. `type = "content"` and `type = "secret"` accept `keywords` as a
+proximity gate; the `gitleaks` builtin ruleset uses this to reproduce
+gitleaks fragment matching.
+
 The `python` ruleset is ordinary `content` rules (pickle, `yaml.load`,
 `shell=True`, `eval`/`exec`, disabled TLS verification, `tempfile.mktemp`).
+The `ast` ruleset flags `eval`/`exec` calls, `new Function`, `innerHTML`
+assignment, `subprocess` with `shell=True`, deserialization on
+pickle/marshal/yaml objects, `exec.Command`, and `env!()` in Rust.
 `javascript`, `go`, `java`, `php`, `ruby`, and `csharp` are the same kind of
 text match for injection, deserialization, and TLS checks in those languages.
 `owasp` covers JWT `none`, disabled JWT verification, and secrets written to
