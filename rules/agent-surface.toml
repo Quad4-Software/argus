@@ -1,0 +1,210 @@
+# AI agent surface: MCP server configs, agent instruction files, and
+# agent settings found inside a scanned tree. These files hand commands,
+# tool grants, and natural-language directives to an agent that runs with
+# the user's privileges, so they deserve the same scrutiny as code.
+#
+# Threat classes covered: remote-script launchers, unpinned install-and-run
+# commands, hardcoded env secrets, approval bypasses, remote transports,
+# risky or lookalike MCP packages, privileged docker launches, inline
+# interpreter payloads, invisible unicode in instructions, override and
+# concealment directives, credential-path targeting, remote instruction
+# fetch, encoded payloads, wildcard tool grants, permissive settings, and
+# hook-executed commands.
+#
+# References: CVE-2025-6514 (mcp-remote), CVE-2025-68145 (git MCP server),
+# postmark-mcp BCC exfiltration, invariantlabs tool-poisoning writeups,
+# GitGuardian reporting on secrets in public MCP configs.
+
+[ruleset]
+name = "agent-surface"
+version = "2026.10.06"
+description = "MCP configs, agent instruction files, and agent settings"
+
+[[rule]]
+id = "AS-001"
+type = "content"
+severity = "critical"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)"(command|args?)"\s*:\s*(\[[^\]]*?)?"?(curl|wget|iwr|invoke-webrequest|fetch)\b|(curl|wget)[^\n]{0,120}\|\s*(sudo\s+)?(ba|z|da|k|c|tc)?sh\b'''
+description = "MCP server launch fetches and runs a remote script"
+remediation = "Remote-script launchers execute attacker-controlled code with your privileges and can change after review. Vendor the server locally and pin it."
+reference = "https://invariantlabs.ai/docs/mcp-scan"
+
+[[rule]]
+id = "AS-002"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)"command"\s*:\s*"?(npx|pnpx|bunx|uvx|pipx|deno)\b|"args?"\s*:\s*\[\s*"(npx|pnpx|bunx|uvx|pipx|pnpm[ ]+dlx|yarn[ ]+dlx|uv[ ]+(tool[ ]+run|run)|deno[ ]+run)\b'''
+description = "MCP server launched via an install-and-run tool"
+remediation = "npx/uvx/dlx launchers resolve the package at run time, so a hijacked or updated package executes without review. Pin an exact version or vendor the package."
+reference = "https://www.docker.com/blog/mcp-supply-chain-security/"
+
+[[rule]]
+id = "AS-003"
+type = "secret"
+severity = "critical"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)"[A-Za-z0-9_.-]*(KEY|TOKEN|SECRET|PASSWORD|PASSWD|AUTH|CREDENTIAL)[A-Za-z0-9_.-]*"\s*:\s*"([A-Za-z0-9_./+=-]{16,})"'''
+group = 2
+entropy = 3.0
+keywords = ["env"]
+description = "hardcoded credential inside an MCP config env block"
+remediation = "Move the credential to a secrets manager or environment indirection. MCP configs with secrets are routinely committed and leaked."
+
+[[rule]]
+id = "AS-004"
+type = "content"
+severity = "critical"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)"(autoApprove|alwaysAllow|autoAccept|allowAllTools|dangerouslyAllowedCommands?|bypassPermissions|dangerouslySkipPermissions)"\s*:\s*(\[\s*"?\*|true|"all"|"always")|"requireApproval"\s*:\s*false'''
+description = "MCP config disables tool-call approval"
+remediation = "Approval bypasses let a server run tools without review. Remove autoApprove/alwaysAllow entries or keep the list minimal and explicit."
+
+[[rule]]
+id = "AS-005"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)"(url|serverUrl|endpoint|transportUrl|baseUrl|sse_url)"\s*:\s*"(https?|wss?)://[^"]+"'''
+exclude = '''(?i)(https?|wss?)://(localhost|127\.0\.0\.1|\[?::1\]?|0\.0\.0\.0)([/:"]|$)'''
+description = "MCP server connects over a remote transport"
+remediation = "Remote MCP transports send tool calls to a third party. Confirm the endpoint is expected and authenticated; prefer stdio servers for local tooling."
+
+[[rule]]
+id = "AS-006"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)(mcp-remote|postmark-mcp|@model-context-protocol|@modelcontextprotocol[.-]|@mcp[-_.])'''
+description = "MCP config references a risky or lookalike package"
+remediation = "mcp-remote has a command-injection CVE and *-mcp packages are mass-forked and typosquatted. Verify the publisher and pin an exact version."
+reference = "https://nvd.nist.gov/vuln/detail/CVE-2025-6514"
+
+[[rule]]
+id = "AS-007"
+type = "dataflow"
+severity = "high"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+source = '''(?i)"command"\s*:\s*"?docker\b|docker[ ]+run\b'''
+sink = '''(?i)(--privileged|--network[ ="]+host|/var/run/docker\.sock|-v[ ]+["' /~]|--pid[ ="]+host|--cap-add|--userns[ ="]+host)'''
+description = "MCP server runs docker with host-level access"
+remediation = "A privileged or host-mounted container escapes its sandbox. Drop --privileged, host mounts, and host networking from the launch arguments."
+
+[[rule]]
+id = "AS-008"
+type = "content"
+severity = "medium"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)\b(ba|z|da)?sh?[ ]+-c\b|node[ ]+-(e|p)\b|python[0-9.]*[ ]+-c\b|powershell[ ]+-(e|enc|encodedcommand)\b|pwsh[ ]+-(e|c)\b|ruby[ ]+-e\b|perl[ ]+-e\b|php[ ]+-r\b|osascript[ ]+-e\b'''
+description = "MCP server launch passes code to an interpreter"
+remediation = "Inline interpreter payloads hide what the server actually runs. Replace with a vendored script you can audit."
+
+[[rule]]
+id = "AS-010"
+type = "content"
+severity = "critical"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''[\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{2064}\x{FEFF}\x{E0000}-\x{E007F}]'''
+description = "invisible unicode inside an agent instruction file"
+remediation = "Zero-width, bidi-override, and tag-block characters hide directives from reviewers but agents still read them. Remove or rewrite the file."
+reference = "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks"
+
+[[rule]]
+id = "AS-011"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''(?i)\b(ignore|disregard|forget|override|bypass|replace)\b[^\n]{0,50}\b(all|any|every|each|previous|prior|earlier|above|system|safety)\b[^\n]{0,40}\b(instructions?|rules?|guidelines?|prompts?|messages?|policies|guardrails?|filters?)\b'''
+description = "instruction file asks an agent to override its directives"
+remediation = "Override phrasing in a file an agent loads is the classic indirect prompt injection. Review the file's provenance before trusting the repo."
+
+[[rule]]
+id = "AS-012"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''(?i)\b(do not|don't|never|avoid|without)\b[^\n]{0,30}\b(tell|inform|show|alert|reveal|disclose|report|mention|notify|warn)[^\n]{0,40}\b(user|human|developer|maintainer|operator|reviewer)\b|\bwithout\b[^\n]{0,20}\b(telling|notifying|alerting|warning|showing)[^\n]{0,30}\b(user|human|developer)\b'''
+description = "instruction file asks an agent to hide actions from the user"
+remediation = "Concealment directives let a malicious file act silently. Treat any 'do not tell the user' text in agent-loaded files as hostile."
+
+[[rule]]
+id = "AS-013"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''(?i)\b(cat|read|open|load|send|upload|post|copy|exfiltrat\w*|dump|print|output|paste|include|embed|encode|base64|transmit|forward)\b[^\n]{0,50}(~?/?\.ssh/|id_rsa|id_ed25519|id_dsa|\.aws/credentials|\.env\b|\.env\.|\.netrc|\.npmrc|\.pypirc|cookies?\.(sqlite|txt|dat)|credentials\.(json|xml|ini)|keychain|password[_-]?(store|file|db))'''
+description = "instruction file directs an agent at credential material"
+remediation = "Agent-loaded files that name secret stores are staging credential theft. Remove the directive and audit what the skill actually needs."
+
+[[rule]]
+id = "AS-014"
+type = "content"
+severity = "medium"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''(?i)\b(fetch|retrieve|download|load|read|pull|follow|obey|execute)\b[^\n]{0,50}\b(further|additional|new|updated|latest|real|next|subsequent|hidden|encoded|external|remote)\b[^\n]{0,40}\b(instructions?|commands?|directives?|rules?|payloads?|tasks?)\b|\b(instructions?|commands?|rules?)[^\n]{0,30}\b(at|from|via|over)\b[^\n]{0,15}https?://'''
+description = "instruction file tells the agent to fetch remote directives"
+remediation = "Instructions loaded from a URL can change after review and pull arbitrary commands into the agent. Keep directives static and reviewable."
+
+[[rule]]
+id = "AS-015"
+type = "content"
+severity = "medium"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+regex = '''(?i)\b(atob\s*\(|base64[ \t]+(-d|--decode|decode)|b64decode|fromCharCode|\\\\x[0-9a-f]{2}\\\\x[0-9a-f]{2}|\bdecode\b[^\n]{0,20}\b(and|then)\b[^\n]{0,20}\b(run|execute|eval|interpret|follow)\b)'''
+description = "instruction file encodes a payload for the agent to run"
+remediation = "Encoded directives evade review. Decode the blob, inspect it, and treat the file as hostile until proven otherwise."
+
+[[rule]]
+id = "AS-016"
+type = "content"
+severity = "medium"
+path = '''(?i)(^|/)(skill\.md|command\.md)$|(^|/)skills?/[^/]+/[^/]*\.(md|ya?ml)$|(^|/)\.(claude|cursor|agents|codex|opencode)/.*\.(md|ya?ml)$'''
+regex = '''(?i)allowed[_-]?tools?[^\n]{0,60}(\*|all\b|any\b)|tools?\s*[:=]\s*\[?\s*"?\*|\b(Bash|Write|Edit|WebFetch|Shell|Execute|Run|Delete)\(\s*\*\s*\)'''
+description = "skill or command grants wildcard tool permissions"
+remediation = "A wildcard tool grant lets the skill run any shell command or write anywhere. Narrow allowed-tools to the specific operations it needs."
+
+[[rule]]
+id = "AS-017"
+type = "dataflow"
+severity = "high"
+path = '''(?i)(^|/)(claude\.md|claude\.local\.md|agents\.md|gemini\.md|\.cursorrules|\.windsurfrules|\.aider\.conf\.yml|copilot-instructions\.md|instructions\.md|system-prompt\.[^.]+|skill\.md|command\.md)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json)$|(^|/)skills?/[^/]+/[^/]*\.md$'''
+source = '''(?i)(\.ssh/|id_rsa|\.aws/credentials|\.env\b|\.netrc|\.npmrc|api[_-]?key|access[_-]?token|secret|credential|password|cookies?|history\.(db|sqlite))'''
+sink = '''(?i)(curl|wget|nc\b|ncat|fetch\s*\(|axios|requests\.(get|post)|https?://|webhook|exfiltrat|upload|post\s+to|send[^\n]{0,20}to|transmit)'''
+description = "instruction file reads secrets and has a network egress channel"
+remediation = "A file that names credential stores AND a network target is the exfiltration shape. Remove the file or strip the egress path."
+
+[[rule]]
+id = "AS-020"
+type = "content"
+severity = "medium"
+path = '''(?i)(^|/)\.(claude|cursor|windsurf|roo|cline|codex|gemini|augment|aider|continue|opencode|zed|vscode|q|kiro|amp|codeium)/settings[^/]*\.(json|ya?ml)$|(^|/)claude_desktop_config\.json$'''
+regex = '''(?i)"(defaultMode|permissionMode|mode|approvalMode|autonomy)"\s*:\s*"(bypassPermissions|acceptEdits|yolo|autonomous|full-?auto|always|never)"|"allow(ed)?(Tool|Command)s?"\s*:\s*\[[^\]]*\*|"dangerously[A-Za-z]*"\s*:\s*true|"skip[A-Za-z]*[Pp]ermission"\s*:\s*true'''
+description = "agent settings enable permissive or autonomous mode"
+remediation = "Bypass modes let agent actions run without review. Keep permissionMode at default and allow-lists narrow."
+
+[[rule]]
+id = "AS-021"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)\.(claude|cursor|windsurf|roo|cline|codex|gemini|augment|aider|continue|opencode|zed|vscode|q|kiro|amp|codeium)/settings[^/]*\.(json|ya?ml)$|(^|/)claude_desktop_config\.json$'''
+regex = '''(?i)"(hooks?|PreToolUse|PostToolUse|UserPromptSubmit|SessionStart|SessionEnd|Stop|Notification)"[^\n]{0,300}"(command|script|exec|run|cmd)"'''
+description = "agent settings register a lifecycle hook that runs a command"
+remediation = "Hooks execute on every matching event with your privileges. Audit what each hook command does; a committed settings file can ship a hook nobody reviewed."
+
+[[rule]]
+id = "AS-022"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)\.(claude|cursor|windsurf|roo|cline|codex|gemini|augment|aider|continue|opencode|zed|vscode|q|kiro|amp|codeium)/settings[^/]*\.(json|ya?ml)$|(^|/)claude_desktop_config\.json$'''
+regex = '''(?i)"(command|script|exec|run|cmd)"\s*:\s*"[^"]*(curl|wget|iwr|nc\b|/dev/tcp|base64|eval|bash|sh[ ]+-|powershell|python[0-9.]*[ ]+-c|node[ ]+-e)'''
+description = "agent hook or setting runs a fetch/shell payload"
+remediation = "A settings hook that pulls remote code or pipes to a shell is a persistent execution channel. Replace with a local, reviewable script."
+
+[[rule]]
+id = "AS-023"
+type = "path"
+severity = "low"
+regex = '''(?i)(^|/)(\.mcp\.json|mcp\.json|claude_desktop_config\.json|\.cursorrules|\.windsurfrules)$|(^|/)\.(claude|cursor|windsurf|roo|cline|continue|codex|augment|zed|q|kiro|amp|codeium|aider|opencode)/(settings\.local\.json|mcp\.json|\.env[^/]*)$'''
+description = "agent config file committed to the repository"
+remediation = "Client agent configs often embed local paths, absolute working dirs, or secrets. If the file is intentional, keep secrets out of it; otherwise gitignore it."

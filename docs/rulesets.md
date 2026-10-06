@@ -59,6 +59,21 @@ pickle/marshal/yaml objects, `exec.Command`, and `env!()` in Rust.
 text match for injection, deserialization, and TLS checks in those languages.
 `owasp` covers JWT `none`, disabled JWT verification, and secrets written to
 logs. `agent` flags model or tool text passed into `eval` or a shell.
+
+`agent-surface` audits the files an AI agent consumes or is configured
+by: MCP server configs (`.mcp.json`, `claude_desktop_config.json`,
+per-client `*.json` under agent dirs), instruction files (`CLAUDE.md`,
+`AGENTS.md`, `SKILL.md`, `.cursorrules`, `copilot-instructions.md`, rules
+and skills under agent directories), and agent settings files. It flags
+remote-script launchers, unpinned install-and-run commands, hardcoded env
+credentials, approval bypasses, remote transports, risky or lookalike MCP
+packages, privileged docker launches, inline interpreter payloads,
+invisible unicode in instructions, override and concealment phrasing,
+credential-path targeting, remote instruction fetches, encoded payloads,
+wildcard tool grants, permissive modes, and hook-executed commands. A
+dataflow rule also fires when an instruction file names credential
+stores and a network egress channel in the same file.
+
 These match text. They do not parse an AST, and they do not prove broken
 access control, insecure design, or prompt injection.
 

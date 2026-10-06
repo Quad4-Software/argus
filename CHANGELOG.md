@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+A new `agent-surface` ruleset audits the files AI agents consume:
+MCP server configs, instruction files (`CLAUDE.md`, `AGENTS.md`,
+`SKILL.md`, `.cursorrules`, `copilot-instructions.md`, per-client rules
+and skills), and agent settings. It flags remote-script launchers,
+unpinned install-and-run commands, hardcoded env credentials, approval
+bypasses, remote transports, risky or lookalike MCP packages, privileged
+docker launches, inline interpreter payloads, invisible unicode inside
+instructions, override and concealment phrasing, credential-path
+targeting, remote instruction fetches, encoded payloads, wildcard tool
+grants, permissive modes, and hook-executed commands.
+
 ## [0.3.1] - 2026-10-06
 
 Fix the Rekor compact merkle fold: a border sibling exists when its

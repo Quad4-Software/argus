@@ -616,6 +616,7 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
     ("ruby", include_str!("../rules/ruby.toml")),
     ("csharp", include_str!("../rules/csharp.toml")),
     ("agent", include_str!("../rules/agent.toml")),
+    ("agent-surface", include_str!("../rules/agent-surface.toml")),
     ("owasp", include_str!("../rules/owasp.toml")),
     ("gitleaks", include_str!("../rules/gitleaks.toml")),
     #[cfg(feature = "ast")]
