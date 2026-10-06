@@ -9,26 +9,100 @@ use crate::finding::{Finding, Report, Severity};
 use crate::scan::ScanOptions;
 use crate::similar;
 
-/// `argus similar`: score two files/trees, or find near-duplicate pairs
-/// inside one tree when b is None.
-pub(crate) fn similar_cmd(
-    a: &std::path::Path,
-    b: Option<&std::path::Path>,
-    index: Option<&std::path::Path>,
-    index_build: bool,
-    index_query: bool,
-    opts: &ScanOptions,
-    report: &mut Report,
-) {
-    if index_build {
+/// Flags for the downloadable signed similarity corpus. Grouped so the
+/// Similar dispatch arm stays readable as the corpus surface grows.
+/// Default = no corpus activity.
+#[derive(Default)]
+pub(crate) struct CorpusArgs<'a> {
+    /// Corpus db path (--corpus-db). Doubles as the fetch destination and
+    /// the --corpus-build output; default: ~/.local/share/argus/corpus.db.
+    pub db: Option<&'a std::path::Path>,
+    /// Download and verify a signed corpus (--fetch-corpus URL).
+    pub fetch: Option<&'a str>,
+    /// ed25519 pubkey override for corpus verification (--corpus-pubkey);
+    /// defaults to the embedded release key.
+    pub pubkey: Option<&'a std::path::Path>,
+    /// Also search the corpus db during index lookup
+    /// (--index-lookup-corpus).
+    pub lookup: bool,
+    /// Maintainer build: fingerprint `a` (and `b`) into a fresh corpus db
+    /// (--corpus-build NAME).
+    pub build: Option<&'a str>,
+}
+
+/// Full `argus similar` surface: pair/dedup scoring, index build/query,
+/// plus the signed-corpus actions (fetch, build, lookup). Mirrors the
+/// clap fields on Cmd::Similar.
+pub(crate) struct SimilarArgs<'a> {
+    /// Left side (file or directory).
+    pub a: &'a std::path::Path,
+    /// Right side; omit for internal dedup of `a`.
+    pub b: Option<&'a std::path::Path>,
+    /// Fingerprint index db override (--index).
+    pub index: Option<&'a std::path::Path>,
+    /// --index-build.
+    pub index_build: bool,
+    /// --index-query.
+    pub index_query: bool,
+    /// Corpus flags (--fetch-corpus/--corpus-db/--corpus-pubkey/
+    /// --index-lookup-corpus/--corpus-build).
+    pub corpus: CorpusArgs<'a>,
+}
+
+pub(crate) fn similar_dispatch(args: &SimilarArgs<'_>, opts: &ScanOptions, report: &mut Report) {
+    let (a, b, index) = (args.a, args.b, args.index);
+    let corpus = &args.corpus;
+    // fetch first so --fetch-corpus chains into a same-invocation lookup
+    if let Some(url) = corpus.fetch {
+        let dest = corpus
+            .db
+            .map(PathBuf::from)
+            .unwrap_or_else(similar::corpus_path);
+        match similar::fetch_corpus(url, &dest, corpus.pubkey) {
+            Ok(msg) => eprintln!("similar: {msg}"),
+            Err(e) => {
+                report.errors.push(format!("similar --fetch-corpus: {e}"));
+                return;
+            }
+        }
+        // a bare fetch is a maintenance action, not a scan of `a`
+        if !(args.index_build || args.index_query || corpus.lookup || corpus.build.is_some()) {
+            return;
+        }
+    }
+    if let Some(name) = corpus.build {
+        let mut dirs = vec![a.to_path_buf()];
+        if let Some(b) = b {
+            dirs.push(b.to_path_buf());
+        }
+        let out = corpus
+            .db
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("corpus.db"));
+        match similar::build_corpus(&dirs, &out, name) {
+            Ok(msg) => eprintln!("similar: {msg}"),
+            Err(e) => report.errors.push(format!("similar --corpus-build: {e}")),
+        }
+        return;
+    }
+    if args.index_build {
         if let Err(e) = similar::index_build(a, index, opts.max_file_size, report) {
             report.errors.push(format!("similar --index-build: {e}"));
         }
         return;
     }
-    if index_query {
-        if let Err(e) = similar::index_query(a, index, opts.max_file_size, report) {
+    if args.index_query || corpus.lookup {
+        if args.index_query
+            && let Err(e) = similar::index_query(a, index, opts.max_file_size, report)
+        {
             report.errors.push(format!("similar --index-query: {e}"));
+        }
+        if corpus.lookup
+            && let Err(e) = similar::corpus_lookup(a, corpus.db, opts.max_file_size, report)
+        {
+            report
+                .errors
+                .push(format!("similar --index-lookup-corpus: {e}"));
         }
         return;
     }

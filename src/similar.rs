@@ -240,7 +240,7 @@ pub fn index(root: &Path, max_file_size: u64) -> Vec<Fingerprint> {
 
 /// Same as index() but files for which `skip(path, mtime_secs, size)` is
 /// true are not re-fingerprinted - callers keep their existing rows.
-fn index_filtered(
+pub(crate) fn index_filtered(
     root: &Path,
     max_file_size: u64,
     skip: &dyn Fn(&Path, i64, i64) -> bool,
@@ -343,7 +343,7 @@ fn mh_coeffs() -> [(u64, u64); MH_PERMS] {
 /// (a*h + b) mod M61 over the fingerprint's hash set. Two signatures agree
 /// in position i with probability ~= jaccard of the underlying sets.
 /// u128 intermediates keep the multiply exact before reduction.
-fn minhash(hashes: &[u64]) -> [u64; MH_PERMS] {
+pub(crate) fn minhash(hashes: &[u64]) -> [u64; MH_PERMS] {
     let coeffs = mh_coeffs();
     let mut sig = [u64::MAX; MH_PERMS];
     for &h in hashes {
@@ -359,7 +359,7 @@ fn minhash(hashes: &[u64]) -> [u64; MH_PERMS] {
 
 /// LSH band keys: SHA-256 (truncated to 16 bytes) of each band's four
 /// minhash rows. Equal band keys mean all four rows matched.
-fn band_keys(sig: &[u64; MH_PERMS]) -> [(i64, [u8; 16]); MH_BANDS] {
+pub(crate) fn band_keys(sig: &[u64; MH_PERMS]) -> [(i64, [u8; 16]); MH_BANDS] {
     use sha2::Digest;
     let mut out = [(0i64, [0u8; 16]); MH_BANDS];
     for (bi, band) in out.iter_mut().enumerate() {
@@ -375,7 +375,7 @@ fn band_keys(sig: &[u64; MH_PERMS]) -> [(i64, [u8; 16]); MH_BANDS] {
 }
 
 /// Pack/unpack a fingerprint's u64 hash list as a little-endian blob.
-fn fp_blob(hashes: &[u64]) -> Vec<u8> {
+pub(crate) fn fp_blob(hashes: &[u64]) -> Vec<u8> {
     hashes.iter().flat_map(|h| h.to_le_bytes()).collect()
 }
 
@@ -399,7 +399,7 @@ pub(crate) fn default_db_path() -> PathBuf {
     std::env::temp_dir().join("argus-similar.db")
 }
 
-fn index_connect(db: &Path, write: bool) -> Result<rusqlite::Connection, String> {
+pub(crate) fn index_connect(db: &Path, write: bool) -> Result<rusqlite::Connection, String> {
     if write && let Some(parent) = db.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
@@ -604,18 +604,32 @@ pub fn index_query(
         ));
     }
     let conn = index_connect(&dbp, false)?;
-    let not_index =
-        |e: rusqlite::Error| format!("{}: not an argus similar index ({e})", dbp.display());
+    let fps = index(root, max_file_size);
+    query_db(&conn, &dbp.display().to_string(), &fps, None, report)?;
+    Ok(())
+}
+
+/// Shared LSH scan for index_query and corpus_lookup: collect file ids
+/// colliding in >=1 band, fetch stored fingerprints, classify. `corpus`
+/// labels findings with the corpus name so signed-corpus hits stay
+/// distinguishable from local-index hits. Returns findings emitted.
+pub(crate) fn query_db(
+    conn: &rusqlite::Connection,
+    label: &str,
+    fps: &[Fingerprint],
+    corpus: Option<String>,
+    report: &mut Report,
+) -> Result<usize, String> {
+    let not_index = |e: rusqlite::Error| format!("{label}: not an argus similar index ({e})");
     let mut cand_stmt = conn
         .prepare("SELECT DISTINCT file_id FROM bands WHERE band_idx=?1 AND band_key=?2")
         .map_err(not_index)?;
     let mut fp_stmt = conn
         .prepare("SELECT path,total_shingles,fp FROM files WHERE id=?1")
         .map_err(not_index)?;
-    let fps = index(root, max_file_size);
     let mut compared = 0usize;
     let mut matched = 0usize;
-    for fa in &fps {
+    for fa in fps {
         if fa.hashes.is_empty() {
             continue;
         }
@@ -651,21 +665,25 @@ pub fn index_query(
                 continue; // a file must not match itself in the corpus
             }
             let before = report.findings.len();
-            push_index_similar(report, fa, &fb);
+            push_index_similar(report, fa, &fb, corpus.as_deref());
             matched += report.findings.len() - before;
         }
     }
-    eprintln!(
-        "similar: queried {compared} files against {} - {matched} matches",
-        dbp.display()
-    );
-    Ok(())
+    eprintln!("similar: queried {compared} files against {label} - {matched} matches");
+    Ok(matched)
 }
 
 /// Emit a SIM-003/SIM-004 finding for a query-file vs indexed-file match.
 /// Same thresholds as push_similar via classify(); the message names the
-/// indexed corpus path instead of a second scanned path.
-fn push_index_similar(report: &mut Report, fa: &Fingerprint, fb: &Fingerprint) {
+/// indexed corpus path instead of a second scanned path. `corpus` marks
+/// hits coming from the signed downloadable corpus rather than the local
+/// index.
+fn push_index_similar(
+    report: &mut Report,
+    fa: &Fingerprint,
+    fb: &Fingerprint,
+    corpus: Option<&str>,
+) {
     let Some(hit) = classify(fa, fb) else {
         return;
     };
@@ -718,7 +736,7 @@ fn push_index_similar(report: &mut Report, fa: &Fingerprint, fb: &Fingerprint) {
         ),
         reference: None,
         window: None,
-        evidence: None,
+        evidence: corpus.map(|c| vec![format!("matched signed similarity corpus {c}")]),
 });
 }
 
@@ -861,3 +879,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&probe);
     }
 }
+
+pub(crate) mod corpus;
+
+pub(crate) use corpus::{build_corpus, corpus_lookup, corpus_path, fetch_corpus};
