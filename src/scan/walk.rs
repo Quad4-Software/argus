@@ -321,10 +321,7 @@ mod tests {
     }
 
     fn names(root: &Path, files: &[PathBuf]) -> Vec<String> {
-        let mut v: Vec<String> = files
-            .iter()
-            .map(|p| p.strip_prefix(root).unwrap().to_string_lossy().to_string())
-            .collect();
+        let mut v: Vec<String> = files.iter().map(|p| rel_path(root, p)).collect();
         v.sort();
         v
     }
