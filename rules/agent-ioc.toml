@@ -1,0 +1,104 @@
+# Known-bad AI-agent surface artifacts: malicious SKILL.md and mcp.json
+# payloads, backdoored MCP packages, and tool names seen in poisoned-skill
+# incidents. Pairs with the agentwatch tripwire: the tripwire says a file
+# changed, this ruleset says the new bytes or names are known-bad.
+#
+# --- feed format -------------------------------------------------------
+# This file is a normal argus ruleset. A feed publishes updated copies as a
+# single TOML over https or as a git repo of TOML files; install or refresh
+# with:
+#
+#     argus rules-update --feed <git-url|https-url>
+#
+# which drops the file into ~/.config/argus/rules. Publishers bump
+# [ruleset] version on every release and keep source pointing at the
+# canonical feed location so reports carry provenance. A rule from a later
+# source overrides an earlier same-id rule.
+#
+# --- adding entries ----------------------------------------------------
+# Hash rules (AIOC-H*): sha256 over the exact bytes of a captured malicious
+# artifact. Only add digests verified against a public incident report; a
+# typo silently never fires.
+#
+# Name rules (AIOC-N*): package, server, and tool names documented in
+# public writeups, matched inside agent config and instruction paths.
+
+[ruleset]
+name = "agent-ioc"
+version = "2026.10.06"
+description = "Known-bad agent skills, MCP configs, and tool names from public incidents"
+source = "https://github.com/Quad4-Software/argus"
+
+# Demonstration entry: sha256 of this repo's own corpus fixture
+# tests/corpus/as-instr-inject/CLAUDE.md, a file that directs an agent to
+# exfiltrate .env and hide it from the user. It exercises the hash path end
+# to end but flags a test fixture, not real malware.
+# corpus fixture hash - replace with incident hashes
+[[rule]]
+id = "AIOC-H001"
+type = "hash"
+severity = "critical"
+sha256 = ["376be831ca804c2a291df44cb0a04e7935c97df1879dabdbaa4cdcf62ddaada8"]
+description = "file bytes match a captured malicious agent instruction file"
+remediation = "The file matches a hostile artifact byte for byte. Remove it and audit every action the agent took while it was present."
+
+# Template for a new incident hash; keep the comment pattern so digest
+# provenance stays auditable.
+#
+# [[rule]]
+# id = "AIOC-H002"
+# type = "hash"
+# severity = "critical"
+# # sha256 published in <incident report URL>
+# sha256 = ["<64-hex file digest>"]
+# description = "<what the artifact is>"
+# reference = "<incident report URL>"
+
+[[rule]]
+id = "AIOC-N001"
+type = "content"
+severity = "critical"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)postmark-mcp|phanpaque\.com'''
+description = "references postmark-mcp, the npm MCP server backdoored to BCC outgoing mail to phanpaque.com"
+remediation = "The backdoored release silently forwarded every sent email to the package operator. Remove it, then rotate every credential the agent could reach."
+reference = "https://www.koi.ai/blog/postmark-mcp-npm-malicious-backdoor-email-theft"
+
+[[rule]]
+id = "AIOC-N002"
+type = "package"
+severity = "critical"
+names = ["postmark-mcp"]
+description = "postmark-mcp dependency: the npm package was backdoored to exfiltrate mail"
+remediation = "Remove the package and rotate credentials on any host that installed it. This is a manifest-level catch; mcp.json references are covered by AIOC-N001."
+reference = "https://www.koi.ai/blog/postmark-mcp-npm-malicious-backdoor-email-theft"
+
+[[rule]]
+id = "AIOC-N010"
+type = "content"
+severity = "critical"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$'''
+regex = '''(?i)mcp-remote@0\.0\.([5-9]|1[0-9])\b|mcp-remote@0\.1\.([0-9]|1[0-5])\b'''
+description = "pins an mcp-remote release vulnerable to CVE-2025-6514 command injection"
+remediation = "mcp-remote 0.0.5 through 0.1.15 lets a hostile MCP server run commands on the client. Upgrade to 0.1.16 or later, or drop the shim for a native transport."
+reference = "https://nvd.nist.gov/vuln/detail/CVE-2025-6514"
+
+[[rule]]
+id = "AIOC-N020"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(claude\.md|agents\.md|gemini\.md|skill\.md|command\.md|instructions\.md)$|(^|/)skills?/[^/]+/[^/]*\.(md|ya?ml)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/.*\.(md|mdc|txt|json|ya?ml)$'''
+regex = '''(?i)get_fact_of_the_day'''
+description = "tool name used as the payload carrier in the public MCP tool-poisoning disclosure"
+remediation = "This name shipped in the demonstration exploit that smuggled exfiltration instructions through a tool description. Treat the file as hostile until the tool is removed."
+reference = "https://invariantlabs.ai/blog/mcp-security-notification-tool-poisoning-attacks"
+
+[[rule]]
+id = "AIOC-N030"
+type = "content"
+severity = "high"
+path = '''(?i)(^|/)(\.?mcp\.json|mcp\.config\.json|claude_desktop_config\.json|cline_mcp_settings\.json|continue\.json)$|(^|/)\.(cursor|claude|windsurf|continue|codex|agents|opencode|amp|aider|zed|github|roo|cline|q|kiro|codeium|augment)/[^/]*mcp[^/]*\.(json|ya?ml)$|(^|/)package\.json$'''
+regex = '''(?i)"@model-context-protocol/|"@modelcontextprotocol-'''
+description = "references a lookalike of the official @modelcontextprotocol npm scope"
+remediation = "The real MCP SDK ships under @modelcontextprotocol (no hyphen, no suffix). Lookalike scopes are typosquat territory; verify the publisher before launching."
+reference = "https://www.docker.com/blog/mcp-supply-chain-security/"
