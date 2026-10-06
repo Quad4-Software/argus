@@ -75,6 +75,10 @@ pub enum RuleKindDef {
         /// Per-match suppression: matched text matching this regex is skipped.
         #[serde(default)]
         exclude: Option<String>,
+        /// Keyword proximity gate (gitleaks semantics): a hit counts only
+        /// when some keyword appears within 250 bytes of it.
+        #[serde(default)]
+        keywords: Vec<String>,
     },
     /// Check uses: owner/repo@ref refs. repo = "* matches any action ref.
     ActionRef {
@@ -94,14 +98,22 @@ pub enum RuleKindDef {
         #[serde(default)]
         allowed_hosts: Vec<String>,
     },
-    /// Secret detection: regex must capture the candidate secret in group 1;
-    /// finding fires only if it passes the entropy floor and isn't a placeholder.
+    /// Secret detection: regex must capture the candidate secret in `group`
+    /// (default 1; 0 = whole match); finding fires only if it passes the
+    /// entropy floor and isn't a placeholder.
     Secret {
         regex: String,
+        /// Capture group holding the secret candidate. Default 1.
+        #[serde(default)]
+        group: Option<usize>,
         /// Shannon entropy floor (bits/char). Default 3.8.
         entropy: Option<f64>,
         /// Minimum candidate length. Default 20.
         min_len: Option<usize>,
+        /// Keyword proximity gate: a hit counts only when some keyword
+        /// appears within 250 bytes of the match.
+        #[serde(default)]
+        keywords: Vec<String>,
     },
     /// Typosquat check: flag manifest dep names within edit distance 1 of a
     /// popular package (builtin lists npm/pypi), or containing non-ASCII.
@@ -124,6 +136,11 @@ pub enum RuleKindDef {
     Taint {
         source: String,
         sink: String,
+        /// RHS regexes that clear taint instead of spreading it
+        /// (e.g. `encodeURIComponent(`, `escape_string(`). A sanitizer call
+        /// wrapping a tainted var un-taints the assignment target.
+        #[serde(default)]
+        sanitizers: Vec<String>,
         #[serde(default)]
         path: Option<String>,
     },
@@ -140,6 +157,18 @@ pub enum RuleKindDef {
     },
     /// Fire on the presence of a matching repo-relative path.
     Path { regex: String },
+    /// tree-sitter query match (S-expression); matched on the parse tree so
+    /// comments and string literals never produce hits. `capture` selects
+    /// which @name pins the finding position (default: first capture).
+    #[cfg(feature = "ast")]
+    Ast {
+        /// javascript|typescript|python|go|rust
+        lang: String,
+        /// tree-sitter query; needs at least one @capture
+        query: String,
+        #[serde(default)]
+        capture: Option<String>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, serde::Deserialize)]
@@ -175,6 +204,8 @@ pub enum CompiledKind {
         regex: Option<Regex>,
         unless: Option<Regex>,
         exclude: Option<Regex>,
+        /// Keyword proximity gate radius in bytes; None = no gate.
+        gate: Option<Vec<String>>,
     },
     ActionRef {
         uses_re: Regex,
@@ -204,12 +235,15 @@ pub enum CompiledKind {
     },
     Secret {
         re: Regex,
+        group: Option<usize>,
         entropy: f64,
         min_len: usize,
+        gate: Option<Vec<String>>,
     },
     Taint {
         source: Regex,
         sink: Regex,
+        sanitizers: Vec<Regex>,
         path: Option<Regex>,
     },
     Dataflow {
@@ -219,6 +253,15 @@ pub enum CompiledKind {
     },
     Path {
         regex: Regex,
+    },
+    #[cfg(feature = "ast")]
+    Ast {
+        lang: crate::astscan::AstLang,
+        query: std::sync::Arc<tree_sitter::Query>,
+        /// Same query compiled for the tsx grammar; set when lang is
+        /// typescript so a rule covering .tsx files gets valid node ids.
+        tsx_query: Option<std::sync::Arc<tree_sitter::Query>>,
+        capture: Option<String>,
     },
 }
 
@@ -242,6 +285,7 @@ impl CompiledRule {
         r"pyproject\.toml|setup\.py|setup\.cfg|pipfile|pipfile\.lock|poetry\.lock|uv\.lock|",
         r"environment\.ya?ml|",
         r"Cargo\.toml|Cargo\.lock|go\.mod|Gemfile\.lock|composer\.lock|Podfile\.lock|",
+        r"pom\.xml|packages\.lock\.json|[^/]*\.csproj|pubspec\.lock|mix\.lock|",
         r"\.github/dependabot\.ya?ml",
         r")$"
     );
@@ -259,6 +303,9 @@ impl CompiledRule {
                     .is_match(rel)
             }
             CompiledKind::Typosquat { scope_re, .. } => scope_re.is_match(rel),
+            #[cfg(feature = "ast")]
+            CompiledKind::Ast { lang, .. } => crate::astscan::lang_for_path(rel)
+                .is_some_and(|fl| crate::astscan::covers(*lang, fl)),
             _ => true,
         }
     }
@@ -277,6 +324,7 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
             regex,
             unless,
             exclude,
+            keywords,
         } => CompiledKind::Content {
             path: opt_re(path)?,
             contains: contains.clone(),
@@ -284,6 +332,7 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
             regex: opt_re(regex)?,
             unless: opt_re(unless)?,
             exclude: opt_re(exclude)?,
+            gate: (!keywords.is_empty()).then(|| keywords.clone()),
         },
         RuleKindDef::ActionRef {
             repo,
@@ -338,12 +387,16 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
         }
         RuleKindDef::Secret {
             regex,
+            group,
             entropy,
             min_len,
+            keywords,
         } => CompiledKind::Secret {
             re: Regex::new(regex).map_err(|e| format!("rule {}: bad regex: {e}", def.id))?,
+            group: *group,
             entropy: entropy.unwrap_or(3.8),
             min_len: min_len.unwrap_or(20),
+            gate: (!keywords.is_empty()).then(|| keywords.clone()),
         },
         RuleKindDef::Typosquat { list, names } => {
             let mut top: HashSet<String> = HashSet::new();
@@ -404,7 +457,12 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
                 allowed,
             }
         }
-        RuleKindDef::Taint { source, sink, path } => {
+        RuleKindDef::Taint {
+            source,
+            sink,
+            sanitizers,
+            path,
+        } => {
             // taint only makes sense on code - default scope to source files
             let p = path.clone().unwrap_or_else(|| {
                 r"\.(js|ts|mjs|cjs|jsx|tsx|py|rs|go|rb|php|sh|bash|ps1|java|c|cpp|h|hpp)$".into()
@@ -414,6 +472,13 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
                     .map_err(|e| format!("rule {}: bad taint source: {e}", def.id))?,
                 sink: Regex::new(sink)
                     .map_err(|e| format!("rule {}: bad taint sink: {e}", def.id))?,
+                sanitizers: sanitizers
+                    .iter()
+                    .map(|s| {
+                        Regex::new(s)
+                            .map_err(|e| format!("rule {}: bad taint sanitizer: {e}", def.id))
+                    })
+                    .collect::<Result<_, String>>()?,
                 path: Some(
                     Regex::new(&p).map_err(|e| format!("rule {}: bad taint path: {e}", def.id))?,
                 ),
@@ -430,6 +495,44 @@ pub fn compile(def: &RuleDef, set: &str) -> Result<CompiledRule, String> {
             regex: Regex::new(regex)
                 .map_err(|e| format!("rule {}: bad path regex: {e}", def.id))?,
         },
+        #[cfg(feature = "ast")]
+        RuleKindDef::Ast {
+            lang,
+            query,
+            capture,
+        } => {
+            let lang = crate::astscan::AstLang::from_name(lang)
+                .ok_or_else(|| format!("rule {}: unknown ast lang `{lang}`", def.id))?;
+            let q = tree_sitter::Query::new(&lang.grammar(), query)
+                .map_err(|e| format!("rule {}: bad tree-sitter query: {e}", def.id))?;
+            if q.capture_names().is_empty() {
+                return Err(format!(
+                    "rule {}: ast query needs at least one @capture",
+                    def.id
+                ));
+            }
+            if let Some(c) = capture
+                && !q.capture_names().iter().any(|n| *n == c)
+            {
+                return Err(format!("rule {}: capture @{c} not in query", def.id));
+            }
+            // ts files and tsx files parse under different grammars; a
+            // typescript rule needs its query compiled for both or .tsx
+            // hits come back with meaningless node kinds
+            let tsx_query = if lang == crate::astscan::AstLang::TypeScript {
+                tree_sitter::Query::new(&tree_sitter_typescript::LANGUAGE_TSX.into(), query)
+                    .ok()
+                    .map(std::sync::Arc::new)
+            } else {
+                None
+            };
+            CompiledKind::Ast {
+                lang,
+                query: std::sync::Arc::new(q),
+                tsx_query,
+                capture: capture.clone(),
+            }
+        }
     };
     Ok(CompiledRule {
         set: set.into(),
@@ -514,6 +617,9 @@ const BUILTIN_SETS: &[(&str, &str)] = &[
     ("csharp", include_str!("../rules/csharp.toml")),
     ("agent", include_str!("../rules/agent.toml")),
     ("owasp", include_str!("../rules/owasp.toml")),
+    ("gitleaks", include_str!("../rules/gitleaks.toml")),
+    #[cfg(feature = "ast")]
+    ("ast", include_str!("../rules/ast.toml")),
 ];
 
 /// Load builtin rulesets (unless disabled) plus any extra TOML files/dirs.

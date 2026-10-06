@@ -1,0 +1,1 @@
+//registry.npmjs.org/:_authToken=npm_edt2sywb3wkh5dnsipzz5fk2z9ri19r0wyoj

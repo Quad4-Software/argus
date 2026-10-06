@@ -1,0 +1,250 @@
+# AST rules: tree-sitter queries matched on the parse tree. These catch the
+# shapes line-regexes can only approximate - keyword arguments, member calls,
+# and nested expressions - and never fire inside comments or strings.
+
+[ruleset]
+name = "ast"
+version = "2026.10.05"
+description = "tree-sitter structural rules for js/ts, python, go, rust"
+source = "argus builtin"
+
+# --- python ---
+
+[[rule]]
+id = "AST-PY-001"
+type = "ast"
+lang = "python"
+severity = "high"
+capture = "call"
+query = '''
+(call
+  function: (identifier) @f
+  (#eq? @f "eval")) @call
+'''
+description = "eval() call (parse-tree match; comments and strings excluded)"
+remediation = "Avoid eval; use ast.literal_eval or a real parser."
+reference = "https://docs.python.org/3/library/functions.html#eval"
+
+[[rule]]
+id = "AST-PY-002"
+type = "ast"
+lang = "python"
+severity = "high"
+capture = "call"
+query = '''
+(call
+  function: (attribute
+    attribute: (identifier) @attr)
+  (#match? @attr "^(system|popen|spawnl|spawnv|spawnlp|spawnvp)$")) @call
+'''
+description = "os.system/popen-family call"
+remediation = "Prefer subprocess with an argv list, no shell."
+
+[[rule]]
+id = "AST-PY-003"
+type = "ast"
+lang = "python"
+severity = "critical"
+capture = "call"
+query = '''
+(call
+  function: (attribute
+    object: (identifier) @obj
+    attribute: (identifier) @attr)
+  (#match? @obj "^(pickle|marshal|dill|shelve|yaml|_pickle|cPickle)$")
+  (#match? @attr "^(loads|load)$")) @call
+'''
+description = "deserialization sink: pickle/marshal/yaml.load-family call"
+remediation = "pickle/marshal load of untrusted data is code execution. yaml.load needs Loader=SafeLoader."
+reference = "https://owasp.org/www-community/vulnerabilities/Deserialization_of_untrusted_data"
+
+[[rule]]
+id = "AST-PY-004"
+type = "ast"
+lang = "python"
+severity = "high"
+capture = "call"
+query = '''
+(call
+  function: (attribute
+    attribute: (identifier) @f)
+  arguments: (argument_list
+    (keyword_argument
+      name: (identifier) @kw
+      value: (true)))
+  (#match? @f "^(run|Popen|call|check_output|check_call)$")
+  (#eq? @kw "shell")) @call
+'''
+description = "subprocess call with shell=True"
+remediation = "Pass an argv list and drop shell=True; shell injection risk."
+
+[[rule]]
+id = "AST-PY-005"
+type = "ast"
+lang = "python"
+severity = "high"
+capture = "call"
+query = '''
+(call
+  function: (identifier) @f
+  (#eq? @f "exec")) @call
+'''
+description = "exec() call"
+remediation = "exec of dynamic content is code injection."
+
+# --- javascript / typescript ---
+
+[[rule]]
+id = "AST-JS-001"
+type = "ast"
+lang = "javascript"
+severity = "high"
+capture = "call"
+query = '''
+(call_expression
+  function: (identifier) @f
+  (#eq? @f "eval")) @call
+'''
+description = "eval() call (parse-tree match)"
+remediation = "Never eval; use JSON.parse or structured dispatch."
+
+[[rule]]
+id = "AST-JS-002"
+type = "ast"
+lang = "javascript"
+severity = "high"
+capture = "expr"
+query = '''
+(new_expression
+  constructor: (identifier) @c
+  (#eq? @c "Function")) @expr
+'''
+description = "new Function() - string-fed dynamic execution"
+remediation = "Equivalent to eval. Refactor to a real function."
+
+[[rule]]
+id = "AST-JS-003"
+type = "ast"
+lang = "javascript"
+severity = "medium"
+capture = "assign"
+query = '''
+(assignment_expression
+  left: (member_expression
+    property: (property_identifier) @p)
+  (#match? @p "^(innerHTML|outerHTML|documentURI)$")) @assign
+'''
+description = "assignment to innerHTML-family DOM sink"
+remediation = "Use textContent or a sanitizer; innerHTML sinks drive DOM XSS."
+reference = "https://owasp.org/www-community/attacks/DOM_Based_XSS"
+
+[[rule]]
+id = "AST-JS-004"
+type = "ast"
+lang = "javascript"
+severity = "high"
+capture = "call"
+query = '''
+(call_expression
+  function: (member_expression
+    object: (identifier) @o
+    property: (property_identifier) @p)
+  (#match? @o "^(child_process|cp|childProcess)$")
+  (#match? @p "^(exec|execSync|execFile|spawn|spawnSync|fork)$")) @call
+'''
+description = "child_process exec/spawn call"
+remediation = "Never pass request-controlled input; prefer execFile with an argv array."
+
+# --- javascript / typescript ---
+
+[[rule]]
+id = "AST-TS-001"
+type = "ast"
+lang = "typescript"
+severity = "high"
+capture = "call"
+query = '''
+(call_expression
+  function: (identifier) @f
+  (#eq? @f "eval")) @call
+'''
+description = "eval() call (parse-tree match)"
+remediation = "Never eval; use JSON.parse or structured dispatch."
+
+[[rule]]
+id = "AST-TS-002"
+type = "ast"
+lang = "typescript"
+severity = "high"
+capture = "expr"
+query = '''
+(new_expression
+  constructor: (identifier) @c
+  (#eq? @c "Function")) @expr
+'''
+description = "new Function() - string-fed dynamic execution"
+remediation = "Equivalent to eval. Refactor to a real function."
+
+[[rule]]
+id = "AST-TS-003"
+type = "ast"
+lang = "typescript"
+severity = "medium"
+capture = "assign"
+query = '''
+(assignment_expression
+  left: (member_expression
+    property: (property_identifier) @p)
+  (#match? @p "^(innerHTML|outerHTML|documentURI)$")) @assign
+'''
+description = "assignment to innerHTML-family DOM sink"
+remediation = "Use textContent or a sanitizer; innerHTML sinks drive DOM XSS."
+reference = "https://owasp.org/www-community/attacks/DOM_Based_XSS"
+
+[[rule]]
+id = "AST-TS-004"
+type = "ast"
+lang = "typescript"
+severity = "high"
+capture = "call"
+query = '''
+(call_expression
+  function: (member_expression
+    object: (identifier) @o
+    property: (property_identifier) @p)
+  (#match? @o "^(child_process|cp|childProcess)$")
+  (#match? @p "^(exec|execSync|execFile|spawn|spawnSync|fork)$")) @call
+'''
+description = "child_process exec/spawn call"
+remediation = "Never pass request-controlled input; prefer execFile with an argv array."
+
+# --- go / rust ---
+
+[[rule]]
+id = "AST-GO-001"
+type = "ast"
+lang = "go"
+severity = "high"
+capture = "call"
+query = '''
+(call_expression
+  function: (selector_expression
+    field: (field_identifier) @f)
+  (#match? @f "^(Command|CommandContext)$")) @call
+'''
+description = "exec.Command call"
+remediation = "Treat argv elements as hostile; no shell expansion, validate input."
+
+[[rule]]
+id = "AST-RS-001"
+type = "ast"
+lang = "rust"
+severity = "medium"
+capture = "expr"
+query = '''
+(macro_invocation
+  macro: (identifier) @m
+  (#eq? @m "env")) @expr
+'''
+description = "env!() macro embeds build-time env var into the binary"
+remediation = "env! of secrets bakes credentials into release artifacts; load at runtime instead."

@@ -6,7 +6,8 @@
 use crate::color::Styles;
 use crate::finding::{Finding, Severity};
 use crate::progress::Progress;
-use crate::rules::{CompiledKind, CompiledRule, UnsafeRefs};
+use crate::rules::CompiledRule;
+use engine::{FileMatch, Matcher, check_file, shannon_entropy};
 use sha2::Digest;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -33,6 +34,12 @@ pub struct ScanOptions {
     pub incremental: bool,
     /// Live progress line on stderr while a scan runs.
     pub progress: bool,
+    /// Prune dependency/build dirs and honor .gitignore/.ignore while
+    /// walking (--no-prune disables).
+    pub prune: bool,
+    /// Live-verify provider-shaped tokens against their issuer APIs
+    /// (--verify-secrets, network required).
+    pub verify_secrets: bool,
     /// Style table for the progress line (color-less when disabled).
     pub styles: Styles,
 }
@@ -51,6 +58,8 @@ impl Default for ScanOptions {
             only_sets: std::collections::HashSet::new(),
             incremental: false,
             progress: false,
+            prune: true,
+            verify_secrets: false,
             styles: Styles::new(crate::color::ColorMode::Never),
         }
     }
@@ -58,15 +67,6 @@ impl Default for ScanOptions {
 
 pub(crate) fn looks_binary(bytes: &[u8]) -> bool {
     bytes[..bytes.len().min(8192)].contains(&0)
-}
-
-fn is_full_sha(s: &str) -> bool {
-    s.len() == 40 && s.bytes().all(|b| b.is_ascii_hexdigit())
-}
-
-/// docker://...@sha256:<64hex> style digest pin - immutable like a commit SHA.
-fn is_digest_pin(s: &str) -> bool {
-    s.len() == 71 && s.starts_with("sha256:") && s[7..].bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn line_of(text: &str, byte_off: usize) -> usize {
@@ -87,338 +87,6 @@ pub(crate) struct FileHit {
     excerpt: Option<String>,
     message: String,
     severity_override: Option<Severity>,
-}
-
-fn check_file(
-    rel: &str,
-    text: Option<&str>,
-    bytes: Option<&[u8]>,
-    rule: &CompiledRule,
-    max_hits: usize,
-) -> Vec<FileHit> {
-    let mut hits = Vec::new();
-    match &rule.kind {
-        CompiledKind::Hash { sha256 } => {
-            let b = match bytes {
-                Some(b) => b,
-                None => return hits,
-            };
-            let digest = hex_sha256(b);
-            if sha256.contains(&digest) {
-                hits.push(FileHit {
-                    line: None,
-                    excerpt: Some(format!("sha256={digest}")),
-                    message: format!("{}: file hash {digest}", rule.description),
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::SourceUrl { line_re, allowed } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            let mut last_off = 0usize;
-            for cap in line_re.captures_iter(text) {
-                if hits.len() >= max_hits {
-                    return hits;
-                }
-                let url = cap.get(2).map(|m| m.as_str()).unwrap_or("");
-                let host = url
-                    .trim_start_matches("http://")
-                    .trim_start_matches("https://")
-                    .split(['/', ':', '?'])
-                    .next()
-                    .unwrap_or("")
-                    .to_lowercase();
-                if host.is_empty()
-                    || allowed
-                        .iter()
-                        .any(|a| host == *a || host.ends_with(&format!(".{a}")))
-                {
-                    continue;
-                }
-                let off = cap.get(0).map(|m| m.start()).unwrap_or(0);
-                if off == last_off {
-                    continue;
-                }
-                last_off = off;
-                hits.push(FileHit {
-                    line: Some(line_of(text, off)),
-                    excerpt: Some(line_excerpt(text, off)),
-                    message: format!("{}: dependency source `{host}`", rule.description),
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::Path { regex } => {
-            if regex.is_match(rel) {
-                hits.push(FileHit {
-                    line: None,
-                    excerpt: None,
-                    message: rule.description.clone(),
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::Content {
-            contains,
-            contains_all,
-            regex,
-            unless,
-            exclude,
-            ..
-        } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            if let Some(u) = unless
-                && u.is_match(text)
-            {
-                return hits;
-            }
-            if *contains_all
-                && !contains.is_empty()
-                && !contains.iter().all(|c| text.contains(c.as_str()))
-            {
-                return hits;
-            }
-            if !contains.is_empty() && !contains_all {
-                'outer: for c in contains {
-                    let mut start = 0;
-                    while let Some(off) = text[start..].find(c.as_str()) {
-                        let off = start + off;
-                        hits.push(FileHit {
-                            line: Some(line_of(text, off)),
-                            excerpt: Some(line_excerpt(text, off)),
-                            message: format!("{}: matched {:?}", rule.description, c),
-                            severity_override: None,
-                        });
-                        if hits.len() >= max_hits {
-                            break 'outer;
-                        }
-                        start = off + c.len().max(1);
-                    }
-                }
-            } else if *contains_all {
-                // All present: report position of the first one.
-                if let Some(first) = contains.first()
-                    && let Some(off) = text.find(first.as_str())
-                {
-                    hits.push(FileHit {
-                        line: Some(line_of(text, off)),
-                        excerpt: Some(line_excerpt(text, off)),
-                        message: format!(
-                            "{}: all {} markers present",
-                            rule.description,
-                            contains.len()
-                        ),
-                        severity_override: None,
-                    });
-                }
-            }
-            if let Some(re) = regex {
-                for m in re.find_iter(text) {
-                    if hits.len() >= max_hits {
-                        return hits;
-                    }
-                    if exclude.as_ref().is_some_and(|x| x.is_match(m.as_str())) {
-                        continue;
-                    }
-                    hits.push(FileHit {
-                        line: Some(line_of(text, m.start())),
-                        excerpt: Some(line_excerpt(text, m.start())),
-                        message: format!("{}: matched /{}/", rule.description, m.as_str()),
-                        severity_override: None,
-                    });
-                }
-            }
-        }
-        CompiledKind::Taint { source, sink, .. } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            hits.extend(crate::scan::taint::taint_scan(
-                text, source, sink, rule, max_hits,
-            ));
-        }
-        CompiledKind::Dataflow { source, sink, .. } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            let s_hit = source.find(text);
-            let k_hit = sink.find(text);
-            if let (Some(sm), Some(km)) = (s_hit, k_hit) {
-                hits.push(FileHit {
-                    line: Some(line_of(text, sm.start())),
-                    excerpt: Some(line_excerpt(text, km.start())),
-                    message: format!(
-                        "{}: source /{}/ reaches sink /{}/",
-                        rule.description,
-                        sm.as_str(),
-                        km.as_str()
-                    ),
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::Package { names_re, versions } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            for cap in names_re.captures_iter(text) {
-                if hits.len() >= max_hits {
-                    return hits;
-                }
-                let Some(m) = cap.get(1) else { continue };
-                let name = m.as_str();
-                let window_end = (m.end() + 256).min(text.len());
-                let window = &text[m.end()..window_end];
-                let hit_ver = if versions.is_empty() {
-                    None
-                } else {
-                    versions
-                        .iter()
-                        .find(|v| version_bounded(window, v))
-                        .cloned()
-                };
-                if !versions.is_empty() && hit_ver.is_none() {
-                    continue; // name present but no known-bad version nearby
-                }
-                let msg = match hit_ver {
-                    Some(v) => format!("{}: `{name}` at known-bad version {v}", rule.description),
-                    None => format!("{}: `{name}`", rule.description),
-                };
-                hits.push(FileHit {
-                    line: Some(line_of(text, m.start())),
-                    excerpt: Some(line_excerpt(text, m.start())),
-                    message: msg,
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::Secret {
-            re,
-            entropy,
-            min_len,
-        } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            static PLACEHOLDER: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
-            let ph = PLACEHOLDER.get_or_init(|| {
-                regex::Regex::new(r"(?i)(x{3,}|\*+|placeholder|example|sample|dummy|changeme|your[-_ ]|<[^>]+>|\$\{|%\w+%|test[_-]?|fake|none|redact|\b0{4,}|\b1{6,}|\babc|lorem)").unwrap()
-            });
-            for cap in re.captures_iter(text) {
-                if hits.len() >= max_hits {
-                    return hits;
-                }
-                let cand = cap.get(1).map(|m| m.as_str()).unwrap_or("");
-                if cand.len() < *min_len || is_placeholder(cand, ph) {
-                    continue;
-                }
-                if shannon_entropy(cand) < *entropy {
-                    continue;
-                }
-                let off = cap.get(1).map(|m| m.start()).unwrap_or(0);
-                hits.push(FileHit {
-                    line: Some(line_of(text, off)),
-                    excerpt: Some(mask_secret(&line_excerpt(text, off), cand)),
-                    message: rule.description.clone(),
-                    severity_override: None,
-                });
-            }
-        }
-        CompiledKind::Typosquat { top, .. } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            for (name, off) in dep_name_candidates(rel, text) {
-                if hits.len() >= max_hits {
-                    return hits;
-                }
-                let has_nonascii = !name.is_ascii();
-                let norm = crate::rules::norm_name(&name);
-                let norm = norm.trim_start_matches('/').to_string();
-                if norm.is_empty() || top.contains(&norm) {
-                    continue;
-                }
-                let suspect = if has_nonascii {
-                    let stripped: String = norm.chars().filter(|c| c.is_ascii()).collect();
-                    !stripped.is_empty()
-                        && !top.contains(&stripped)
-                        && top.iter().any(|t| lev_at_most(&stripped, t, 1))
-                } else {
-                    top.iter().any(|t| lev_at_most(&norm, t, 1))
-                };
-                if suspect {
-                    hits.push(FileHit {
-                        line: Some(line_of(text, off)),
-                        excerpt: Some(line_excerpt(text, off)),
-                        message: format!(
-                            "{}: `{}` is within edit distance 1 of a popular package name",
-                            rule.description, name
-                        ),
-                        severity_override: None,
-                    });
-                }
-            }
-        }
-        CompiledKind::ActionRef {
-            uses_re,
-            wildcard,
-            malicious,
-            unsafe_refs,
-        } => {
-            let text = match text {
-                Some(t) => t,
-                None => return hits,
-            };
-            for cap in uses_re.captures_iter(text) {
-                if hits.len() >= max_hits {
-                    return hits;
-                }
-                let (reff, off) = if *wildcard {
-                    (
-                        cap.get(3).map(|m| m.as_str()).unwrap_or("").to_string(),
-                        cap.get(0).map(|m| m.start()).unwrap_or(0),
-                    )
-                } else {
-                    (
-                        cap.get(1).map(|m| m.as_str()).unwrap_or("").to_string(),
-                        cap.get(0).map(|m| m.start()).unwrap_or(0),
-                    )
-                };
-                let matched = cap.get(0).map(|m| m.as_str()).unwrap_or("");
-                let mk = |msg: String, sev| FileHit {
-                    line: Some(line_of(text, off)),
-                    excerpt: Some(line_excerpt(text, off)),
-                    message: format!("{}: {} -> {matched}", rule.description, msg),
-                    severity_override: sev,
-                };
-                let pinned = is_full_sha(&reff) || is_digest_pin(&reff);
-                if pinned && malicious.contains(&reff.to_lowercase()) {
-                    hits.push(mk(
-                        format!("pinned to KNOWN-MALICIOUS ref {reff}"),
-                        Some(Severity::Critical),
-                    ));
-                } else if pinned {
-                    if matches!(unsafe_refs, UnsafeRefs::All) {
-                        hits.push(mk(format!("unverifiable pin {reff}"), None));
-                    }
-                } else {
-                    hits.push(mk(format!("mutable ref {reff}"), None));
-                }
-            }
-        }
-    }
-    hits
 }
 
 /// Scan one file; returns findings. text is None for skipped/oversize/binary files.
@@ -464,13 +132,33 @@ pub fn scan_file(
     opts: &ScanOptions,
     target: &str,
 ) -> Vec<Finding> {
+    let m = Matcher::build(rules.iter().copied());
+    let idxs: Vec<usize> = (0..rules.len()).collect();
+    scan_file_matched(rel, text, bytes, rules, &idxs, &m, opts, target)
+}
+
+/// Scan one file with a shared, prebuilt matcher. `idxs` are indices into
+/// `rules` (the same slice the matcher was built over) selected by
+/// `path_in_scope`.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn scan_file_matched(
+    rel: &str,
+    text: Option<&str>,
+    bytes: Option<&[u8]>,
+    rules: &[&CompiledRule],
+    idxs: &[usize],
+    m: &Matcher,
+    opts: &ScanOptions,
+    target: &str,
+) -> Vec<Finding> {
+    let fm_own = text.map(|t| FileMatch::compute(m, t, rel));
+    let fm_def = FileMatch::default();
+    let fm = fm_own.as_ref().unwrap_or(&fm_def);
     let mut out = Vec::new();
     let mut seen: HashSet<(String, Option<usize>, String)> = HashSet::new();
-    for rule in rules {
-        if !rule.path_in_scope(rel) {
-            continue;
-        }
-        for mut hit in check_file(rel, text, bytes, rule, opts.max_per_rule_per_file) {
+    for &i in idxs {
+        let rule = rules[i];
+        for mut hit in check_file(rel, text, bytes, i, rule, opts.max_per_rule_per_file, fm) {
             if suppressed(text, hit.line, &rule.id) {
                 continue;
             }
@@ -499,14 +187,17 @@ pub fn scan_file(
                 remediation: rule.remediation.clone(),
                 reference: rule.reference.clone(),
                 window: rule.window.clone(),
+                evidence: None,
             });
         }
     }
     // entropy pass: secrets no shape rule knows - high-entropy tokens on
     // code-ish files only, with guards for hashes/paths/known-safe files
-    if rules.iter().any(|r| r.set == "secrets")
+    // and machine-generated sources
+    if idxs.iter().any(|&i| rules[i].set == "secrets")
         && let Some(t) = text
         && !crate::entropy::is_lockfile_name(rel)
+        && !crate::entropy::is_generated(t)
     {
         for (ln, line) in t.lines().enumerate() {
             for tok in crate::entropy::tokens(line) {
@@ -531,9 +222,20 @@ pub fn scan_file(
                     ),
                     reference: None,
                     window: None,
+                    evidence: None,
                 });
             }
         }
+    }
+    // --verify-secrets: live-check provider-shaped tokens against their
+    // own issuer API, capped per file. Only exact provider shapes are
+    // ever sent (never arbitrary strings) and findings mask the token.
+    // Binary files are skipped - extracted strings trip on test vectors.
+    if opts.verify_secrets
+        && let Some(t) = text
+        && !bytes.as_deref().is_some_and(looks_binary)
+    {
+        out.extend(crate::verify::verify_file_text(t, rel, target, 5));
     }
     out
 }
@@ -546,7 +248,7 @@ pub fn scan_root(
     rules: &[CompiledRule],
     opts: &ScanOptions,
 ) -> (Vec<Finding>, usize) {
-    let files = collect_files(root, opts.include_git);
+    let files = collect_files(root, opts.include_git, opts.prune);
     run_pool(files, root, target, rules, opts)
 }
 
@@ -567,17 +269,28 @@ pub fn scan_selected(
 }
 
 fn run_pool(
-    files: Vec<PathBuf>,
+    mut files: Vec<PathBuf>,
     root: &Path,
     target: &str,
     rules: &[CompiledRule],
     opts: &ScanOptions,
 ) -> (Vec<Finding>, usize) {
+    // Largest-first scheduling: the biggest files start on workers early
+    // instead of straggling at the tail of the walk order.
+    files.sort_by_key(|p| std::cmp::Reverse(p.metadata().map(|m| m.len()).unwrap_or(0)));
     let count = files.len();
     // incremental cache: read-through on (mtime,size) hit, write-back of
     // freshly scanned results. Shared cache = mutexed map.
     let cache = if opts.incremental {
-        let fp = crate::cache::ruleset_fp(&rules.iter().collect::<Vec<_>>());
+        // verify-secrets findings come from live provider calls; without
+        // the flag in the fingerprint a cached non-verify run replays
+        // stale verdicts (and vice versa)
+        let mut fp = crate::cache::ruleset_fp(&rules.iter().collect::<Vec<_>>());
+        fp.push_str(if opts.verify_secrets {
+            "+verify"
+        } else {
+            "-verify"
+        });
         Some((
             crate::cache::load(root, &fp),
             Mutex::new(std::collections::HashMap::<String, crate::cache::Entry>::new()),
@@ -590,6 +303,9 @@ fn run_pool(
     let results = Arc::new(Mutex::new(Vec::new()));
     let jobs = opts.jobs.max(1).min(count.max(1));
     let prog = Arc::new(Progress::new(target, count, opts.progress, opts.styles));
+    // One RegexSet + one Aho-Corasick automaton across all rules, shared
+    // read-only by every worker.
+    let matcher = Arc::new(Matcher::build(rules.iter()));
     // Windows gives default threads about 1 MiB. The regex crate recurses
     // and that overflows while matching short files. Workers get 8 MiB.
     let rules = Arc::new(rules.to_vec());
@@ -600,7 +316,7 @@ fn run_pool(
 
     let mut workers = Vec::with_capacity(jobs);
     for _ in 0..jobs {
-        let (queue, results, prog, rules, opts, root, target, cache) = (
+        let (queue, results, prog, rules, opts, root, target, cache, matcher) = (
             Arc::clone(&queue),
             Arc::clone(&results),
             Arc::clone(&prog),
@@ -609,6 +325,7 @@ fn run_pool(
             Arc::clone(&root),
             Arc::clone(&target),
             Arc::clone(&cache),
+            Arc::clone(&matcher),
         );
         workers.push(
             std::thread::Builder::new()
@@ -626,8 +343,10 @@ fn run_pool(
                         if opts.exclude.iter().any(|re| re.is_match(&rel)) {
                             continue;
                         }
-                        let applicable: Vec<&CompiledRule> =
-                            rules.iter().filter(|r| r.path_in_scope(&rel)).collect();
+                        let rule_refs: Vec<&CompiledRule> = rules.iter().collect();
+                        let applicable: Vec<usize> = (0..rule_refs.len())
+                            .filter(|&i| rule_refs[i].path_in_scope(&rel))
+                            .collect();
                         if applicable.is_empty() {
                             continue;
                         }
@@ -645,12 +364,13 @@ fn run_pool(
                         }
                         let needs_text = applicable
                             .iter()
-                            .any(|r| r.needs_content() && !r.needs_bytes());
+                            .any(|&i| rules[i].needs_content() && !rules[i].needs_bytes());
                         #[cfg(feature = "yara")]
                         let has_yara = opts.yara.is_some();
                         #[cfg(not(feature = "yara"))]
                         let has_yara = false;
-                        let needs_bytes = applicable.iter().any(|r| r.needs_bytes()) || has_yara;
+                        let needs_bytes =
+                            applicable.iter().any(|&i| rules[i].needs_bytes()) || has_yara;
                         let (text, bytes) = if needs_text || needs_bytes {
                             match std::fs::metadata(&file) {
                                 Ok(m) if m.len() <= opts.max_file_size => {
@@ -676,11 +396,13 @@ fn run_pool(
                             (None, None)
                         };
                         let binary = bytes.as_deref().is_some_and(looks_binary);
-                        let mut found = scan_file(
+                        let mut found = scan_file_matched(
                             &rel,
                             text.as_deref(),
                             bytes.as_deref(),
+                            &rule_refs,
                             &applicable,
+                            &matcher,
                             &opts,
                             &target,
                         );
@@ -788,37 +510,6 @@ fn extract_strings(b: &[u8]) -> String {
     out
 }
 
-/// True if levenshtein(a, b) <= k (early-exit banded check).
-fn lev_at_most(a: &str, b: &str, k: usize) -> bool {
-    let (a, b) = (a.as_bytes(), b.as_bytes());
-    if a.len().abs_diff(b.len()) > k {
-        return false;
-    }
-    let (m, n) = (a.len(), b.len());
-    let mut prev2 = vec![0usize; n + 1];
-    let mut prev: Vec<usize> = (0..=n).collect();
-    let mut cur = vec![0usize; n + 1];
-    for i in 1..=m {
-        cur[0] = i;
-        let mut row_min = cur[0];
-        for j in 1..=n {
-            let cost = if a[i - 1] == b[j - 1] { 0 } else { 1 };
-            cur[j] = (prev[j] + 1).min(cur[j - 1] + 1).min(prev[j - 1] + cost);
-            // adjacent transposition (classic typosquat shape)
-            if i >= 2 && j >= 2 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
-                cur[j] = cur[j].min(prev2[j - 2] + 1);
-            }
-            row_min = row_min.min(cur[j]);
-        }
-        if row_min > k {
-            return false;
-        }
-        std::mem::swap(&mut prev2, &mut prev);
-        std::mem::swap(&mut prev, &mut cur);
-    }
-    prev[n] <= k
-}
-
 fn container_enabled(opts: &ScanOptions, rel: &str) -> bool {
     let set_ok = opts.only_sets.is_empty() || opts.only_sets.contains("container-audit");
     set_ok
@@ -841,43 +532,6 @@ fn audit_enabled(opts: &ScanOptions, rel: &str) -> bool {
         .is_match(rel)
 }
 
-fn shannon_entropy(s: &str) -> f64 {
-    let mut counts = [0usize; 256];
-    for b in s.as_bytes() {
-        counts[*b as usize] += 1;
-    }
-    let n = s.len() as f64;
-    counts
-        .iter()
-        .filter(|&&c| c > 0)
-        .map(|&c| {
-            let p = c as f64 / n;
-            -p * p.log2()
-        })
-        .sum()
-}
-
-fn is_placeholder(s: &str, ph: &regex::Regex) -> bool {
-    if ph.is_match(s) {
-        return true;
-    }
-    // low-variety strings: <=4 distinct chars
-    s.as_bytes()
-        .iter()
-        .collect::<std::collections::HashSet<_>>()
-        .len()
-        <= 4
-}
-
-/// Redact the secret inside the excerpt before reporting.
-fn mask_secret(line: &str, secret: &str) -> String {
-    if secret.len() < 8 {
-        return line.to_string();
-    }
-    let masked = format!("{}...{}", &secret[..4], &secret[secret.len() - 3..]);
-    line.replace(secret, &masked)
-}
-
 /// Mask any high-entropy token inside an excerpt (secrets never report raw).
 fn mask_tokens(line: &str) -> String {
     static TOK: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
@@ -893,47 +547,8 @@ fn mask_tokens(line: &str) -> String {
     .into_owned()
 }
 
-/// True when `version` appears in `window` as its own token.
-/// A longer version that merely contains the bad string does not count:
-/// 6.0.0 is not 16.0.0, and 5.6.1 is not 5.6.10.
-fn version_bounded(window: &str, version: &str) -> bool {
-    if version.is_empty() {
-        return false;
-    }
-    let bytes = window.as_bytes();
-    let needle = version.as_bytes();
-    let mut from = 0;
-    while from + needle.len() <= bytes.len() {
-        let Some(rel) = window[from..].find(version) else {
-            break;
-        };
-        let at = from + rel;
-        let before_ok = at == 0 || !bytes[at - 1].is_ascii_alphanumeric();
-        let after = at + needle.len();
-        let after_ok = after >= bytes.len() || !bytes[after].is_ascii_alphanumeric();
-        if before_ok && after_ok {
-            return true;
-        }
-        from = at + 1;
-    }
-    false
-}
-
-#[cfg(test)]
-mod version_bounds {
-    use super::version_bounded;
-
-    #[test]
-    fn longer_versions_do_not_match() {
-        assert!(version_bounded(r#""6.0.0""#, "6.0.0"));
-        assert!(!version_bounded(r#""16.0.0""#, "6.0.0"));
-        assert!(!version_bounded(r#""5.6.10""#, "5.6.1"));
-        assert!(version_bounded("axios@1.14.1", "1.14.1"));
-        assert!(!version_bounded("axios@1.14.10", "1.14.1"));
-        assert!(!version_bounded("axios@11.14.1", "1.14.1"));
-    }
-}
-
+mod anchors;
+pub(crate) mod engine;
 pub(crate) mod taint;
 pub(crate) mod walk;
-pub(crate) use walk::{collect_files, dep_name_candidates, rel_path};
+pub(crate) use walk::{collect_files, rel_path};
