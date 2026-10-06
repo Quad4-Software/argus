@@ -1,0 +1,2 @@
+# base64-encoded prose, not a credential
+payload = "data:text/plain;base64,aGVsbG8gd29ybGQsIHRoaXMgaXMgYW4gZXhhbXBsZSBvZiBwbGFpbiBwcm9zZSB0ZXh0LCBkZWZpbml0ZWx5IG5vdCBhIGNyZWRlbnRpYWw="
