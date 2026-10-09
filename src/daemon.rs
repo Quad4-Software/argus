@@ -58,7 +58,7 @@ pub fn hmac_sha256_hex(secret: &str, body: &[u8]) -> String {
         .collect()
 }
 
-/// Verify GitHub webhook X-Hub-Signature-256 (sha256=<hex>).
+/// Verify GitHub webhook X-Hub-Signature-256 (sha256=\<hex\>).
 pub fn verify_github_sig(secret: &str, body: &[u8], sig_header: &str) -> bool {
     let Some(hex) = sig_header.strip_prefix("sha256=") else {
         return false;

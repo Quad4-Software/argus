@@ -364,7 +364,7 @@ fn chain_to_root(leaf: &ParsedCert, bundle_chain: &[Vec<u8>]) -> bool {
     false
 }
 
-/// DSSE PAE: DSSEv1 <len(type)> <type> <len(body)> <body>
+/// DSSE PAE: DSSEv1 \<len(type)\> \<type\> \<len(body)\> \<body\>
 fn pae(payload_type: &str, payload: &[u8]) -> Vec<u8> {
     let mut v = Vec::new();
     v.extend_from_slice(b"DSSEv1 ");

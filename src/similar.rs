@@ -48,7 +48,7 @@ fn fnv(data: &[u8]) -> u64 {
     h
 }
 
-/// Normalize into token ids: [A-Za-z_][A-Za-z0-9_]* -> ID, numbers/strings ->
+/// Normalize into token ids: \[A-Za-z_\]\[A-Za-z0-9_\]* -> ID, numbers/strings ->
 /// LIT, everything else verbatim; comments and whitespace dropped.
 fn tokenize(src: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(src.len() / 4);

@@ -415,6 +415,24 @@ with `--dep-watch` alert on registry maintainer changes. With
 extras) and reports added/modified/deleted files - a tripwire for
 agent-surface persistence.
 
+`--domain` (repeatable) posture-watches a domain each cycle: CT log
+name deltas flag new subdomains, NS/MX/TXT/A changes flag takeovers,
+security header removals flag regressions, and RDAP registrar/expiry
+plus cert `not_after` flag hijacks and expirations. `--typo` resolves
+lookalike permutations of each watched domain and alerts when one
+goes live. `--gh-events` polls the org events feed (github + `--org`)
+for public flips, new/deleted repos, member adds, and pushes whose
+before-SHA does not match the seen head - public flips and new repos
+get an immediate clone+scan. `--kev` matches newly-listed CISA KEV
+products against the stored dep baselines. `--code-watch QUERY`
+(repeatable) polls GitHub code search for new hits; needs a token.
+
+```sh
+argus watch --org my-org --gh-events --kev
+argus watch --domain quad4.io --typo --once
+argus watch --repo me/api --code-watch 'org:me "PRIVATE KEY"'
+```
+
 ## init
 
 Install a pre-commit hook running `argus scan --staged --fail-on medium`.
@@ -448,7 +466,7 @@ argus records example.com
 
 ## api
 
-Local JSON API on `127.0.0.1:9876`. `GET /health`, `GET /v1/records?q=`, `POST /v1/intel` with `{"indicator":"..."}`, `POST /v1/account`, `POST /v1/socials`, `POST /v1/feed`, and `POST /v1/trackers` with `{"url":"..."}`.
+Local JSON API on `127.0.0.1:9876`. `GET /health`, `GET /v1/records?q=`, `POST /v1/intel` with `{"indicator":"..."}`, `POST /v1/account`, `POST /v1/socials`, `POST /v1/keybase`, `POST /v1/steam`, `POST /v1/bluesky`, `POST /v1/mastodon`, `POST /v1/reddit`, `POST /v1/youtube`, `POST /v1/tiktok`, `POST /v1/lemmy`, `POST /v1/feed`, and `POST /v1/trackers` with `{"url":"..."}`.
 
 Outbound webhooks are `[[webhook]]` entries in the config, with `url` and optional `events`. `ARGUS_WEBHOOK_SECRET` signs the body as `X-Argus-Signature: sha256=...`. Link-local webhook targets are refused.
 
@@ -485,11 +503,33 @@ argus style --kind code src/a.rs src/b.rs
 
 ## account &lt;github|gitlab&gt; &lt;login&gt;
 
-Public profile age, followers, following, repo counts, stars, forks, and social links from the profile site. GitHub works without a token. GitLab often hides created date and follower counts unless `GITLAB_TOKEN` is set. `GITHUB_TOKEN` raises the GitHub rate limit. Tokens are not printed.
+Public profile age, followers, following, repo counts, stars, forks, and social links from the profile site. GitHub also reads the public events feed (`/users/<login>/events/public`, or `/orgs/<login>/events` for organizations) and summarizes recent event kinds with push head/before SHAs. GitHub works without a token. GitLab often hides created date and follower counts unless `GITLAB_TOKEN` is set. `GITHUB_TOKEN` raises the GitHub rate limit. Tokens are not printed.
 
 ```sh
 argus account github octocat
 argus account gitlab dzaporozhets
+```
+
+## gharchive --org|--user|--repo &lt;name&gt;
+
+Filters the GHArchive public event firehose at data.gharchive.org. Each hour of GitHub activity is one gzipped JSONL file; argus downloads the most recent completed hours in parallel, decompresses while streaming, and keeps events that touch the target. `--org` matches the event org or the repo owner, `--user` matches the actor or the repo owner, `--repo` matches owner/name exactly. `--hours` is 1-168 (default 3, roughly 5-300 MB each). `--events` narrows to a comma list of kinds; short names like `Push,Public,Delete` work.
+
+Push SHAs stay in the archive after a force push or branch delete, so `gh-push` evidence (ref, before, head) is the starting point for recovering dangling commits. `gh-public` flags repositories flipped to public, `gh-create` and `gh-delete` cover ref and repo lifecycle, `gh-emails` collects commit author identities. Hour files that are not published yet are skipped and listed in evidence.
+
+`--fetch` goes further: every observed push SHA is fetched from the repo (GitHub serves objects by SHA even when no ref points at them), checked out, and scanned. This recovers secrets that were pushed and then force-pushed away. `--fetch-max` caps the commit count.
+
+```sh
+argus gharchive --org quad4-software --hours 24
+argus gharchive --repo rust-lang/rust --events push,public
+argus gharchive --org my-org --hours 72 --fetch
+```
+
+## typo &lt;domain&gt;
+
+Lookalike domain check. Generates dnstwist-style permutations of the registered label (omission, repetition, transposition, confusable characters, bitsquatting, hyphen insertion, TLD swap) and resolves each over DNS-over-HTTPS. Live lookalikes are listed; ones with MX records are phishing-capable. To watch for new lookalikes continuously use `argus watch --domain x --typo`.
+
+```sh
+argus typo quad4.io
 ```
 
 ## socials &lt;url&gt;
@@ -583,6 +623,78 @@ One username against a small public API table: GitHub, GitLab, Codeberg, crates.
 argus user octocat
 ```
 
+## keybase &lt;username&gt;
+
+Public Keybase profile, identity proofs, and the account device list from `keybase.io/_/api/1.0/user/lookup.json`. Devices come from the account sigchain, so old machines, phones, and paper keys show up next to the current ones. Each device row carries the type (desktop, mobile, backup), the name, the creation date, the last-update date, and the status. A revoked device is flagged. Proofs list the linked identities (Twitter, GitHub, domains) with their state. No key or login is used, so only the public record is read.
+
+```sh
+argus keybase chris
+```
+
+## steam &lt;target&gt;
+
+Public Steam community profile. The target is a vanity name, an id64, or a profile URL. The page is fetched once and parsed: persona, real name, location, bio, level, avatar, country flag, sidebar counts, name history from the alias endpoint, and recent games. A private profile reports the fields it hides. A miss is not proof the account does not exist.
+
+```sh
+argus steam zed
+argus steam 76561198015649972
+argus steam https://steamcommunity.com/id/zed
+```
+
+## bluesky &lt;handle&gt;
+
+Public Bluesky profile through the appview at `public.api.bsky.app`. A handle, a DID, an `at://` URI, or a bsky.app profile URL works. The report carries the DID, display name, description, counts, account date, self-labels, and any verification. No account or app password is used.
+
+```sh
+argus bluesky jay.bsky.team
+```
+
+## mastodon &lt;target&gt;
+
+Public Mastodon account through the instance lookup endpoint. The target is `user@instance`, a profile URL, or a bare username with `--instance` (default `mastodon.social`). The report carries the account id, display name, note text, counts, creation and last-post dates, account flags (locked, bot, group, noindex), and profile fields such as links.
+
+```sh
+argus mastodon Gargron@mastodon.social
+argus mastodon Gargron --instance fosstodon.org
+```
+
+## reddit &lt;user&gt;
+
+Public Reddit account history from the Arctic Shift archive (Reddit's own JSON refuses datacenter clients). The target is a username, `u/name`, or a profile URL. The report carries post, comment, and total karma, archive counts, the earliest and latest activity dates, recent posts and comments with scores and permalinks, and the subreddits seen in the recent window. The archive is a community service and answers a busy moment with a retry and an inconclusive finding, never a false miss.
+
+```sh
+argus reddit spez
+argus reddit u/spez
+```
+
+## youtube &lt;target&gt;
+
+Public YouTube video or channel. A video id, watch/shorts/youtu.be URL, `@handle`, or channel URL works. Videos resolve through oembed (title, author, thumbnail). Channels parse the public page header for the title, handle, subscriber count, video count, and verification badge, plus the Atom feed for the channel creation date and recent uploads with view counts. No key is used.
+
+```sh
+argus youtube @NASA
+argus youtube dQw4w9WgXcQ
+argus youtube https://www.youtube.com/watch?v=dQw4w9WgXcQ
+```
+
+## tiktok &lt;target&gt;
+
+Public TikTok video or profile. A video id, video URL, `@user`, or profile URL works. Videos resolve through oembed. Profiles parse the page rehydration blob for nickname, bio, region, avatar, follower, following, like, and video counts, plus the verified, private, and seller flags and any links in the bio. A challenge page reports inconclusive instead of a hard failure.
+
+```sh
+argus tiktok @scout2015
+argus tiktok https://www.tiktok.com/@scout2015/video/6718335390845095173
+```
+
+## lemmy &lt;target&gt;
+
+Public Lemmy account through the instance v3 API. The target is `name@instance`, a `/u/` URL, or a bare username with `--instance`. The report carries the display name, actor id, home instance, bio, join and update dates, post and comment counts, account flags (admin, bot, banned, deleted, local), moderated communities, and recent posts and comments with scores.
+
+```sh
+argus lemmy dessalines@lemmy.ml
+argus lemmy dessalines --instance lemmy.ml
+```
+
 ## modules
 
 Print the built-in command list from `src/catalog.rs`. Removing a command means deleting its source, its catalog row, and its CLI arm.
@@ -593,7 +705,7 @@ argus modules
 
 ## mcp
 
-Stdio JSON-RPC server. Legacy clients use `initialize` (protocol `2025-06-18` or `2025-11-25`). Current clients can call `server/discover` and send protocol `2026-07-28` on each request. Tools include `scan`, `scan_system`, `list_rules`, `intel`, `store_search`, `supply`, `stego`, `codec`, `style`, `account`, `socials`, `feed`, and `gitmeta`. `grep` and `extract` stay off this list so local file contents are not sent to a model.
+Stdio JSON-RPC server. Legacy clients use `initialize` (protocol `2025-06-18` or `2025-11-25`). Current clients can call `server/discover` and send protocol `2026-07-28` on each request. Tools include `scan`, `scan_system`, `list_rules`, `intel`, `store_search`, `supply`, `stego`, `codec`, `style`, `account`, `socials`, `keybase`, `steam`, `bluesky`, `mastodon`, `reddit`, `youtube`, `tiktok`, `lemmy`, `feed`, and `gitmeta`. `grep` and `extract` stay off this list so local file contents are not sent to a model.
 
 ACP is the editor-to-agent protocol. Argus is not a coding agent, so automation goes through MCP, the local API, and webhooks.
 

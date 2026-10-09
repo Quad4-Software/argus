@@ -193,7 +193,16 @@ fn tools_list() -> Value {
         {"name": "account", "title": "Forge account", "description": "Public GitHub or GitLab account metadata.", "inputSchema": {"type": "object", "properties": {"forge": {"type": "string"}, "login": {"type": "string"}, "host": {"type": "string"}}, "required": ["forge", "login"]}, "outputSchema": {"type": "object"}},
         {"name": "socials", "title": "Social and resume links", "description": "Extract social and resume links from a public page, including link-in-bio hubs.", "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}, "outputSchema": {"type": "object"}},
         {"name": "feed", "title": "Feed search", "description": "Fetch an RSS, Atom, or JSON feed and optionally search it.", "inputSchema": {"type": "object", "properties": {"url": {"type": "string"}, "query": {"type": "string"}}, "required": ["url"]}, "outputSchema": {"type": "object"}},
-        {"name": "gitmeta", "title": "Git identity", "description": "Local git names and emails, or a public .git/HEAD check that does not download objects.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}}
+        {"name": "gitmeta", "title": "Git identity", "description": "Local git names and emails, or a public .git/HEAD check that does not download objects.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "keybase", "title": "Keybase profile and devices", "description": "Public Keybase profile, identity proofs, and the account device list with created and last-updated dates.", "inputSchema": {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}, "outputSchema": {"type": "object"}},
+        {"name": "steam", "title": "Steam profile", "description": "Public Steam community profile: persona, identity, level, counts, name history, and recent games.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "bluesky", "title": "Bluesky profile", "description": "Public Bluesky profile via the appview: DID, counts, self-labels, and verification.", "inputSchema": {"type": "object", "properties": {"handle": {"type": "string"}}, "required": ["handle"]}, "outputSchema": {"type": "object"}},
+        {"name": "mastodon", "title": "Mastodon account", "description": "Public Mastodon account: profile, counts, flags, and profile fields.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}, "instance": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "reddit", "title": "Reddit account history", "description": "Public Reddit account history from the Arctic Shift archive: karma, archive counts, recent posts and comments.", "inputSchema": {"type": "object", "properties": {"user": {"type": "string"}}, "required": ["user"]}, "outputSchema": {"type": "object"}},
+        {"name": "youtube", "title": "YouTube video or channel", "description": "Public YouTube video or channel: oembed metadata, subscribers, verification, and recent uploads.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "tiktok", "title": "TikTok video or profile", "description": "Public TikTok video or profile: oembed metadata and page account data.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "lemmy", "title": "Lemmy account", "description": "Public Lemmy account: person view, counts, moderated communities, recent posts and comments.", "inputSchema": {"type": "object", "properties": {"target": {"type": "string"}, "instance": {"type": "string"}}, "required": ["target"]}, "outputSchema": {"type": "object"}},
+        {"name": "gharchive", "title": "GHArchive event filter", "description": "Filter the GHArchive public event firehose for an org, user, or repo. Returns push SHAs, public flips, and ref creates/deletes.", "inputSchema": {"type": "object", "properties": {"org": {"type": "string"}, "user": {"type": "string"}, "repo": {"type": "string"}, "hours": {"type": "integer"}, "events": {"type": "string"}}}, "outputSchema": {"type": "object"}}
     ]})
 }
 
@@ -303,6 +312,32 @@ fn call_tool(
         "socials" => osint_tool(crate::osint::scan_socials(
             args["url"].as_str().unwrap_or(""),
         )),
+        "keybase" => osint_tool(crate::osint::scan_keybase(
+            args["name"].as_str().unwrap_or(""),
+        )),
+        "steam" => osint_tool(crate::osint::scan_steam(
+            args["target"].as_str().unwrap_or(""),
+        )),
+        "bluesky" => osint_tool(crate::osint::scan_bluesky(
+            args["handle"].as_str().unwrap_or(""),
+        )),
+        "mastodon" => osint_tool(crate::osint::scan_mastodon(
+            args["target"].as_str().unwrap_or(""),
+            args["instance"].as_str().unwrap_or("mastodon.social"),
+        )),
+        "reddit" => osint_tool(crate::osint::scan_reddit(
+            args["user"].as_str().unwrap_or(""),
+        )),
+        "youtube" => osint_tool(crate::osint::scan_youtube(
+            args["target"].as_str().unwrap_or(""),
+        )),
+        "tiktok" => osint_tool(crate::osint::scan_tiktok(
+            args["target"].as_str().unwrap_or(""),
+        )),
+        "lemmy" => osint_tool(crate::osint::scan_lemmy(
+            args["target"].as_str().unwrap_or(""),
+            args["instance"].as_str(),
+        )),
         "feed" => osint_tool(crate::osint::scan_feed(
             args["url"].as_str().unwrap_or(""),
             args["query"].as_str(),
@@ -310,6 +345,24 @@ fn call_tool(
         "gitmeta" => osint_tool(crate::osint::scan_gitmeta(
             args["target"].as_str().unwrap_or("."),
         )),
+        "gharchive" => {
+            let sel = match (
+                args["org"].as_str(),
+                args["user"].as_str(),
+                args["repo"].as_str(),
+            ) {
+                (Some(n), None, None) => crate::osint::GhSel::Org(n.to_string()),
+                (None, Some(n), None) => crate::osint::GhSel::User(n.to_string()),
+                (None, None, Some(n)) => crate::osint::GhSel::Repo(n.to_string()),
+                _ => return Err(err(-32602, "pass exactly one of org, user, repo")),
+            };
+            let hours = args["hours"].as_u64().unwrap_or(3) as u32;
+            osint_tool(crate::osint::scan_gharchive(
+                &sel,
+                hours,
+                args["events"].as_str(),
+            ))
+        }
         "list_rules" => {
             let filter = args["ruleset"].as_str();
             let list: Vec<Value> = rules.iter()

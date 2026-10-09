@@ -13,7 +13,7 @@ use std::path::Path;
 #[derive(Debug, Default, Clone)]
 pub struct Expect {
     /// Source repo: case-insensitive substring match against the cert's
-    /// repo claim, so "org/repo" matches "https://github.com/org/repo".
+    /// repo claim, so "org/repo" matches <https://github.com/org/repo>.
     pub repo: Option<String>,
     /// Signer identity (SAN URI): case-insensitive substring match
     /// against any identity on the cert.

@@ -39,7 +39,7 @@ fn unhex(s: &str) -> Result<[u8; 32], String> {
     Ok(out)
 }
 
-/// Sign a ruleset file; writes <file>.sig (base64 signature).
+/// Sign a ruleset file; writes \<file\>.sig (base64 signature).
 pub fn sign(ruleset: &Path, key: &Path) -> Result<String, String> {
     use ed25519_dalek::Signer;
     let hexkey = std::fs::read_to_string(key).map_err(|e| format!("key: {e}"))?;

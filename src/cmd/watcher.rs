@@ -123,8 +123,11 @@ pub(crate) fn watch_cmd(
                 created_at: None,
             });
         }
-    } else if a.org.is_none() && a.user.is_none() && !a.feed.is_empty() {
-        // feed-only watch: no repo enumeration needed
+    } else if a.org.is_none()
+        && a.user.is_none()
+        && (!a.feed.is_empty() || !a.domain.is_empty() || !a.code_watch.is_empty())
+    {
+        // feed/domain/query-only watch: no repo enumeration needed
     } else {
         let sel = if let Some(o) = &a.org {
             provider::Selector::Org(o.clone())
@@ -145,11 +148,21 @@ pub(crate) fn watch_cmd(
         feeds.push("https://github.com/advisories.atom".into());
     }
     eprintln!(
-        "watching {} repos, {} feeds, every {}s",
+        "watching {} repos, {} feeds, {} domains, every {}s",
         repos.len(),
         feeds.len(),
+        a.domain.len(),
         a.interval
     );
+    if a.gh_events && (a.forge != "github" || a.org.is_none()) {
+        eprintln!("warn: --gh-events needs github forge and --org");
+    }
+    if !a.code_watch.is_empty() && token.is_none() {
+        eprintln!("warn: --code-watch queries need a github token; skipping");
+    }
+    if a.typo && a.domain.is_empty() {
+        eprintln!("warn: --typo has no --domain to permute");
+    }
 
     // shared rescan closure: clone-or-fetch into watch workdir, scan, delta.
     // Returns (findings, deps) so the caller can do dep deltas and
@@ -297,6 +310,84 @@ pub(crate) fn watch_cmd(
                 Err(e) => eprintln!("warn: feed {feed}: {e}"),
             }
         }
+        for domain in &a.domain {
+            let domain = match crate::osint::name::normalize_domain(domain) {
+                Ok(d) => d,
+                Err(e) => {
+                    eprintln!("warn: domain {domain}: {e}");
+                    continue;
+                }
+            };
+            match watch::domain_snapshot(&domain) {
+                Ok(mut snap) => {
+                    let old = state.domains.get(&domain).cloned();
+                    let known = old.is_some();
+                    let old = old.unwrap_or_default();
+                    // warn-once flags ride on the new snapshot
+                    snap.cert_warned = old.cert_warned.clone();
+                    snap.expiry_warned = old.expiry_warned.clone();
+                    let mut findings = watch::domain_diff(&domain, &old, &snap, known);
+                    findings.extend(watch::domain_expiry(&domain, &mut snap));
+                    if a.typo {
+                        let cands = crate::osint::typo_candidates(&domain);
+                        let mut live: Vec<String> = crate::osint::typo_live(&cands)
+                            .iter()
+                            .map(|l| l.name.clone())
+                            .collect();
+                        live.sort();
+                        let old_live = state.typos.get(&domain).cloned().unwrap_or_default();
+                        if state.typos.contains_key(&domain) {
+                            for n in live.iter().filter(|n| !old_live.contains(n)) {
+                                findings.push(watch_finding(
+                                    &domain,
+                                    "DWATCH-010",
+                                    Severity::Medium,
+                                    format!("lookalike domain went live: {n}"),
+                                ));
+                            }
+                        }
+                        state.typos.insert(domain.clone(), live);
+                    }
+                    state.domains.insert(domain.clone(), snap);
+                    emit_findings(findings, cli);
+                }
+                Err(e) => eprintln!("warn: domain {domain}: {e}"),
+            }
+        }
+        if a.gh_events
+            && a.forge == "github"
+            && let Some(org) = &a.org
+        {
+            gh_events_poll(org, &api, token.as_deref(), &mut state, cli, &rescan);
+        }
+        if a.kev {
+            kev_poll(&mut state, cli);
+        }
+        for q in &a.code_watch {
+            if token.is_none() {
+                break;
+            }
+            match watch::code_search(&api, token.as_deref(), q) {
+                Ok(urls) => {
+                    let known = state.code_watch.contains_key(q);
+                    let old = state.code_watch.get(q).cloned().unwrap_or_default();
+                    if known {
+                        let mut findings = Vec::new();
+                        for u in urls.iter().filter(|u| !old.contains(u)).take(5) {
+                            findings.push(watch_finding(
+                                q,
+                                "CWATCH-001",
+                                Severity::Medium,
+                                format!("new code search hit: {u}"),
+                            ));
+                        }
+                        emit_findings(findings, cli);
+                    }
+                    state.code_watch.insert(q.clone(), urls);
+                }
+                Err(e) => eprintln!("warn: code watch {q}: {e}"),
+            }
+        }
         if a.agent_surface {
             let (surface, _snap) = agentwatch::check_once(&a.agent_dir);
             if !surface.is_empty() {
@@ -352,6 +443,182 @@ pub(crate) fn on_feed_event(
             }
         }
     }
+}
+
+fn emit_findings(findings: Vec<Finding>, cli: &Cli) {
+    if findings.is_empty() {
+        return;
+    }
+    let mut r = Report::new();
+    r.findings = findings;
+    r.finalize(Severity::Info);
+    emit(&r.to_text(&Styles::new(cli.color.unwrap_or(ColorMode::Auto))));
+}
+
+/// Poll the org events feed and turn fresh events into findings.
+/// Public flips and new repos also get an immediate clone+scan.
+fn gh_events_poll(
+    org: &str,
+    api: &str,
+    token: Option<&str>,
+    state: &mut watch::WatchState,
+    cli: &Cli,
+    rescan: &impl Fn(&str, &str) -> Result<(Vec<Finding>, Vec<osv::Dep>), String>,
+) {
+    let rows = match watch::github_org_events(api, org, token) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("warn: org events {org}: {e}");
+            return;
+        }
+    };
+    let last = state.events.get(org).cloned();
+    let mut fresh: Vec<serde_json::Value> = Vec::new();
+    for r in &rows {
+        let id = r.get("id").and_then(|i| i.as_str()).unwrap_or("");
+        if last.as_deref() == Some(id) {
+            break;
+        }
+        fresh.push(r.clone());
+    }
+    if let Some(newest) = rows
+        .first()
+        .and_then(|r| r.get("id"))
+        .and_then(|i| i.as_str())
+    {
+        state.events.insert(org.to_string(), newest.to_string());
+    }
+    if last.is_none() {
+        return; // first poll is the baseline
+    }
+    let mut findings = Vec::new();
+    let mut chain: std::collections::HashMap<(String, String), String> =
+        std::collections::HashMap::new();
+    for ev in crate::osint::events_from_values(&fresh).iter().rev() {
+        let repo_url = format!("https://github.com/{}.git", ev.repo);
+        match ev.kind.as_str() {
+            "PublicEvent" => {
+                findings.push(watch_finding(
+                    org,
+                    "GHEV-001",
+                    Severity::High,
+                    format!("repo flipped public: {}", ev.repo),
+                ));
+                if let Ok((f, _)) = rescan(&ev.repo, &repo_url) {
+                    findings.extend(f);
+                }
+            }
+            "CreateEvent" if ev.detail == "new repository" => {
+                findings.push(watch_finding(
+                    org,
+                    "GHEV-002",
+                    Severity::Info,
+                    format!("new repo {} by {}", ev.repo, ev.actor),
+                ));
+                if let Ok((f, _)) = rescan(&ev.repo, &repo_url) {
+                    findings.extend(f);
+                }
+            }
+            "DeleteEvent" if ev.detail == "repository" => {
+                findings.push(watch_finding(
+                    org,
+                    "GHEV-003",
+                    Severity::Medium,
+                    format!("repo deleted: {}", ev.repo),
+                ));
+            }
+            "MemberEvent" if ev.action == "added" => {
+                findings.push(watch_finding(
+                    org,
+                    "GHEV-004",
+                    Severity::Medium,
+                    format!("org member added: {}", ev.detail),
+                ));
+            }
+            "PushEvent" => {
+                // Chain continuity: a push's `before` must equal the head
+                // of the previous push on the same repo+ref. A break is a
+                // force push or a rewritten branch.
+                let key = (ev.repo.clone(), ev.git_ref.clone());
+                if let Some(exp) = chain.get(&key)
+                    && !ev.before.is_empty()
+                    && ev.before != *exp
+                {
+                    findings.push(watch_finding(
+                        org,
+                        "GHEV-005",
+                        Severity::High,
+                        format!(
+                            "history rewritten on {} {}: pushed onto {} but previous head was {}",
+                            ev.repo,
+                            ev.git_ref,
+                            &ev.before[..12.min(ev.before.len())],
+                            &exp[..12.min(exp.len())]
+                        ),
+                    ));
+                }
+                if !ev.head.is_empty() {
+                    chain.insert(key, ev.head.clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    emit_findings(findings, cli);
+}
+
+/// New CISA KEV entries matched against the stored dep baselines.
+fn kev_poll(state: &mut watch::WatchState, cli: &Cli) {
+    let rows = match watch::kev_feed() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("warn: KEV feed: {e}");
+            return;
+        }
+    };
+    let norm = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .flat_map(|c| c.to_lowercase())
+            .collect()
+    };
+    let mut findings = Vec::new();
+    for (cve, vendor, product) in &rows {
+        if cve.is_empty() || state.kev_seen.iter().any(|k| k == cve) {
+            continue;
+        }
+        state.kev_seen.push(cve.clone());
+        let prod = norm(product);
+        let vend = norm(vendor);
+        if prod.len() < 4 && vend.len() < 4 {
+            continue;
+        }
+        for (repo, deps) in &state.deps {
+            for d in deps {
+                // "eco:name@version" -> bare name
+                let name = d
+                    .split_once(':')
+                    .map(|(_, r)| r.split('@').next().unwrap_or(""))
+                    .unwrap_or("");
+                let name = norm(name);
+                if name.len() < 4 {
+                    continue;
+                }
+                let hit = (!prod.is_empty() && (prod == name || prod.contains(&name)))
+                    || (!vend.is_empty() && vend == name);
+                if hit {
+                    findings.push(watch_finding(
+                        repo,
+                        "KEV-001",
+                        Severity::High,
+                        format!("{cve} ({vendor} {product}) is exploited and matches dep {d}"),
+                    ));
+                }
+            }
+        }
+    }
+    state.kev_seen.truncate(6000);
+    emit_findings(findings, cli);
 }
 
 pub(crate) fn watch_finding(target: &str, id: &str, sev: Severity, msg: String) -> Finding {

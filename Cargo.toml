@@ -32,7 +32,7 @@ yaml-rust2 = "0.13.0"
 rusqlite = { version = "0.40", features = ["bundled"] }
 hmac = "0.13"
 ed25519-dalek = { version = "3", features = ["pkcs8"] }
-getrandom = "0.3"
+getrandom = "0.4"
 maxminddb = { version = "0.32.0", features = ["mmap"] }
 flate2 = "1.1.10"
 postgres = { version = "0.19.14", optional = true }
@@ -46,7 +46,7 @@ tree-sitter-javascript = { version = "0.25", optional = true }
 tree-sitter-typescript = { version = "0.23", optional = true }
 tree-sitter-go = { version = "0.25", optional = true }
 tree-sitter-rust = { version = "0.24", optional = true }
-p256 = "0.13.2"
+p256 = "0.14"
 x509-parser = "0.18.1"
 base64 = "0.23.1"
 p384 = "0.14.0"

@@ -446,6 +446,14 @@ fn mcp_stdio_roundtrip() {
     assert!(names.contains(&"style"));
     assert!(names.contains(&"account"));
     assert!(names.contains(&"socials"));
+    assert!(names.contains(&"keybase"));
+    assert!(names.contains(&"steam"));
+    assert!(names.contains(&"bluesky"));
+    assert!(names.contains(&"mastodon"));
+    assert!(names.contains(&"reddit"));
+    assert!(names.contains(&"youtube"));
+    assert!(names.contains(&"tiktok"));
+    assert!(names.contains(&"lemmy"));
     assert!(names.contains(&"feed"));
     assert!(names.contains(&"gitmeta"));
     assert!(

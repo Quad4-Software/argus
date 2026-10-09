@@ -73,6 +73,26 @@ fn github(login: &str) -> Result<Vec<Hit>, String> {
             None,
         )),
     }
+    let is_org = user.get("type").and_then(|t| t.as_str()) == Some("Organization");
+    let events_url = if is_org {
+        format!("https://api.github.com/orgs/{login}/events?per_page=30")
+    } else {
+        format!("https://api.github.com/users/{login}/events/public?per_page=30")
+    };
+    match api_get(&events_url, &extra) {
+        Ok((st, _, raw)) if (200..300).contains(&st) => {
+            let arr: Vec<Value> = serde_json::from_str(&raw).unwrap_or_default();
+            let evs = super::gharchive::events_from_values(&arr);
+            findings.push(super::gharchive::events_hit(&evs, "events"));
+        }
+        Ok((st, _, _)) => findings.push(Hit::new(
+            "events",
+            Status::Inconclusive,
+            format!("GitHub events API HTTP {st}"),
+            None,
+        )),
+        Err(e) => findings.push(Hit::new("events", Status::Inconclusive, e, None)),
+    }
     findings.extend(page_socials(
         user.get("blog").and_then(|v| v.as_str()).unwrap_or(""),
         user.get("bio").and_then(|v| v.as_str()).unwrap_or(""),

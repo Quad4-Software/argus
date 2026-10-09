@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-QSL-1.0-0BSD
 // Copyright (c) 2026 Quad4
 
-//! Container image audit: argus image <ref>.
+//! Container image audit: argus image \<ref\>.
 //!
 //! - docker/podman inspect: baked-in ENV secrets, image runs as root,
 //!   :latest tag, image age

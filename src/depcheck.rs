@@ -204,7 +204,7 @@ pub fn check(
     out
 }
 
-/// "git@github.com:o/r.git" / "https://github.com/o/r" -> "o/r"
+/// "git@github.com:o/r.git" / <https://github.com/o/r> -> "o/r"
 pub fn github_repo_path(url: &str) -> Option<String> {
     let u = url.trim_end_matches(".git").trim_end_matches('/');
     for pat in ["github.com/", "github.com:"] {

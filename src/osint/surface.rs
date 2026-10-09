@@ -333,6 +333,69 @@ pub fn certs(net: &Net, domain: &str) -> Hit {
     )
 }
 
+/// Uncapped in-scope cert names plus the latest not_after that covers
+/// the apex. Used by domain watch; `certs` stays the capped report form.
+pub(crate) fn cert_name_list(net: &Net, domain: &str) -> (Vec<String>, String) {
+    let (spotter, ct) = std::thread::scope(|s| {
+        let spotter = s.spawn(|| certspotter(net, domain));
+        let ct = s.spawn(|| cert_ct(net, domain));
+        (
+            spotter
+                .join()
+                .unwrap_or_else(|_| Feed::fail("certspotter", "lookup panicked")),
+            ct.join()
+                .unwrap_or_else(|_| Feed::fail("scanmalware", "lookup panicked")),
+        )
+    });
+    let mut names = Vec::new();
+    let mut notes = Vec::new();
+    for feed in [&spotter, &ct] {
+        absorb(feed, domain, &mut names, &mut notes);
+    }
+    if names.is_empty() {
+        absorb(&crtsh(domain), domain, &mut names, &mut notes);
+    }
+    (names, certspotter_expiry(net, domain))
+}
+
+/// Latest certspotter not_after that names the apex exactly. That date
+/// approximates the live cert's expiry for watch purposes.
+fn certspotter_expiry(net: &Net, domain: &str) -> String {
+    let url = format!(
+        "https://api.certspotter.com/v1/issuances?domain={}&expand=dns_names",
+        percent_encode(domain)
+    );
+    let Ok(resp) = net.get(&url, &[("Accept", "application/json")]) else {
+        return String::new();
+    };
+    if resp.status != 200 {
+        return String::new();
+    }
+    let Ok(rows) = serde_json::from_str::<Vec<Value>>(&resp.body) else {
+        return String::new();
+    };
+    let mut best = String::new();
+    for row in &rows {
+        let covers = row
+            .get("dns_names")
+            .and_then(|n| n.as_array())
+            .is_some_and(|arr| {
+                arr.iter()
+                    .filter_map(|n| n.as_str())
+                    .any(|n| n.eq_ignore_ascii_case(domain))
+            });
+        if !covers {
+            continue;
+        }
+        if let Some(na) = row.get("not_after").and_then(|s| s.as_str())
+            && na > best.as_str()
+        {
+            best = na.to_string();
+        }
+    }
+    best
+}
+
 struct Feed {
     source: &'static str,
     names: Vec<String>,
@@ -660,6 +723,38 @@ fn rdap(net: &Net, module: &str, url: &str) -> Hit {
             }
         })
     });
+    let registrar = v
+        .get("entities")
+        .and_then(|e| e.as_array())
+        .and_then(|arr| {
+            arr.iter().find_map(|ent| {
+                let is_registrar = ent
+                    .get("roles")
+                    .and_then(|r| r.as_array())
+                    .is_some_and(|rs| {
+                        rs.iter()
+                            .filter_map(|r| r.as_str())
+                            .any(|r| r.eq_ignore_ascii_case("registrar"))
+                    });
+                if !is_registrar {
+                    return None;
+                }
+                ent.get("vcardArray")
+                    .and_then(|vc| vc.as_array())
+                    .and_then(|vc| vc.get(1))
+                    .and_then(|items| items.as_array())
+                    .and_then(|items| {
+                        items.iter().find_map(|item| {
+                            let arr = item.as_array()?;
+                            if arr.first()?.as_str()? == "fn" {
+                                arr.get(3)?.as_str().map(str::to_string)
+                            } else {
+                                None
+                            }
+                        })
+                    })
+            })
+        });
     let summary = if !name.is_empty() && !statuses.is_empty() {
         format!("{name} ({})", statuses.join(", "))
     } else if !name.is_empty() {
@@ -681,6 +776,7 @@ fn rdap(net: &Net, module: &str, url: &str) -> Hit {
             "status": statuses,
             "nameservers": ns,
             "expiration": expires,
+            "registrar": registrar.unwrap_or_default(),
         })),
     )
 }
@@ -1431,6 +1527,74 @@ fn keep_hosts(raw: impl IntoIterator<Item = String>, root: &str, out: &mut Vec<S
                 return;
             }
         }
+    }
+}
+
+pub(crate) fn html_text(html: &str) -> String {
+    let mut text = String::new();
+    let mut skip = false;
+    let mut chars = html.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '<' => {
+                let tag: String = chars.clone().take_while(|c| *c != '>').collect();
+                let name = tag
+                    .trim_start_matches('/')
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_ascii_lowercase();
+                if is_block_tag(&name) {
+                    text.push(' ');
+                }
+                skip = true;
+            }
+            '>' => skip = false,
+            '&' if !skip => {
+                let mut probe = chars.clone();
+                let mut ent = String::new();
+                let mut found = false;
+                for n in probe.by_ref() {
+                    if n == ';' {
+                        found = true;
+                        break;
+                    }
+                    if ent.len() >= 8 || matches!(n, '&' | '<' | '>') {
+                        break;
+                    }
+                    ent.push(n);
+                }
+                if found {
+                    chars = probe;
+                    text.push_str(&decode_entity(&ent));
+                } else {
+                    text.push('&');
+                }
+            }
+            _ if !skip => text.push(c),
+            _ => {}
+        }
+    }
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn is_block_tag(name: &str) -> bool {
+    matches!(
+        name,
+        "br" | "p" | "div" | "li" | "ul" | "ol" | "tr" | "td" | "th" | "hr" | "blockquote"
+    ) || matches!(name, "h1" | "h2" | "h3" | "h4" | "h5" | "h6")
+}
+
+fn decode_entity(ent: &str) -> String {
+    match ent {
+        "amp" => "&".into(),
+        "lt" => "<".into(),
+        "gt" => ">".into(),
+        "quot" => "\"".into(),
+        "apos" | "#39" => "'".into(),
+        "nbsp" => " ".into(),
+        "hellip" => "...".into(),
+        _ => String::new(),
     }
 }
 

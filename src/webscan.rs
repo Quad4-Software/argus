@@ -209,7 +209,7 @@ fn page_links(html: &str, host: &str) -> Vec<String> {
     out
 }
 
-/// <form action="http://..."> submits credentials over plaintext.
+/// \<form action="http://..."\> submits credentials over plaintext.
 fn form_checks(html: &str, target: &str, page: &str, out: &mut Vec<Finding>) {
     let re = regex::Regex::new(r#"(?i)<form[^>]+action=["'](http://[^"']+)["']"#).unwrap();
     for c in re.captures_iter(html) {
@@ -241,7 +241,7 @@ fn asset_urls(html: &str) -> Vec<String> {
     out
 }
 
-/// Inline <script> bodies (no src) joined into one pseudo-file.
+/// Inline \<script\> bodies (no src) joined into one pseudo-file.
 fn inline_scripts(html: &str) -> String {
     let re = regex::Regex::new(r"(?is)<script([^>]*)>(.*?)</script>").unwrap();
     re.captures_iter(html)

@@ -73,7 +73,7 @@ pub struct Baseline {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<String>,
     /// Embedded ed25519 signature (base64) over canonical fps. A
-    /// detached <file>.sig takes precedence when both exist.
+    /// detached \<file\>.sig takes precedence when both exist.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
     pub fingerprints: Vec<Entry>,
@@ -224,10 +224,8 @@ fn parse_expiry(s: &str) -> Option<u64> {
         _ => {
             let (sign, num) = if let Some(r) = rest.strip_prefix('+') {
                 (1i64, r)
-            } else if let Some(r) = rest.strip_prefix('-') {
-                (-1i64, r)
             } else {
-                return None;
+                (-1i64, rest.strip_prefix('-')?)
             };
             // accept HH:MM and HHMM offsets
             let digits: String = num.chars().filter(|c| c.is_ascii_digit()).collect();
@@ -293,7 +291,7 @@ pub fn load(path: &Path) -> Result<HashSet<String>, String> {
     Ok(load_full(path)?.baseline.fingerprint_set())
 }
 
-/// Write a detached <file>.sig signature over the canonical fps.
+/// Write a detached \<file\>.sig signature over the canonical fps.
 /// Signs the file as stored so verification stays stable as entries
 /// age out.
 // invoked by the baseline signing CLI flag once wired into main
@@ -306,7 +304,7 @@ pub fn sign(path: &Path, key: &Path) -> Result<String, String> {
 }
 
 /// Verify a baseline's signature against a public key. A detached
-/// <file>.sig wins over the embedded signature field; an unsigned
+/// \<file\>.sig wins over the embedded signature field; an unsigned
 /// baseline is an error so callers enforcing review can rely on this.
 // invoked by the baseline pubkey enforcement flag once wired into main
 pub fn verify(path: &Path, pubkey: &Path) -> Result<(), String> {

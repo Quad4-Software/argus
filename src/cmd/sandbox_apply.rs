@@ -297,6 +297,15 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
             sb.reads.push(dir.clone());
             sb.writes.push(dir);
         }
+        Cmd::Gharchive(a) if a.fetch => {
+            // dangling-commit clones live under the data dir
+            let dir = std::env::home_dir()
+                .unwrap_or_else(|| "/tmp".into())
+                .join(".local/share/argus/gharchive-clones");
+            let _ = std::fs::create_dir_all(&dir);
+            sb.writes.push(dir.clone());
+            sb.reads.push(dir);
+        }
         Cmd::Supply { path } | Cmd::Stego { path } | Cmd::Media { path } => {
             sb.reads.push(path.clone());
         }
@@ -444,6 +453,16 @@ pub(crate) fn cfg_needs_net(cmd: &Cmd) -> bool {
             | Cmd::Feed { .. }
             | Cmd::Favicon { .. }
             | Cmd::User { .. }
+            | Cmd::Keybase { .. }
+            | Cmd::Steam { .. }
+            | Cmd::Bluesky { .. }
+            | Cmd::Mastodon { .. }
+            | Cmd::Reddit { .. }
+            | Cmd::Youtube { .. }
+            | Cmd::Tiktok { .. }
+            | Cmd::Lemmy { .. }
+            | Cmd::Gharchive(_)
+            | Cmd::Typo { .. }
     ) || matches!(cmd, Cmd::Gitmeta { target } if crate::cli::is_http_target(target))
         || matches!(cmd, Cmd::Extract { target } if crate::cli::is_http_target(target))
         || matches!(cmd, Cmd::Host(h) if h.needs_network())

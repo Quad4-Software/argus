@@ -12,6 +12,9 @@ use std::path::PathBuf;
 mod args;
 pub use args::*;
 
+mod gates;
+pub use gates::*;
+
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
 pub enum SbomFmt {
     #[default]
@@ -462,7 +465,7 @@ pub enum Cmd {
         #[arg(long)]
         pubkey: PathBuf,
     },
-    /// Detached-sign a ruleset file (writes <file>.sig).
+    /// Detached-sign a ruleset file, writing a .sig file beside it.
     RulesSign {
         /// Ruleset TOML to sign.
         file: PathBuf,
@@ -753,6 +756,80 @@ pub enum Cmd {
     /// Public username check against a small built-in site table.
     User { name: String },
 
+    /// Keybase profile, identity proofs, and the public device list.
+    Keybase {
+        /// Keybase username.
+        name: String,
+    },
+
+    /// Public Steam community profile: persona, identity, counts, and
+    /// recent games. Private profiles report what they hide.
+    Steam {
+        /// Vanity name, id64, or profile URL.
+        target: String,
+    },
+
+    /// Public Bluesky profile via the appview: DID, counts, self-labels,
+    /// and verification. No account needed.
+    Bluesky {
+        /// Handle, DID, or bsky.app profile URL.
+        handle: String,
+    },
+
+    /// Public Mastodon account: profile, counts, flags, and profile
+    /// fields. The lookup endpoint needs no token.
+    Mastodon {
+        /// user@instance or a profile URL.
+        target: String,
+        /// Instance used for a bare username.
+        #[arg(long, default_value = "mastodon.social")]
+        instance: String,
+    },
+
+    /// Public Reddit account history from the Arctic Shift archive:
+    /// karma, archive counts, and recent posts and comments.
+    Reddit {
+        /// Username, u/name, or profile URL.
+        user: String,
+    },
+
+    /// Public YouTube video or channel: oembed metadata, subscribers,
+    /// verification, and recent uploads from the Atom feed.
+    Youtube {
+        /// Video id or url, @handle, or channel url.
+        target: String,
+    },
+
+    /// Public TikTok video or profile: oembed metadata and the page
+    /// account blob (followers, likes, verification, bio links).
+    Tiktok {
+        /// Video id or url, @user, or profile url.
+        target: String,
+    },
+
+    /// Public Lemmy account: person view, counts, moderated
+    /// communities, and recent posts and comments.
+    Lemmy {
+        /// name@instance or a /u/ URL.
+        target: String,
+        /// Instance used for a bare username.
+        #[arg(long)]
+        instance: Option<String>,
+    },
+
+    /// GHArchive firehose: filter hourly dumps of all public GitHub
+    /// events (data.gharchive.org) for one org, user, or repo. Push SHAs
+    /// survive force pushes and branch deletes in the archive.
+    Gharchive(GharchiveArgs),
+
+    /// Lookalike domains: dnstwist-style permutations of the registered
+    /// label (omission, transposition, bitsquat, confusables, TLD swap)
+    /// resolved over DNS. A live lookalike with MX is phishing-capable.
+    Typo {
+        /// Domain to permute (registered form, e.g. example.com).
+        domain: String,
+    },
+
     /// List built-in modules.
     Modules,
 
@@ -783,7 +860,7 @@ pub enum Cmd {
         /// Artifact file the attestation claims to cover (digest check).
         #[arg(long, value_name = "FILE")]
         artifact: Option<PathBuf>,
-        /// Fetch and verify npm publish attestations for package[@version].
+        /// Fetch and verify npm publish attestations for package or package@version.
         #[arg(long, value_name = "PKG")]
         npm: Option<String>,
         /// Legacy cosign mode: detached .sig file (base64 or raw).
@@ -867,111 +944,4 @@ pub enum Cmd {
         #[arg(long, value_enum, default_value = "text")]
         format: Format,
     },
-}
-
-/// File-walking commands. Progress stays off for machine-facing ones.
-pub fn scans_files(cmd: &Cmd) -> bool {
-    !matches!(
-        cmd,
-        Cmd::Rules
-            | Cmd::RulesKeygen { .. }
-            | Cmd::RulesSign { .. }
-            | Cmd::RulesUpdate { .. }
-            | Cmd::Completions(_)
-            | Cmd::Mcp
-            | Cmd::Init { .. }
-            | Cmd::Authors { .. }
-            | Cmd::Sbom { .. }
-            | Cmd::Ai { .. }
-            | Cmd::Domain { .. }
-            | Cmd::Email { .. }
-            | Cmd::Ip { .. }
-            | Cmd::Hash { .. }
-            | Cmd::Url { .. }
-            | Cmd::Ports { .. }
-            | Cmd::Intel { .. }
-            | Cmd::Supply { .. }
-            | Cmd::Records { .. }
-            | Cmd::Api { .. }
-            | Cmd::Stego { .. }
-            | Cmd::Codec { .. }
-            | Cmd::Style { .. }
-            | Cmd::Account { .. }
-            | Cmd::Socials { .. }
-            | Cmd::Feed { .. }
-            | Cmd::Gitmeta { .. }
-            | Cmd::Grep { .. }
-            | Cmd::Extract { .. }
-            | Cmd::Meta { .. }
-            | Cmd::Media { .. }
-            | Cmd::Dork { .. }
-            | Cmd::Favicon { .. }
-            | Cmd::User { .. }
-            | Cmd::Modules
-            | Cmd::Host(_)
-    )
-}
-
-#[macro_export]
-macro_rules! osint_arms {
-    () => {
-        $crate::cli::Cmd::Domain { .. }
-            | $crate::cli::Cmd::Email { .. }
-            | $crate::cli::Cmd::Hash { .. }
-            | $crate::cli::Cmd::Url { .. }
-            | $crate::cli::Cmd::Ports { .. }
-            | $crate::cli::Cmd::Ip { .. }
-            | $crate::cli::Cmd::Intel { .. }
-            | $crate::cli::Cmd::Supply { .. }
-            | $crate::cli::Cmd::Records { .. }
-            | $crate::cli::Cmd::Api { .. }
-            | $crate::cli::Cmd::Stego { .. }
-            | $crate::cli::Cmd::Codec { .. }
-            | $crate::cli::Cmd::Style { .. }
-            | $crate::cli::Cmd::Account { .. }
-            | $crate::cli::Cmd::Socials { .. }
-            | $crate::cli::Cmd::Feed { .. }
-            | $crate::cli::Cmd::Gitmeta { .. }
-            | $crate::cli::Cmd::Grep { .. }
-            | $crate::cli::Cmd::Extract { .. }
-            | $crate::cli::Cmd::Meta { .. }
-            | $crate::cli::Cmd::Media { .. }
-            | $crate::cli::Cmd::Dork { .. }
-            | $crate::cli::Cmd::Favicon { .. }
-            | $crate::cli::Cmd::User { .. }
-            | $crate::cli::Cmd::Modules
-    };
-}
-
-pub fn is_http_target(s: &str) -> bool {
-    let t = s.trim();
-    t.len() >= 8
-        && (t[..8].eq_ignore_ascii_case("https://") || t[..7].eq_ignore_ascii_case("http://"))
-}
-
-/// Commands that cannot run without the network.
-pub fn needs_network(cmd: &Cmd) -> bool {
-    matches!(
-        cmd,
-        Cmd::Github(_)
-            | Cmd::Gitlab(_)
-            | Cmd::Gitea(_)
-            | Cmd::Roam(_)
-            | Cmd::Watch(_)
-            | Cmd::Daemon(_)
-            | Cmd::RulesUpdate { .. }
-            | Cmd::Domain { .. }
-            | Cmd::Email { .. }
-            | Cmd::Hash { .. }
-            | Cmd::Url { .. }
-            | Cmd::Ports { .. }
-            | Cmd::Intel { .. }
-            | Cmd::Account { .. }
-            | Cmd::Socials { .. }
-            | Cmd::Feed { .. }
-            | Cmd::Favicon { .. }
-            | Cmd::User { .. }
-    ) || matches!(cmd, Cmd::Gitmeta { target } if is_http_target(target))
-        || matches!(cmd, Cmd::Host(h) if h.needs_network())
-        || matches!(cmd, Cmd::Extract { target } if is_http_target(target))
 }

@@ -3,7 +3,7 @@
 
 //! Incremental scan cache - skip re-reading files whose (mtime,size)
 //! and the active ruleset fingerprint are unchanged. Cache lives at
-//! <root>/.arguscache.json and is written back after the scan.
+//! \<root\>/.arguscache.json and is written back after the scan.
 
 use crate::finding::Finding;
 use serde::{Deserialize, Serialize};

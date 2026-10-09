@@ -123,8 +123,12 @@ impl Loc {
 }
 
 fn fetch(start: Loc) -> Result<Page, String> {
+    fetch_with(start, 6, 512 * 1024, true)
+}
+
+fn fetch_with(start: Loc, secs: u64, cap: usize, gzip: bool) -> Result<Page, String> {
     let config = ureq::config::Config::builder()
-        .timeout_global(Some(Duration::from_secs(6)))
+        .timeout_global(Some(Duration::from_secs(secs)))
         .max_redirects(0)
         .http_status_as_error(false)
         .user_agent(concat!("argus/", env!("CARGO_PKG_VERSION")))
@@ -136,7 +140,11 @@ fn fetch(start: Loc) -> Result<Page, String> {
         assert_public(&current)?;
         let url = current.url();
         hops.push(url.clone());
-        let mut resp = agent.get(&url).call().map_err(|e| format!("{url}: {e}"))?;
+        let mut req = agent.get(&url);
+        if !gzip {
+            req = req.header("accept-encoding", "");
+        }
+        let mut resp = req.call().map_err(|e| format!("{url}: {e}"))?;
         let status = resp.status().as_u16();
         let headers: Vec<(String, String)> = resp
             .headers()
@@ -160,8 +168,12 @@ fn fetch(start: Loc) -> Result<Page, String> {
             continue;
         }
         let mut body = resp.body_mut().read_to_string().unwrap_or_default();
-        if body.len() > 512 * 1024 {
-            body.truncate(512 * 1024);
+        if body.len() > cap {
+            let mut end = cap;
+            while end > 0 && !body.is_char_boundary(end) {
+                end -= 1;
+            }
+            body.truncate(end);
         }
         return Ok(Page {
             status,
@@ -270,9 +282,6 @@ fn parse_http_url(raw: &str) -> Result<Loc, String> {
     } else {
         return Err("pass an http or https URL".into());
     };
-    if rest.contains('@') {
-        return Err("refusing a URL with credentials".into());
-    }
     let (authority, path) = match rest.find(['/', '?', '#']) {
         Some(i) => {
             let path = if rest[i..].starts_with('#') {
@@ -286,6 +295,9 @@ fn parse_http_url(raw: &str) -> Result<Loc, String> {
         }
         None => (rest, "/".to_string()),
     };
+    if authority.contains('@') {
+        return Err("refusing a URL with credentials".into());
+    }
     if authority.is_empty() {
         return Err("URL has no host".into());
     }
@@ -332,6 +344,32 @@ pub(crate) fn fetch_public(raw: &str) -> Result<Fetched, String> {
     let start = parse_http_url(raw.trim())?;
     assert_public(&start)?;
     let page = fetch(start)?;
+    Ok((page.status, page.final_url, page.headers, page.body))
+}
+
+/// Same as fetch_public with a longer budget for one slow public index.
+pub(crate) fn fetch_public_slow(raw: &str) -> Result<Fetched, String> {
+    let start = parse_http_url(raw.trim())?;
+    assert_public(&start)?;
+    let page = fetch_with(start, 20, 512 * 1024, true)?;
+    Ok((page.status, page.final_url, page.headers, page.body))
+}
+
+/// Same as fetch_public with a longer budget and a larger body cap for
+/// one heavy public page.
+pub(crate) fn fetch_public_cap(raw: &str, cap: usize) -> Result<Fetched, String> {
+    let start = parse_http_url(raw.trim())?;
+    assert_public(&start)?;
+    let page = fetch_with(start, 20, cap, true)?;
+    Ok((page.status, page.final_url, page.headers, page.body))
+}
+
+/// Same as fetch_public without any accept-encoding header. Steam's
+/// edge answers requests that carry one from some addresses with 429.
+pub(crate) fn fetch_public_no_gzip(raw: &str) -> Result<Fetched, String> {
+    let start = parse_http_url(raw.trim())?;
+    assert_public(&start)?;
+    let page = fetch_with(start, 20, 512 * 1024, false)?;
     Ok((page.status, page.final_url, page.headers, page.body))
 }
 

@@ -39,7 +39,9 @@ argus url https://quad4.io       # fetch, redirects, WAF and challenge markers
 argus ports 127.0.0.1 --ports 22 # TCP connect, modern ports first
 argus system                     # Lynis-class host audit
 argus scan . --osv --dep-check   # + dependency advisories and hygiene
-argus account github octocat    # public profile, repos, stars
+argus account github octocat    # public profile, repos, stars, recent events
+argus gharchive --org my-org    # public event firehose, push SHAs, repo flips
+argus typo quad4.io             # live lookalike domains
 argus socials https://example.com
 argus feed https://blog.rust-lang.org/feed.xml
 argus style a.txt b.txt         # style distance, not an identification
@@ -54,6 +56,14 @@ argus media ./photos             # C2PA, IPTC, generator tags
 argus dork example.com           # search links only
 argus favicon https://example.com
 argus user octocat
+argus keybase chris             # profile, proofs, device list
+argus steam zed                 # public profile, counts, name history
+argus bluesky jay.bsky.team     # profile, counts, verification
+argus mastodon Gargron@mastodon.social
+argus reddit spez              # archive karma, recent posts and comments
+argus youtube @NASA             # channel header, verification, uploads
+argus tiktok @scout2015         # profile stats and flags
+argus lemmy dessalines@lemmy.ml
 ```
 
 Findings carry severity, a stable rule id, evidence, and a fix hint.

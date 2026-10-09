@@ -415,3 +415,182 @@ fn live_chat_example_com() {
     assert!(finding(&doc, "xmpp-starttls")["status"].is_string());
     assert!(finding(&doc, "ircs")["status"].is_string());
 }
+
+#[test]
+fn platform_commands_reject_bad_input_and_offline() {
+    for args in [
+        vec!["keybase", "bad name"],
+        vec!["keybase", "a"],
+        vec!["steam", "bad name!"],
+        vec!["steam", "profiles/notdigits"],
+        vec!["bluesky", "bad handle!"],
+        vec!["bluesky", "https://example.com/profile/x"],
+        vec!["mastodon", "bad user!"],
+        vec!["mastodon", "user", "--instance", "not a host"],
+        vec!["reddit", "ab"],
+        vec!["reddit", "bad name!"],
+        vec!["reddit", "https://example.com/user/spez"],
+        vec!["youtube", "bad id!"],
+        vec!["youtube", "https://www.youtube.com/../../etc"],
+        vec!["tiktok", "bad user!"],
+        vec!["tiktok", "https://www.tiktok.com/tag/cats"],
+        vec!["lemmy", "bad name!"],
+        vec!["lemmy", "dessalines", "--instance", "not a host"],
+    ] {
+        let out = bin()
+            .args(["--color", "never", "--progress", "never"])
+            .args(&args)
+            .output()
+            .unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "{args:?}: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+    for args in [
+        vec!["keybase", "chris"],
+        vec!["steam", "zed"],
+        vec!["bluesky", "jay.bsky.team"],
+        vec!["mastodon", "Gargron@mastodon.social"],
+        vec!["reddit", "spez"],
+        vec!["youtube", "@NASA"],
+        vec!["tiktok", "@scout2015"],
+        vec!["lemmy", "dessalines@lemmy.ml"],
+    ] {
+        let out = bin()
+            .args(["--offline", "--color", "never", "--progress", "never"])
+            .args(&args)
+            .output()
+            .unwrap();
+        assert_eq!(out.status.code(), Some(2), "{args:?} ran offline");
+    }
+}
+
+#[test]
+#[ignore = "needs public DNS"]
+fn live_platform_profiles() {
+    let (ok, stdout, stderr) = json_cmd(&["keybase", "chris"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("keybase json");
+    assert_eq!(doc["kind"], "keybase");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    let devices = finding(&doc, "devices");
+    assert_eq!(devices["status"], "confirmed", "{}", devices["summary"]);
+    assert!(
+        devices["summary"].as_str().unwrap().contains("device(s)"),
+        "{}",
+        devices["summary"]
+    );
+    assert!(finding(&doc, "device")["summary"].as_str().unwrap().len() > 8);
+    assert!(finding(&doc, "proofs")["status"].is_string());
+
+    let (ok, stdout, stderr) = json_cmd(&["keybase", "nosuchuserzzz123"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("keybase miss json");
+    assert_eq!(finding(&doc, "profile")["status"], "absent");
+
+    let (ok, stdout, stderr) = json_cmd(&["steam", "76561198015649972"]);
+    if stderr.contains("429") {
+        eprintln!("steam rate limited this address, skipping the profile check");
+    } else {
+        assert!(ok, "{stderr}");
+        let doc: Value = serde_json::from_str(&stdout).expect("steam json");
+        assert_eq!(doc["kind"], "steam");
+        let profile = finding(&doc, "profile");
+        assert!(
+            matches!(
+                profile["status"].as_str(),
+                Some("confirmed" | "inconclusive")
+            ),
+            "{}",
+            profile["summary"]
+        );
+        assert!(finding(&doc, "counts")["status"].is_string());
+        assert!(finding(&doc, "recent")["status"].is_string());
+    }
+
+    let (ok, stdout, stderr) = json_cmd(&["bluesky", "jay.bsky.team"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("bluesky json");
+    assert_eq!(doc["kind"], "bluesky");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    assert!(
+        finding(&doc, "counts")["summary"]
+            .as_str()
+            .unwrap()
+            .contains("followers")
+    );
+
+    let (ok, stdout, stderr) = json_cmd(&["mastodon", "Gargron@mastodon.social"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("mastodon json");
+    assert_eq!(doc["kind"], "mastodon");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    assert!(finding(&doc, "fields")["status"].is_string());
+}
+
+#[test]
+#[ignore = "needs public DNS"]
+fn live_reddit_youtube_tiktok_lemmy() {
+    let (ok, stdout, stderr) = json_cmd(&["reddit", "spez"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("reddit json");
+    assert_eq!(doc["kind"], "reddit");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    let karma = finding(&doc, "karma");
+    assert_eq!(karma["status"], "confirmed", "{}", karma["summary"]);
+    assert!(finding(&doc, "activity")["status"].is_string());
+    let (ok, stdout, _) = json_cmd(&["reddit", "nosuchuserzzz12345"]);
+    assert!(ok);
+    let miss: Value = serde_json::from_str(&stdout).expect("reddit miss json");
+    let status = finding(&miss, "profile")["status"].as_str().unwrap();
+    assert!(
+        matches!(status, "absent" | "inconclusive"),
+        "reddit miss read as {status}"
+    );
+
+    let (ok, stdout, stderr) = json_cmd(&["youtube", "@NASA"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("youtube channel json");
+    assert_eq!(doc["kind"], "youtube");
+    assert_eq!(finding(&doc, "channel")["status"], "confirmed");
+    let stats = finding(&doc, "stats");
+    assert_eq!(stats["status"], "confirmed", "{}", stats["summary"]);
+    assert!(stats["summary"].as_str().unwrap().contains("subscribers"));
+    assert!(finding(&doc, "recent")["status"].is_string());
+    let (ok, stdout, stderr) = json_cmd(&["youtube", "dQw4w9WgXcQ"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("youtube video json");
+    assert_eq!(finding(&doc, "video")["status"], "confirmed");
+
+    let (ok, stdout, stderr) = json_cmd(&["tiktok", "@scout2015"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("tiktok json");
+    assert_eq!(doc["kind"], "tiktok");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    assert!(
+        finding(&doc, "stats")["summary"]
+            .as_str()
+            .unwrap()
+            .contains("followers")
+    );
+    let (ok, stdout, _) = json_cmd(&["tiktok", "@nosuchuserzzz987654"]);
+    assert!(ok);
+    let miss: Value = serde_json::from_str(&stdout).expect("tiktok miss json");
+    assert_eq!(finding(&miss, "profile")["status"], "absent");
+
+    let (ok, stdout, stderr) = json_cmd(&["lemmy", "dessalines@lemmy.ml"]);
+    assert!(ok, "{stderr}");
+    let doc: Value = serde_json::from_str(&stdout).expect("lemmy json");
+    assert_eq!(doc["kind"], "lemmy");
+    assert_eq!(finding(&doc, "profile")["status"], "confirmed");
+    assert!(
+        finding(&doc, "counts")["summary"]
+            .as_str()
+            .unwrap()
+            .contains("posts")
+    );
+    assert!(finding(&doc, "posts")["status"].is_string());
+}

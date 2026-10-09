@@ -21,7 +21,9 @@ src/
   workflow_audit.rs container_audit.rs image.rs sysaudit/ webscan.rs
   fix.rs verify.rs vex.rs license.rs publish.rs
   ai/                  git-history provenance evidence + analyze()
-  osint/               public lookups (domain, mail, chat, ip, url, ports, meta)
+  osint/               public lookups (domain, mail, chat, ip, url, ports, meta,
+                       platforms: account, user, keybase, steam, bluesky, mastodon,
+                       reddit, youtube, tiktok, lemmy)
   host/                sockets, open files, hash signatures, threat leads
   webpassive.rs        passive page checks used by webscan.rs
   search.rs            streaming grep over text, CSV, JSON, SQLite

@@ -91,9 +91,9 @@ pub(crate) struct FileHit {
 
 /// Scan one file; returns findings. text is None for skipped/oversize/binary files.
 /// True when a suppression marker covers this finding.
-/// Markers: argus:ignore <ID> on the same line, argus:ignore-next-line <ID>
+/// Markers: argus:ignore \<ID\> on the same line, argus:ignore-next-line \<ID\>
 /// on the previous line, argus:ignore-file anywhere near the top (first 20 lines).
-/// <ID> optional = suppress everything; comma lists allowed.
+/// \<ID\> optional = suppress everything; comma lists allowed.
 fn suppressed(text: Option<&str>, line: Option<usize>, rule_id: &str) -> bool {
     let Some(t) = text else { return false };
     let lines: Vec<&str> = t.lines().take(line.unwrap_or(20)).collect();

@@ -5,7 +5,7 @@
 //! the statement subject (sha256 of its canonical serialization); the
 //! predicate carries a severity summary and a digest over the finding
 //! fingerprints so a consumer can gate a release on scan results without
-//! re-implementing argus rules. Signing is detached: <out>.sig holds a
+//! re-implementing argus rules. Signing is detached: \<out\>.sig holds a
 //! base64 ed25519 signature over the exact bytes written, verifiable
 //! with verify_attestation and the public key.
 
@@ -70,7 +70,7 @@ fn hex(b: &[u8]) -> String {
     b.iter().map(|x| format!("{x:02x}")).collect()
 }
 
-/// <path>.sig, appending rather than replacing the extension so
+/// \<path\>.sig, appending rather than replacing the extension so
 /// report.intoto.json -> report.intoto.json.sig.
 fn sig_path(p: &Path) -> PathBuf {
     let mut os = p.as_os_str().to_os_string();

@@ -5,7 +5,13 @@ use crate::cli::{Cli, Cmd, Format};
 use crate::osint;
 use std::process::ExitCode;
 
-pub(crate) fn run(cli: &Cli, offline: bool, format: Format) -> Result<ExitCode, String> {
+pub(crate) fn run(
+    cli: &Cli,
+    offline: bool,
+    format: Format,
+    rules: &[crate::rules::CompiledRule],
+    opts: &crate::scan::ScanOptions,
+) -> Result<ExitCode, String> {
     match &cli.cmd {
         Cmd::Domain { domain } => {
             let report = osint::scan_domain(domain)?;
@@ -98,6 +104,36 @@ pub(crate) fn run(cli: &Cli, offline: bool, format: Format) -> Result<ExitCode, 
         Cmd::Dork { query } => finish(cli, format, &osint::scan_dork(query)?),
         Cmd::Favicon { url } => finish(cli, format, &osint::scan_favicon(url)?),
         Cmd::User { name } => finish(cli, format, &osint::scan_user(name)?),
+        Cmd::Keybase { name } => finish(cli, format, &osint::scan_keybase(name)?),
+        Cmd::Steam { target } => finish(cli, format, &osint::scan_steam(target)?),
+        Cmd::Bluesky { handle } => finish(cli, format, &osint::scan_bluesky(handle)?),
+        Cmd::Mastodon { target, instance } => {
+            finish(cli, format, &osint::scan_mastodon(target, instance)?)
+        }
+        Cmd::Reddit { user } => finish(cli, format, &osint::scan_reddit(user)?),
+        Cmd::Youtube { target } => finish(cli, format, &osint::scan_youtube(target)?),
+        Cmd::Tiktok { target } => finish(cli, format, &osint::scan_tiktok(target)?),
+        Cmd::Lemmy { target, instance } => finish(
+            cli,
+            format,
+            &osint::scan_lemmy(target, instance.as_deref())?,
+        ),
+        Cmd::Gharchive(a) => {
+            let sel = match (&a.org, &a.user, &a.repo) {
+                (Some(n), None, None) => osint::GhSel::Org(n.clone()),
+                (None, Some(n), None) => osint::GhSel::User(n.clone()),
+                (None, None, Some(n)) => osint::GhSel::Repo(n.clone()),
+                (None, None, None) => return Err("pass --org, --user, or --repo".into()),
+                _ => return Err("pass only one of --org, --user, --repo".into()),
+            };
+            let (report, evs) = osint::collect_gharchive(&sel, a.hours, a.events.as_deref())?;
+            let code = finish(cli, format, &report)?;
+            if a.fetch {
+                super::revive::run(&evs, a.fetch_max, rules, opts, cli.verbose > 0);
+            }
+            Ok(code)
+        }
+        Cmd::Typo { domain } => finish(cli, format, &osint::scan_typo(domain)?),
         Cmd::Modules => {
             print!("{}", crate::catalog::list());
             Ok(ExitCode::SUCCESS)
@@ -186,6 +222,75 @@ fn serve_api(listen: &str) -> Result<ExitCode, String> {
                 let v = json_body(&req.body);
                 let url = v.get("url").and_then(|s| s.as_str()).unwrap_or("");
                 match osint::scan_socials(url) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/keybase") => {
+                let v = json_body(&req.body);
+                let name = v.get("name").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_keybase(name) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/steam") => {
+                let v = json_body(&req.body);
+                let target = v.get("target").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_steam(target) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/bluesky") => {
+                let v = json_body(&req.body);
+                let handle = v.get("handle").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_bluesky(handle) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/mastodon") => {
+                let v = json_body(&req.body);
+                let target = v.get("target").and_then(|s| s.as_str()).unwrap_or("");
+                let instance = v
+                    .get("instance")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or("mastodon.social");
+                match osint::scan_mastodon(target, instance) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/reddit") => {
+                let v = json_body(&req.body);
+                let user = v.get("user").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_reddit(user) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/youtube") => {
+                let v = json_body(&req.body);
+                let target = v.get("target").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_youtube(target) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/tiktok") => {
+                let v = json_body(&req.body);
+                let target = v.get("target").and_then(|s| s.as_str()).unwrap_or("");
+                match osint::scan_tiktok(target) {
+                    Ok(report) => (200, osint::render(&report, Format::Json)),
+                    Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
+                }
+            }
+            ("POST", "/v1/lemmy") => {
+                let v = json_body(&req.body);
+                let target = v.get("target").and_then(|s| s.as_str()).unwrap_or("");
+                let instance = v.get("instance").and_then(|s| s.as_str());
+                match osint::scan_lemmy(target, instance) {
                     Ok(report) => (200, osint::render(&report, Format::Json)),
                     Err(e) => (400, serde_json::json!({"error": e}).to_string() + "\n"),
                 }

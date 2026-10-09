@@ -418,7 +418,7 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
             eprintln!("verify: checked {} candidate tokens", n.min(25));
             report.findings.extend(fs);
         }
-        osint_arms!() => return cmd::osint_cmd::run(cli, offline, format),
+        osint_arms!() => return cmd::osint_cmd::run(cli, offline, format, &rules, &opts),
         Cmd::Host(_) => return cmd::host_cmd::run(cli, offline, format),
         Cmd::Web { url, depth } => match webscan::scan(url, *depth, &rules, &opts, cli.verbose > 0)
         {

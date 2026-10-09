@@ -2,6 +2,61 @@
 
 ## Unreleased
 
+`argus gharchive` filters the GHArchive public event firehose:
+`--org`, `--user`, or `--repo` selects a target, `--hours` picks how
+many hourly dumps to stream (1-168), and `--events` narrows event
+kinds. Push SHAs, public flips, ref creates/deletes, and commit
+author identities surface as separate findings; the same event
+extraction now feeds an `events` finding in `argus account github`
+backed by the GitHub events feed. `--fetch` downloads each observed
+push SHA (GitHub serves objects no ref points at) and scans it, so a
+secret that was pushed and force-pushed away still gets caught.
+
+`argus typo <domain>` generates dnstwist-style lookalikes (omission,
+transposition, bitsquat, confusables, hyphenation, TLD swap) and
+resolves them over DoH; live domains with MX are phishing-capable.
+
+Platform OSINT grows four commands. `argus keybase <username>` reads
+the public lookup API and reports the profile, identity proofs, and
+the account device list with type, name, creation and update dates,
+and status, flagging revoked devices. `argus steam <target>` parses a
+public Steam community profile (persona, real name, location, bio,
+level, counts, name history from the alias endpoint, recent games) and
+reports what a private profile hides. `argus bluesky <handle>` reads
+the public appview actor view: DID, counts, self-labels, and
+verification. `argus mastodon <target>` reads the instance account
+lookup: profile, counts, flags, and profile fields. All four are on
+the local API (`/v1/keybase`, `/v1/steam`, `/v1/bluesky`,
+`/v1/mastodon`) and the MCP tool list. The `user` table keybase check
+no longer reads a missing account as a hit.
+
+The next batch adds four more. `argus reddit <user>` reads the Arctic
+Shift archive (Reddit's own JSON refuses datacenter clients) for
+karma, archive counts, earliest and latest activity, recent posts and
+comments, and the subreddits in the recent window. A busy archive
+moment retries once and then reports inconclusive instead of a false
+miss. `argus youtube <target>` resolves videos through oembed and
+channels through the public page header (title, handle, subscribers,
+video count, verification) plus the Atom feed (channel date, recent
+uploads with views). `argus tiktok <target>` resolves videos through
+oembed and profiles through the page rehydration blob (counts, flags,
+bio links), reporting a challenge page as inconclusive.
+`argus lemmy <target>` reads the instance v3 API: person view,
+counts, flags, moderated communities, and recent posts and comments.
+They join the local API (`/v1/reddit`, `/v1/youtube`, `/v1/tiktok`,
+`/v1/lemmy`) and the MCP tool list. The public page fetcher now
+refuses credentials only in the authority, so `@handle` paths work,
+and keeps a larger capped body for heavy pages.
+
+`argus watch` grows posture monitoring: `--domain` diffs CT names,
+DNS records, security headers, and RDAP registrar/expiry each cycle
+and warns once per approaching expiry; `--typo` alerts when a
+lookalike of a watched domain goes live; `--gh-events` polls the org
+event feed for public flips, repo creates/deletes, member adds, and
+before-SHA mismatches (likely force pushes), auto-scanning new or
+public repos; `--kev` alerts when a watched dep matches a new CISA
+KEV product; `--code-watch` polls GitHub code search queries.
+
 Attestation gets identity pinning and a new emit path: `--expect-repo`,
 `--expect-identity`, and `--expect-issuer` turn a VERIFIED bundle into
 FAIL when it attests the wrong thing; `--emit-attestation` writes an

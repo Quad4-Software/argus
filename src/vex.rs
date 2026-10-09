@@ -4,7 +4,7 @@
 //! OpenVEX support: ingest a VEX document to suppress/annotate findings,
 //! and emit VEX documents for the vulns a scan found.
 //!
-//! Spec: https://github.com/openvex/spec - statements carry
+//! Spec: <https://github.com/openvex/spec> - statements carry
 //! {vulnerability: {name}, products: [...], status, justification}.
 //! Statuses: not_affected | affected | fixed | under_investigation.
 

@@ -339,7 +339,7 @@ fn resolve_cves(http: &HttpClient, ids: &[String]) -> HashMap<String, Vec<String
     out
 }
 
-/// Append [KEV] / [EPSS x.xx pNN] markers to advisory findings and bump
+/// Append \[KEV\] / \[EPSS x.xx pNN\] markers to advisory findings and bump
 /// KEV-listed hits to at least High. Findings keep their field schema;
 /// the advisory id is read from rule_id. Skipped entirely by callers
 /// under --no-enrich / --offline.

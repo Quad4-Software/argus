@@ -14,6 +14,7 @@ pub mod host_cmd;
 pub mod misc;
 pub mod osint_cmd;
 pub mod remote;
+pub(crate) mod revive;
 pub mod sandbox_apply;
 pub mod watcher;
 

@@ -69,6 +69,46 @@ pub fn modules() -> &'static [Module] {
             about: "Small public username table",
         },
         Module {
+            name: "keybase",
+            group: "osint",
+            about: "Profile, proofs, and the device list",
+        },
+        Module {
+            name: "steam",
+            group: "osint",
+            about: "Public Steam community profile",
+        },
+        Module {
+            name: "bluesky",
+            group: "osint",
+            about: "Public Bluesky profile",
+        },
+        Module {
+            name: "mastodon",
+            group: "osint",
+            about: "Public Mastodon account",
+        },
+        Module {
+            name: "reddit",
+            group: "osint",
+            about: "Archive karma and recent activity",
+        },
+        Module {
+            name: "youtube",
+            group: "osint",
+            about: "Public video and channel metadata",
+        },
+        Module {
+            name: "tiktok",
+            group: "osint",
+            about: "Public video and profile metadata",
+        },
+        Module {
+            name: "lemmy",
+            group: "osint",
+            about: "Public Lemmy account",
+        },
+        Module {
             name: "dork",
             group: "osint",
             about: "Search links only, no fetch",
@@ -87,6 +127,16 @@ pub fn modules() -> &'static [Module] {
             name: "gitmeta",
             group: "osint",
             about: "Git names, emails, exposed HEAD",
+        },
+        Module {
+            name: "gharchive",
+            group: "osint",
+            about: "Public GitHub event firehose filter",
+        },
+        Module {
+            name: "typo",
+            group: "osint",
+            about: "Lookalike domain permutations, DNS liveness",
         },
         Module {
             name: "extract",

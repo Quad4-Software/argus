@@ -6,10 +6,12 @@
 //!
 //! Entries look like:
 //!
-//!     SEC-001                      suppress rule everywhere
-//!     SEC-001 tests/fixtures/**    suppress rule under a glob
-//!     * vendor/                    suppress everything under a path
-//!     SEC-001 .github/workflows/ci.yml
+//! ```text
+//! SEC-001                      suppress rule everywhere
+//! SEC-001 tests/fixtures/**    suppress rule under a glob
+//! * vendor/                    suppress everything under a path
+//! SEC-001 .github/workflows/ci.yml
+//! ```
 //!
 //! The file is read from each scanned root (and cwd for non-path scans).
 

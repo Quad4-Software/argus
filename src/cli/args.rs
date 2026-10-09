@@ -124,6 +124,27 @@ pub struct WatchArgs {
     /// Extra directory to include in --agent-surface (repeatable).
     #[arg(long)]
     pub agent_dir: Vec<PathBuf>,
+    /// Domain to posture-watch each cycle (repeatable): CT names, DNS
+    /// records, security headers, RDAP registrar and expiry, cert expiry.
+    #[arg(long)]
+    pub domain: Vec<String>,
+    /// Poll the GitHub org events feed (with --org, github only). Flags
+    /// repos flipped public, new/deleted repos, member adds, and pushes
+    /// whose before-SHA does not match the last seen head.
+    #[arg(long)]
+    pub gh_events: bool,
+    /// Resolve lookalike permutations of each --domain and alert when a
+    /// new one goes live (dnstwist-style, DNS only).
+    #[arg(long)]
+    pub typo: bool,
+    /// Poll the CISA KEV feed; alert when a watched dep name matches a
+    /// newly-listed exploited product.
+    #[arg(long)]
+    pub kev: bool,
+    /// GitHub code search query to poll for new results each cycle
+    /// (repeatable, needs a token).
+    #[arg(long)]
+    pub code_watch: Vec<String>,
 }
 
 #[derive(Args)]
@@ -180,4 +201,31 @@ pub struct RemoteArgs {
 #[derive(Args)]
 pub struct CompletionsArgs {
     pub shell: clap_complete::Shell,
+}
+
+/// GHArchive firehose filter (data.gharchive.org hourly event dumps).
+#[derive(Args)]
+pub struct GharchiveArgs {
+    /// Org login: matches the event org or the repo owner.
+    #[arg(long, conflicts_with_all = ["user", "repo"])]
+    pub org: Option<String>,
+    /// User login: matches the event actor or the repo owner.
+    #[arg(long)]
+    pub user: Option<String>,
+    /// Repo owner/name: matches the repo name exactly.
+    #[arg(long)]
+    pub repo: Option<String>,
+    /// Hours of history to download and filter (1-168, ~5-300 MB each).
+    #[arg(long, default_value = "3")]
+    pub hours: u32,
+    /// Keep only these event kinds, comma list such as Push,Public,Delete.
+    #[arg(long)]
+    pub events: Option<String>,
+    /// Fetch each observed push SHA from the repo and scan it. Recovers
+    /// commits that were force-pushed away (GitHub serves any live SHA).
+    #[arg(long)]
+    pub fetch: bool,
+    /// Cap commits fetched+scanned with --fetch.
+    #[arg(long, default_value = "10")]
+    pub fetch_max: usize,
 }

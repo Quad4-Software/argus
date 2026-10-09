@@ -55,7 +55,11 @@ const SITES: &[Site] = &[
             if status != 200 {
                 return Status::Inconclusive;
             }
-            if body.contains("\"them\":[]") || body.contains("\"them\":null") {
+            if body.contains("\"them\":[]")
+                || body.contains("\"them\":null")
+                || body.contains("\"them\":[null]")
+                || body.contains("NOT_FOUND")
+            {
                 Status::Absent
             } else if body.contains("\"them\"") {
                 Status::Confirmed
