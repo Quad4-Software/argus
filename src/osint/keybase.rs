@@ -155,7 +155,7 @@ fn device_hits(them: &Value) -> Vec<Hit> {
             ));
         }
     }
-    devices.sort_by(|a, b| b.0.cmp(&a.0));
+    devices.sort_by_key(|a| std::cmp::Reverse(a.0));
     let list: Vec<Value> = devices.into_iter().map(|(_, v)| v).collect();
     let mut out = Vec::new();
     if list.is_empty() {
