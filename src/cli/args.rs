@@ -229,3 +229,48 @@ pub struct GharchiveArgs {
     #[arg(long, default_value = "10")]
     pub fetch_max: usize,
 }
+
+/// Host CVE scanner: passive external fingerprinting or local install
+/// inventory against the bundled advisory database.
+#[derive(Args)]
+pub struct CveArgs {
+    /// Hosts, host:port, or http(s) URLs. Empty means --local.
+    pub targets: Vec<String>,
+    /// File with one target per line.
+    #[arg(long)]
+    pub file: Option<PathBuf>,
+    /// Scan this host's installs instead of remote targets.
+    #[arg(long)]
+    pub local: bool,
+    /// Scan a mounted filesystem or unpacked image offline; nothing is
+    /// executed and no containers are inspected.
+    #[arg(long)]
+    pub root: Option<PathBuf>,
+    /// Comma list or ranges for external mode (default: common web ports).
+    #[arg(long)]
+    pub ports: Option<String>,
+    /// Parallel target workers.
+    #[arg(long, default_value = "32")]
+    pub jobs: usize,
+    /// Extra advisory TOML file; later entries with the same id override
+    /// (repeatable).
+    #[arg(long)]
+    pub db: Vec<PathBuf>,
+    /// Limit to these products: nginx, php, brotli, httpd, traefik, caddy
+    /// (repeatable).
+    #[arg(long)]
+    pub product: Vec<String>,
+    /// Print the merged advisory database and exit.
+    #[arg(long)]
+    pub list: bool,
+    /// Skip container image version checks in local mode.
+    #[arg(long)]
+    pub no_containers: bool,
+}
+
+impl CveArgs {
+    /// True when the scan talks to remote targets.
+    pub fn external(&self) -> bool {
+        !self.local && self.root.is_none() && (!self.targets.is_empty() || self.file.is_some())
+    }
+}

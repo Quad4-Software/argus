@@ -12,6 +12,7 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         || cli.check_runs
         || cli.verify_secrets
         || cfg_needs_net(&cli.cmd)
+        || matches!(&cli.cmd, Cmd::Cve(a) if a.external())
         || matches!(
             cli.cmd,
             Cmd::Daemon(_)
@@ -366,6 +367,20 @@ pub(crate) fn apply_sandbox(cli: &Cli, opts: &ScanOptions) {
         Cmd::Meta { path } => sb.reads.push(path.clone()),
         Cmd::Extract { target } if !crate::cli::is_http_target(target) => {
             sb.reads.push(PathBuf::from(target));
+        }
+        Cmd::Cve(a) => {
+            if let Some(r) = &a.root {
+                sb.reads.push(r.clone());
+            } else if a.local || !a.external() {
+                // local mode reads the whole host
+                sb.reads.push("/".into());
+            }
+            for d in &a.db {
+                sb.reads.push(d.clone());
+            }
+            if let Some(f) = &a.file {
+                sb.reads.push(f.clone());
+            }
         }
         _ => {}
     }

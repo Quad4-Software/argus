@@ -38,6 +38,7 @@ argus hash <sha256>              # CIRCL hashlookup, optional MalwareBazaar
 argus url https://quad4.io       # fetch, redirects, WAF and challenge markers
 argus ports 127.0.0.1 --ports 22 # TCP connect, modern ports first
 argus system                     # Lynis-class host audit
+argus cve                        # installed/advertised versions vs advisory db
 argus scan . --osv --dep-check   # + dependency advisories and hygiene
 argus account github octocat    # public profile, repos, stars, recent events
 argus gharchive --org my-org    # public event firehose, push SHAs, repo flips

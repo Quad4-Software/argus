@@ -118,6 +118,7 @@ pub use keybase::scan as scan_keybase;
 pub use lemmy::scan as scan_lemmy;
 pub use mastodon::scan as scan_mastodon;
 pub use meta::scan as scan_meta;
+pub(crate) use ports::parse_spec as parse_port_spec;
 pub use ports::scan as scan_ports;
 pub use reddit::scan as scan_reddit;
 pub use siteurl::scan as scan_url;

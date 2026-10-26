@@ -82,6 +82,17 @@ new hashes through `rules-update`.
 These match text. They do not parse an AST, and they do not prove broken
 access control, insecure design, or prompt injection.
 
+## CVE advisory data
+
+`argus cve` embeds two data files. `rules/data/cve-web.toml` is
+hand-curated advisories for nginx, PHP, Brotli and Apache httpd with
+per-advisory `needs` config probes and `scope` fields.
+`rules/data/cve-ghsa.toml` is generated for Traefik and Caddy by
+`python3 scripts/build_cve_db.py > rules/data/cve-ghsa.toml`. Both
+follow the same `[[advisory]]` schema. The database is fixed at build
+time; pass `--db file.toml` to merge newer advisories (later entries
+with the same id override).
+
 ## The corpus
 
 `tests/corpus/<case>/` holds one fixture plus `expected.txt` with rule

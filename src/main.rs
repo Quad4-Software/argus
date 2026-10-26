@@ -19,6 +19,7 @@ mod codec;
 mod color;
 mod config;
 mod container_audit;
+mod cve;
 mod daemon;
 mod db;
 mod depcheck;
@@ -524,6 +525,12 @@ fn run(cli: &Cli) -> Result<ExitCode, String> {
         }
         Cmd::Daemon(a) => {
             return daemon_cmd(cli, a, &cfg, &rules, &opts);
+        }
+        Cmd::Cve(a) => {
+            if a.list {
+                return cve::print_db(a);
+            }
+            cve::run(a, &mut report)?;
         }
         Cmd::System { extra } => {
             report.findings.extend(sysaudit::audit());

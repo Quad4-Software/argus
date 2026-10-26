@@ -194,6 +194,11 @@ pub fn modules() -> &'static [Module] {
             about: "Preload, cron cradles, staging files",
         },
         Module {
+            name: "cve",
+            group: "host",
+            about: "Advisory match on installed/advertised versions",
+        },
+        Module {
             name: "supply",
             group: "local",
             about: "Lockfile closure",

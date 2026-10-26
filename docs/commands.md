@@ -182,6 +182,35 @@ on the CISA known-exploited list as of 18 September 2026. A distribution
 kernel can carry those fixes without the upstream patch number. Firmware
 chip images are not scanned.
 
+## cve [targets...]
+
+Match versions of nginx, PHP, Apache httpd, Brotli, Traefik and Caddy
+against the bundled advisory database. With targets it fingerprints
+remote hosts; without targets (or with `--local`/`--root`) it
+inventories this machine or a mounted tree.
+
+```sh
+argus cve                              # local install inventory
+argus cve example.com                  # passive remote fingerprint
+argus cve https://example.com --ports 443,8443
+argus cve --file hosts.txt --jobs 16
+argus cve --root /mnt/image            # unpacked image, nothing executed
+argus cve --list                       # print the advisory database
+argus cve --db newer.toml --product nginx
+```
+
+External mode only does passive fingerprinting: TCP connect plus a GET
+for headers and a couple of well-known endpoints. No exploit payloads
+are ever sent. Banners on distro builds are downgraded one severity
+level since vendors backport fixes. Local mode reads binaries
+statically, follows nginx/apache/php config to test feature
+reachability (`needs` per advisory), and checks package changelogs for
+vendor backports. `--root` never execs and skips /proc and containers.
+Containerized nginx/php-fpm/traefik/caddy processes are detected via
+mount namespaces, read through /proc/<pid>/exe (which needs root on
+most hosts) and reported with target `container:<image>`; running as a
+normal user still reports them as unreadable rather than wrong.
+
 ## similar &lt;a&gt; [b]
 
 Code similarity scoring using normalized-token winnowing fingerprints

@@ -57,6 +57,7 @@ pub fn scans_files(cmd: &Cmd) -> bool {
             | Cmd::Typo { .. }
             | Cmd::Modules
             | Cmd::Host(_)
+            | Cmd::Cve(_)
     )
 }
 
@@ -141,5 +142,6 @@ pub fn needs_network(cmd: &Cmd) -> bool {
             | Cmd::Typo { .. }
     ) || matches!(cmd, Cmd::Gitmeta { target } if is_http_target(target))
         || matches!(cmd, Cmd::Host(h) if h.needs_network())
+        || matches!(cmd, Cmd::Cve(a) if a.external())
         || matches!(cmd, Cmd::Extract { target } if is_http_target(target))
 }

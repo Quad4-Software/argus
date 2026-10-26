@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+`argus cve` matches installed or advertised versions of nginx, PHP,
+Apache httpd, Brotli, Traefik and Caddy against a bundled advisory
+database (`rules/data/cve-web.toml` curated, `cve-ghsa.toml` generated
+by `scripts/build_cve_db.py`). External targets are fingerprinted
+passively (banners, `/api/version`, the Caddy admin port) with no
+exploit payloads; local mode reads binaries statically, checks feature
+reachability from real configs, and honors vendor backports found in
+dpkg/rpm changelogs. `--root` inspects a mounted tree offline,
+`--db` merges newer advisory files, `--list` prints the database.
+
 `argus gharchive` filters the GHArchive public event firehose:
 `--org`, `--user`, or `--repo` selects a target, `--hours` picks how
 many hourly dumps to stream (1-168), and `--events` narrows event

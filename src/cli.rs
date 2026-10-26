@@ -433,6 +433,10 @@ pub enum Cmd {
         #[arg(long)]
         extra: Vec<PathBuf>,
     },
+    /// Match installed or advertised versions of nginx, PHP, httpd,
+    /// Brotli, Traefik and Caddy against the bundled advisory database.
+    /// External mode only fingerprints banners; no payloads are sent.
+    Cve(CveArgs),
     /// Scan local directories or repository checkouts.
     Scan {
         /// Paths to scan (default: current directory).
